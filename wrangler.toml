@@ -1,3 +1,6 @@
+name = "school-routine-app"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
 
 # D1 Database Binding
 [[d1_databases]]
@@ -9,4 +12,3 @@ database_id = "c5ecdac4-aa6a-4008-b155-588b1e1573d7"
 [[r2_buckets]]
 binding = "BUCKET"
 bucket_name = "routine"
-
