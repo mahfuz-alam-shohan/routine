@@ -1,45 +1,68 @@
-import { htmlResponse, getCookie } from '../core/utils.js'; // Import getCookie
+import { htmlResponse, jsonResponse, getCookie } from '../core/utils.js';
 import { InstituteLayout } from '../ui/institute/layout.js';
 import { InstituteDashboardHTML } from '../ui/institute/dashboard.js';
+import { TeachersPageHTML } from '../ui/institute/teachers.js'; // <--- Import UI
 
 export async function handleInstituteRequest(request, env) {
   const url = new URL(request.url);
 
-  // 1. IDENTIFY THE SCHOOL
-  // We read the email from the cookie we just saved in login
+  // 1. AUTH & CONTEXT (Find the school_id)
   const email = getCookie(request, 'user_email');
-  let schoolName = "School Portal"; // Default fallback
-  let stats = { teachers: 0, classes: 0 };
+  if (!email) return new Response("Session Expired", { status: 403 });
 
-  if (email) {
-      // Fetch the School Profile linked to this email
-      const profile = await env.DB.prepare(`
-          SELECT p.school_name 
-          FROM profiles_institution p
-          JOIN auth_accounts a ON p.auth_id = a.id
-          WHERE a.email = ?
-      `).bind(email).first();
+  // Fetch School ID and Name
+  const schoolProfile = await env.DB.prepare(`
+      SELECT p.id, p.school_name 
+      FROM profiles_institution p
+      JOIN auth_accounts a ON p.auth_id = a.id
+      WHERE a.email = ?
+  `).bind(email).first();
 
-      if (profile) {
-          schoolName = profile.school_name;
-      }
-  }
+  if (!schoolProfile) return new Response("School Not Found", { status: 404 });
+  
+  const { id: schoolId, school_name: schoolName } = schoolProfile;
 
-  // --- SUB-ROUTE: DASHBOARD ---
+
+  // --- ROUTE: DASHBOARD ---
   if (url.pathname === '/school/dashboard') {
-    const content = InstituteDashboardHTML(stats);
-    return htmlResponse(InstituteLayout(content, "Dashboard", schoolName));
+    // Get Real Stats
+    const tCount = await env.DB.prepare("SELECT count(*) as count FROM profiles_teacher WHERE school_id = ?").bind(schoolId).first();
+    // (Classes table doesn't exist yet, so we mock it as 0)
+    
+    const stats = { teachers: tCount.count, classes: 0 };
+    return htmlResponse(InstituteLayout(InstituteDashboardHTML(stats), "Dashboard", schoolName));
   }
 
-  // --- SUB-ROUTE: TEACHERS ---
+
+  // --- ROUTE: TEACHERS ---
   if (url.pathname === '/school/teachers') {
-      return htmlResponse(InstituteLayout("<h1>Teachers Page (Coming Next)</h1>", "Teachers", schoolName));
+      
+      // POST: Add Teacher
+      if (request.method === 'POST') {
+          try {
+              const body = await request.json();
+              if(!body.full_name) return jsonResponse({error:"Name required"}, 400);
+
+              await env.DB.prepare("INSERT INTO profiles_teacher (school_id, full_name, phone) VALUES (?, ?, ?)")
+                .bind(schoolId, body.full_name, body.phone || '')
+                .run();
+              
+              return jsonResponse({ success: true });
+          } catch(e) {
+              return jsonResponse({ error: e.message }, 500);
+          }
+      }
+
+      // GET: List Teachers
+      const teachers = await env.DB.prepare("SELECT * FROM profiles_teacher WHERE school_id = ? ORDER BY id DESC").bind(schoolId).all();
+      return htmlResponse(InstituteLayout(TeachersPageHTML(teachers.results), "Teachers", schoolName));
   }
 
-  // --- SUB-ROUTE: CLASSES ---
+
+  // --- ROUTE: CLASSES (Placeholder) ---
   if (url.pathname === '/school/classes') {
       return htmlResponse(InstituteLayout("<h1>Classes Page (Coming Next)</h1>", "Classes", schoolName));
   }
 
-  return new Response("School Page Not Found", { status: 404 });
+  return new Response("Page Not Found", { status: 404 });
 }
