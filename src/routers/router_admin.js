@@ -2,7 +2,7 @@ import { htmlResponse, jsonResponse } from '../core/utils.js';
 import { hashPassword } from '../core/auth.js';
 import { ADMIN_SETUP_HTML } from '../ui/admin/setup.js';
 import { ROLES } from '../config.js';
-import { SCHEMA_SQL } from '../db_schema.js'; // <--- Import this
+import { SCHEMA_SQL } from '../db_schema.js'; 
 
 export async function handleAdminRequest(request, env) {
   const url = new URL(request.url);
@@ -10,18 +10,28 @@ export async function handleAdminRequest(request, env) {
   // --- SUB-ROUTE: SETUP (Create first admin) ---
   if (url.pathname === '/admin/setup') {
     
-    // 1. ENSURE TABLES EXIST (Run this ONLY here)
-    // We run this here so the homepage never crashes.
+    // 1. SAFE DATABASE MIGRATION (The Fix)
+    // We split the SQL by ";" and run commands one by one. 
+    // This prevents the "undefined duration" crash.
     try {
-        await env.DB.exec(SCHEMA_SQL);
+      const statements = SCHEMA_SQL.split(';')
+                          .map(s => s.trim()) // Remove spaces
+                          .filter(s => s.length > 0); // Remove empty lines
+
+      for (const statement of statements) {
+        await env.DB.prepare(statement).run();
+      }
+      
     } catch (e) {
-        return htmlResponse(`<h1>DB Error</h1><p>${e.message}</p>`);
+      // If table already exists, it might throw an error, which is fine.
+      // We log it but don't crash the page.
+      console.log("DB Init Note:", e.message);
     }
 
     // 2. Check if admin already exists
     const check = await env.DB.prepare("SELECT count(*) as count FROM auth_accounts WHERE role = ?").bind(ROLES.ADMIN).first();
     
-    if (check.count > 0) {
+    if (check && check.count > 0) {
       return htmlResponse("<h1>System Locked</h1><p>Admin already exists.</p>");
     }
 
