@@ -1,0 +1,12 @@
+
+# D1 Database Binding
+[[d1_databases]]
+binding = "DB"
+database_name = "routine"
+database_id = "c5ecdac4-aa6a-4008-b155-588b1e1573d7"
+
+# R2 Bucket Binding
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "routine"
+
