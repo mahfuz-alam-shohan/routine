@@ -1,16 +1,20 @@
 import { htmlResponse, jsonResponse, getCookie } from '../core/utils.js';
 import { InstituteLayout } from '../ui/institute/layout.js';
 import { InstituteDashboardHTML } from '../ui/institute/dashboard.js';
-import { TeachersPageHTML } from '../ui/institute/teachers.js'; // <--- Import UI
+import { TeachersPageHTML } from '../ui/institute/teachers.js'; 
 
 export async function handleInstituteRequest(request, env) {
   const url = new URL(request.url);
 
-  // 1. AUTH & CONTEXT (Find the school_id)
+  // 1. AUTH CHECK
   const email = getCookie(request, 'user_email');
-  if (!email) return new Response("Session Expired", { status: 403 });
+  
+  // UX FIX: If no session, redirect to Login instead of crashing
+  if (!email) {
+      return Response.redirect(new URL('/login', request.url), 302);
+  }
 
-  // Fetch School ID and Name
+  // 2. CONTEXT (Find the school_id)
   const schoolProfile = await env.DB.prepare(`
       SELECT p.id, p.school_name 
       FROM profiles_institution p
@@ -18,17 +22,14 @@ export async function handleInstituteRequest(request, env) {
       WHERE a.email = ?
   `).bind(email).first();
 
-  if (!schoolProfile) return new Response("School Not Found", { status: 404 });
+  if (!schoolProfile) return new Response("School Profile Not Found. Please contact Admin.", { status: 404 });
   
   const { id: schoolId, school_name: schoolName } = schoolProfile;
 
 
   // --- ROUTE: DASHBOARD ---
   if (url.pathname === '/school/dashboard') {
-    // Get Real Stats
     const tCount = await env.DB.prepare("SELECT count(*) as count FROM profiles_teacher WHERE school_id = ?").bind(schoolId).first();
-    // (Classes table doesn't exist yet, so we mock it as 0)
-    
     const stats = { teachers: tCount.count, classes: 0 };
     return htmlResponse(InstituteLayout(InstituteDashboardHTML(stats), "Dashboard", schoolName));
   }
@@ -59,7 +60,7 @@ export async function handleInstituteRequest(request, env) {
   }
 
 
-  // --- ROUTE: CLASSES (Placeholder) ---
+  // --- ROUTE: CLASSES ---
   if (url.pathname === '/school/classes') {
       return htmlResponse(InstituteLayout("<h1>Classes Page (Coming Next)</h1>", "Classes", schoolName));
   }

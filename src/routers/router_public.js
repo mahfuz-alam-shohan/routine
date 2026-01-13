@@ -31,11 +31,9 @@ export async function handlePublicRequest(request, env) {
 
             // 3. Login Success (Set Cookies)
             const headers = new Headers();
-            // Store Role
+            // CRITICAL: We need all 3 of these
             headers.append("Set-Cookie", `user_role=${user.role}; Path=/; HttpOnly; Secure; SameSite=Strict`);
-            // Store Email (NEW! We need this to identify the school later)
-            headers.append("Set-Cookie", `user_email=${user.email}; Path=/; HttpOnly; Secure; SameSite=Strict`);
-            // Store Status
+            headers.append("Set-Cookie", `user_email=${user.email}; Path=/; HttpOnly; Secure; SameSite=Strict`); 
             headers.append("Set-Cookie", `auth_status=active; Path=/; HttpOnly; Secure; SameSite=Strict`);
 
             return new Response(JSON.stringify({ success: true, role: user.role }), {
@@ -51,14 +49,13 @@ export async function handlePublicRequest(request, env) {
     return htmlResponse(PublicLayout(LOGIN_HTML, "Login - RoutineAI"));
   }
 
-  // --- LOGOUT (NEW!) ---
+  // --- LOGOUT ---
   if (url.pathname === '/logout') {
-    // We "delete" cookies by setting them to expire in the past
     const headers = new Headers();
     headers.append("Set-Cookie", "user_role=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
     headers.append("Set-Cookie", "user_email=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
     headers.append("Set-Cookie", "auth_status=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
-    headers.append("Location", "/login"); // Redirect to login
+    headers.append("Location", "/login"); 
 
     return new Response("Logging out...", { status: 302, headers: headers });
   }
