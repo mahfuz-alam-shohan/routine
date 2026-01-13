@@ -3,12 +3,9 @@ export const LOGIN_HTML = `
   <div class="max-w-md w-full space-y-8">
     <div>
       <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Sign in</h2>
-      <p class="mt-2 text-center text-sm text-gray-600">
-        <a href="/" class="font-medium text-blue-600 hover:text-blue-500">Back to Home</a>
-      </p>
     </div>
     
-    <form class="mt-8 space-y-6" onsubmit="handleLogin(event)">
+    <form id="loginForm" class="mt-8 space-y-6">
       <div class="rounded-md shadow-sm -space-y-px">
         <div>
           <label for="email" class="sr-only">Email address</label>
@@ -32,8 +29,10 @@ export const LOGIN_HTML = `
 </div>
 
 <script>
-  async function handleLogin(e) {
-    e.preventDefault();
+  // 1. Attach Event Listener Manually (More Robust)
+  document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault(); // STOP THE REFRESH
+    
     const btn = document.getElementById('login-btn');
     const msg = document.getElementById('error-msg');
     
@@ -56,31 +55,27 @@ export const LOGIN_HTML = `
       if (result.success) {
         btn.innerText = "Redirecting...";
         
-        // --- DIAGNOSTIC CHECK ---
+        // Lowercase check to fix the "Redirect to Home" bug
         const role = (result.role || '').toLowerCase().trim();
-        console.log("Server Role:", role); // See console for debug
 
         if (role === 'admin') {
             window.location.href = '/admin/dashboard';
-        } 
-        else if (role === 'institute' || role === 'school') {
+        } else if (role === 'institute' || role === 'school') {
             window.location.href = '/school/dashboard';
-        } 
-        else {
-            // IF WE HIT THIS, WE KNOW THE PROBLEM
-            alert("Login Successful, but Role is unknown: '" + result.role + "'");
-            btn.innerText = "Sign in";
-            btn.disabled = false;
+        } else {
+            alert("Login OK, but Role Unknown: " + role);
+            window.location.href = '/';
         }
       } else {
         throw new Error(result.error || "Login failed");
       }
     } catch (err) {
-      msg.innerText = err.message;
+      console.error(err);
+      msg.innerText = err.message || "Connection Error";
       msg.classList.remove('hidden');
       btn.innerText = "Sign in";
       btn.disabled = false;
     }
-  }
+  });
 </script>
 `;
