@@ -1,7 +1,6 @@
 export function SchoolsPageHTML(schoolsList = []) {
-  // Generate Rows
   const rows = schoolsList.map(school => `
-    <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
+    <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0 group">
         <td class="px-6 py-4 whitespace-nowrap">
             <div class="text-sm font-medium text-gray-900">${school.school_name}</div>
             <div class="text-xs text-gray-500 md:hidden">EIIN: ${school.eiin_code || 'N/A'}</div>
@@ -12,6 +11,11 @@ export function SchoolsPageHTML(schoolsList = []) {
             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                 Active
             </span>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <a href="/admin/school/view?id=${school.auth_id}" class="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-md transition-colors">
+                Manage
+            </a>
         </td>
     </tr>
   `).join('');
@@ -32,17 +36,19 @@ export function SchoolsPageHTML(schoolsList = []) {
         </div>
 
         <div id="list-view" class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
-            <div class="overflow-x-auto"> <table class="min-w-full divide-y divide-gray-200">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">School Name</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">EIIN Code</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin Email</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
-                        ${rows.length > 0 ? rows : '<tr><td colspan="4" class="px-6 py-12 text-center text-gray-500">No schools found. <br><span class="text-sm">Click "Add New School" to create one.</span></td></tr>'}
+                        ${rows.length > 0 ? rows : '<tr><td colspan="5" class="px-6 py-12 text-center text-gray-500">No schools found. <br><span class="text-sm">Click "Add New School" to create one.</span></td></tr>'}
                     </tbody>
                 </table>
             </div>

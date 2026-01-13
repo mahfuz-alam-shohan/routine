@@ -4,14 +4,13 @@ import { hashPassword } from '../core/auth.js';
 import { ADMIN_SETUP_HTML } from '../ui/admin/setup.js';
 import { AdminLayout } from '../ui/admin/layout.js';
 import { SettingsPageHTML } from '../ui/admin/settings.js';
-import { SchoolsPageHTML } from '../ui/admin/schools.js'; // <--- New Import
+import { SchoolsPageHTML } from '../ui/admin/schools.js'; 
+import { SchoolDetailHTML } from '../ui/admin/school_detail.js'; // <--- NEW IMPORT
 import { ROLES } from '../config.js';
 import { syncDatabase } from '../core/schema_manager.js';
 
 export async function handleAdminRequest(request, env) {
   const url = new URL(request.url);
-
-  // 1. FETCH COMPANY NAME (For the Sidebar)
   const companyName = await getCompanyName(env);
 
   // --- SUB-ROUTE: DASHBOARD ---
@@ -31,94 +30,63 @@ export async function handleAdminRequest(request, env) {
             <p class="text-2xl font-bold text-green-600">Healthy</p>
         </div>
     </div>
-
-    <div class="p-6 bg-white rounded shadow">
-        <h3 class="text-lg font-bold mb-2">Welcome to ${companyName}</h3>
-        <p class="text-gray-600">This is the Super Admin control panel. Here you will add schools (clients) in the future.</p>
-    </div>`;
-    
+    <div class="p-6 bg-white rounded shadow"><h3 class="text-lg font-bold mb-2">Welcome to ${companyName}</h3></div>`;
     return htmlResponse(AdminLayout(content, "Super Admin Dashboard", companyName));
   }
 
 
   // --- SUB-ROUTE: MANAGE SCHOOLS ---
   if (url.pathname === '/admin/schools') {
-    
-    // POST: Create New School
     if (request.method === 'POST') {
         try {
             const body = await request.json();
-            
-            // 1. Validation
-            if (!body.email || !body.password || !body.school_name) {
-                return jsonResponse({ error: "Missing required fields" }, 400);
-            }
-
-            // 2. Check if Email Exists
+            if (!body.email || !body.password || !body.school_name) return jsonResponse({ error: "Missing required fields" }, 400);
             const exists = await env.DB.prepare("SELECT id FROM auth_accounts WHERE email = ?").bind(body.email).first();
             if (exists) return jsonResponse({ error: "Email already registered" }, 400);
 
-            // 3. Create Auth Account (Role = INSTITUTE)
             const { hash, salt } = await hashPassword(body.password);
-            
-            // We use RETURNING id to get the new user's ID immediately
-            const authResult = await env.DB.prepare(
-                "INSERT INTO auth_accounts (email, password_hash, salt, role) VALUES (?, ?, ?, ?) RETURNING id"
-            ).bind(body.email, hash, salt, ROLES.INSTITUTE).first();
-
-            // 4. Create School Profile
-            await env.DB.prepare(
-                "INSERT INTO profiles_institution (auth_id, school_name, eiin_code, address) VALUES (?, ?, ?, ?)"
-            ).bind(authResult.id, body.school_name, body.eiin || '', body.address || '').run();
-
+            const authResult = await env.DB.prepare("INSERT INTO auth_accounts (email, password_hash, salt, role) VALUES (?, ?, ?, ?) RETURNING id").bind(body.email, hash, salt, ROLES.INSTITUTE).first();
+            await env.DB.prepare("INSERT INTO profiles_institution (auth_id, school_name, eiin_code, address) VALUES (?, ?, ?, ?)").bind(authResult.id, body.school_name, body.eiin || '', body.address || '').run();
             return jsonResponse({ success: true });
-
-        } catch(e) {
-            return jsonResponse({ error: e.message }, 500);
-        }
+        } catch(e) { return jsonResponse({ error: e.message }, 500); }
     }
-
-    // GET: List Schools
+    // GET List
     try {
-        const result = await env.DB.prepare(`
-            SELECT 
-                p.school_name, 
-                p.eiin_code, 
-                a.email 
-            FROM profiles_institution p
-            JOIN auth_accounts a ON p.auth_id = a.id
-            ORDER BY p.id DESC
-        `).all();
-
+        const result = await env.DB.prepare(`SELECT p.auth_id, p.school_name, p.eiin_code, a.email FROM profiles_institution p JOIN auth_accounts a ON p.auth_id = a.id ORDER BY p.id DESC`).all();
         const content = SchoolsPageHTML(result.results || []);
         return htmlResponse(AdminLayout(content, "Manage Schools", companyName));
-    } catch (e) {
-        return htmlResponse(AdminLayout(`<h1>Error loading schools</h1><p>${e.message}</p>`, "Error", companyName));
-    }
+    } catch (e) { return htmlResponse(AdminLayout(`<h1>Error loading schools</h1><p>${e.message}</p>`, "Error", companyName)); }
   }
 
 
-  // --- SUB-ROUTE: SETTINGS (Platform Name) ---
+  // --- SUB-ROUTE: SCHOOL MASTER VIEW (NEW) ---
+  if (url.pathname === '/admin/school/view') {
+    const schoolId = url.searchParams.get('id');
+    if (!schoolId) return htmlResponse("<h1>Invalid School ID</h1>");
+
+    // Fetch School Data by Auth ID
+    const school = await env.DB.prepare(`
+        SELECT p.*, a.email, a.created_at 
+        FROM profiles_institution p 
+        JOIN auth_accounts a ON p.auth_id = a.id 
+        WHERE a.id = ?
+    `).bind(schoolId).first();
+
+    if (!school) return htmlResponse("<h1>School Not Found</h1>");
+
+    const stats = { teachers: 0, students: 0, routines: 0 }; // Mock stats
+    const content = SchoolDetailHTML(school, stats);
+    return htmlResponse(AdminLayout(content, "School Overview", companyName));
+  }
+
+
+  // --- SUB-ROUTE: SETTINGS ---
   if (url.pathname === '/admin/settings') {
-    
-    // Action: Sync DB
-    if (url.searchParams.get('action') === 'sync_db') {
-        const report = await syncDatabase(env);
-        return jsonResponse({ success: true, report: report });
-    }
-
-    // POST: Save Company Name
+    if (url.searchParams.get('action') === 'sync_db') { const report = await syncDatabase(env); return jsonResponse({ success: true, report: report }); }
     if (request.method === 'POST') {
-        try {
-            const body = await request.json();
-            await env.DB.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('site_name', ?)").bind(body.site_name).run();
-            return jsonResponse({ success: true });
-        } catch(e) {
-            return jsonResponse({ error: e.message }, 500);
-        }
+        try { const body = await request.json(); await env.DB.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('site_name', ?)").bind(body.site_name).run(); return jsonResponse({ success: true }); } 
+        catch(e) { return jsonResponse({ error: e.message }, 500); }
     }
-
-    // GET: Show Page
     const content = SettingsPageHTML(companyName);
     return htmlResponse(AdminLayout(content, "Platform Settings", companyName));
   }
@@ -127,7 +95,6 @@ export async function handleAdminRequest(request, env) {
   // --- SUB-ROUTE: SETUP ---
   if (url.pathname === '/admin/setup') {
     try { await syncDatabase(env); } catch (e) {}
-
     const check = await env.DB.prepare("SELECT count(*) as count FROM auth_accounts WHERE role = ?").bind(ROLES.ADMIN).first();
     if (check && check.count > 0) return htmlResponse("<h1>System Locked</h1><p>Admin already exists.</p>");
 
@@ -135,16 +102,10 @@ export async function handleAdminRequest(request, env) {
       try {
         const { email, password } = await request.json();
         const { hash, salt } = await hashPassword(password);
-        
         await env.DB.prepare("INSERT INTO auth_accounts (email, password_hash, salt, role) VALUES (?, ?, ?, ?)").bind(email, hash, salt, ROLES.ADMIN).run();
-        
-        // Default Company Name
         await env.DB.prepare("INSERT OR IGNORE INTO system_settings (key, value) VALUES ('site_name', 'Routine SaaS')").run();
-        
         return jsonResponse({ success: true });
-      } catch (e) {
-        return jsonResponse({ error: e.message }, 500);
-      }
+      } catch (e) { return jsonResponse({ error: e.message }, 500); }
     }
     return htmlResponse(ADMIN_SETUP_HTML);
   }
