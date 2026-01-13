@@ -2,31 +2,26 @@ export const LOGIN_HTML = `
 <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
   <div class="max-w-md w-full space-y-8">
     <div>
-      <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Sign in to your account</h2>
+      <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Sign in</h2>
       <p class="mt-2 text-center text-sm text-gray-600">
-        Or <a href="/" class="font-medium text-blue-600 hover:text-blue-500">return home</a>
+        <a href="/" class="font-medium text-blue-600 hover:text-blue-500">Back to Home</a>
       </p>
     </div>
     
     <form class="mt-8 space-y-6" onsubmit="handleLogin(event)">
       <div class="rounded-md shadow-sm -space-y-px">
         <div>
-          <label for="email-address" class="sr-only">Email address</label>
-          <input id="email-address" name="email" type="email" autocomplete="email" required 
-            class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" 
-            placeholder="Email address">
+          <label for="email" class="sr-only">Email address</label>
+          <input id="email" name="email" type="email" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="Email address">
         </div>
         <div>
           <label for="password" class="sr-only">Password</label>
-          <input id="password" name="password" type="password" autocomplete="current-password" required 
-            class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" 
-            placeholder="Password">
+          <input id="password" name="password" type="password" required class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="Password">
         </div>
       </div>
 
       <div>
-        <button type="submit" id="login-btn" 
-          class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+        <button type="submit" id="login-btn" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
           Sign in
         </button>
       </div>
@@ -38,13 +33,11 @@ export const LOGIN_HTML = `
 
 <script>
   async function handleLogin(e) {
-    e.preventDefault(); 
-    
+    e.preventDefault();
     const btn = document.getElementById('login-btn');
     const msg = document.getElementById('error-msg');
-    const originalText = btn.innerText;
     
-    btn.innerText = "Signing in...";
+    btn.innerText = "Checking...";
     btn.disabled = true;
     msg.classList.add('hidden');
 
@@ -63,26 +56,29 @@ export const LOGIN_HTML = `
       if (result.success) {
         btn.innerText = "Redirecting...";
         
-        // --- FIX IS HERE: Convert role to lowercase before checking ---
-        const role = (result.role || '').toLowerCase();
+        // --- DIAGNOSTIC CHECK ---
+        const role = (result.role || '').toLowerCase().trim();
+        console.log("Server Role:", role); // See console for debug
 
         if (role === 'admin') {
             window.location.href = '/admin/dashboard';
-        } else if (role === 'institute') {
+        } 
+        else if (role === 'institute' || role === 'school') {
             window.location.href = '/school/dashboard';
-        } else {
-            // Debugging Help: If it fails, alert us why
-            alert('Login successful, but unknown role: ' + result.role);
-            window.location.href = '/'; 
+        } 
+        else {
+            // IF WE HIT THIS, WE KNOW THE PROBLEM
+            alert("Login Successful, but Role is unknown: '" + result.role + "'");
+            btn.innerText = "Sign in";
+            btn.disabled = false;
         }
       } else {
         throw new Error(result.error || "Login failed");
       }
     } catch (err) {
-      console.error(err);
-      msg.innerText = err.message || "Connection error.";
+      msg.innerText = err.message;
       msg.classList.remove('hidden');
-      btn.innerText = originalText;
+      btn.innerText = "Sign in";
       btn.disabled = false;
     }
   }

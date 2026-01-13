@@ -1,6 +1,11 @@
 export const ROLES = {
-  ADMIN: 'ADMIN',
-  INSTITUTE: 'INSTITUTE',
-  TEACHER: 'TEACHER',
-  STUDENT: 'STUDENT'
+    ADMIN: 'admin',
+    INSTITUTE: 'institute',  // <--- ensuring this is lowercase 'institute'
+    TEACHER: 'teacher',
+    STUDENT: 'student'
+};
+
+export const SITE_CONFIG = {
+    NAME: 'RoutineAI',
+    VERSION: '1.0.0'
 };

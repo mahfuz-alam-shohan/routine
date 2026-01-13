@@ -15,7 +15,6 @@ export async function handlePublicRequest(request, env) {
   // --- LOGIN PAGE ---
   if (url.pathname === '/login') {
     
-    // POST: Handle Login
     if (request.method === 'POST') {
         try {
             const { email, password } = await request.json();
@@ -23,20 +22,21 @@ export async function handlePublicRequest(request, env) {
             // 1. Find User
             const user = await env.DB.prepare("SELECT * FROM auth_accounts WHERE email = ?").bind(email).first();
             
-            if (!user) return jsonResponse({ error: "Invalid credentials" }, 401);
+            if (!user) return jsonResponse({ error: "Account not found" }, 401);
 
             // 2. Verify Password
             const isValid = await verifyPassword(password, user.password_hash, user.salt);
-            if (!isValid) return jsonResponse({ error: "Invalid credentials" }, 401);
+            if (!isValid) return jsonResponse({ error: "Wrong password" }, 401);
 
             // 3. Login Success (Set Cookies)
             const headers = new Headers();
-            // CRITICAL: We need all 3 of these
-            headers.append("Set-Cookie", `user_role=${user.role}; Path=/; HttpOnly; Secure; SameSite=Strict`);
+            const safeRole = user.role || 'unknown'; // Fallback if empty
+
+            headers.append("Set-Cookie", `user_role=${safeRole}; Path=/; HttpOnly; Secure; SameSite=Strict`);
             headers.append("Set-Cookie", `user_email=${user.email}; Path=/; HttpOnly; Secure; SameSite=Strict`); 
             headers.append("Set-Cookie", `auth_status=active; Path=/; HttpOnly; Secure; SameSite=Strict`);
 
-            return new Response(JSON.stringify({ success: true, role: user.role }), {
+            return new Response(JSON.stringify({ success: true, role: safeRole }), {
                 headers: { ...Object.fromEntries(headers), 'Content-Type': 'application/json' }
             });
 
@@ -45,8 +45,7 @@ export async function handlePublicRequest(request, env) {
         }
     }
 
-    // GET: Show Form
-    return htmlResponse(PublicLayout(LOGIN_HTML, "Login - RoutineAI"));
+    return htmlResponse(PublicLayout(LOGIN_HTML, "Login"));
   }
 
   // --- LOGOUT ---
@@ -56,7 +55,6 @@ export async function handlePublicRequest(request, env) {
     headers.append("Set-Cookie", "user_email=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
     headers.append("Set-Cookie", "auth_status=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
     headers.append("Location", "/login"); 
-
     return new Response("Logging out...", { status: 302, headers: headers });
   }
 
