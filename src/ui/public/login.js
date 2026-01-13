@@ -1,81 +1,93 @@
-// src/ui/public/login.js
-
 export const LOGIN_HTML = `
-<div class="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8">
-  <div class="sm:mx-auto sm:w-full sm:max-w-sm">
-    <h2 class="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900">Sign in to your account</h2>
-  </div>
-
-  <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
-    <form class="space-y-6" onsubmit="handleLogin(event)">
-      
-      <div>
-        <label for="email" class="block text-sm font-medium leading-6 text-gray-900">Email address</label>
-        <div class="mt-2">
-          <input id="email" name="email" type="email" autocomplete="email" required class="block w-full rounded-md border-0 p-2 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6">
+<div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-md w-full space-y-8">
+    <div>
+      <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Sign in to your account</h2>
+      <p class="mt-2 text-center text-sm text-gray-600">
+        Or <a href="/" class="font-medium text-blue-600 hover:text-blue-500">return home</a>
+      </p>
+    </div>
+    
+    <form class="mt-8 space-y-6" onsubmit="handleLogin(event)">
+      <div class="rounded-md shadow-sm -space-y-px">
+        <div>
+          <label for="email-address" class="sr-only">Email address</label>
+          <input id="email-address" name="email" type="email" autocomplete="email" required 
+            class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" 
+            placeholder="Email address">
+        </div>
+        <div>
+          <label for="password" class="sr-only">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required 
+            class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" 
+            placeholder="Password">
         </div>
       </div>
 
       <div>
-        <div class="flex items-center justify-between">
-          <label for="password" class="block text-sm font-medium leading-6 text-gray-900">Password</label>
-          <div class="text-sm">
-            <a href="#" class="font-semibold text-blue-600 hover:text-blue-500">Forgot password?</a>
-          </div>
-        </div>
-        <div class="mt-2">
-          <input id="password" name="password" type="password" autocomplete="current-password" required class="block w-full rounded-md border-0 p-2 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6">
-        </div>
-      </div>
-
-      <div id="error-msg" class="text-red-500 text-sm text-center hidden"></div>
-
-      <div>
-        <button type="submit" class="flex w-full justify-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
-            Sign in
+        <button type="submit" id="login-btn" 
+          class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+          Sign in
         </button>
       </div>
+      
+      <div id="error-msg" class="text-red-500 text-center text-sm font-medium hidden bg-red-50 p-2 rounded"></div>
     </form>
   </div>
 </div>
 
 <script>
-async function handleLogin(e) {
-    e.preventDefault();
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    const errBox = document.getElementById('error-msg');
-    const btn = e.target.querySelector('button');
-
-    btn.innerText = "Verifying...";
+  async function handleLogin(e) {
+    e.preventDefault(); // Stop page reload
+    
+    const btn = document.getElementById('login-btn');
+    const msg = document.getElementById('error-msg');
+    const originalText = btn.innerText;
+    
+    // 1. Show Loading State
+    btn.innerText = "Signing in...";
     btn.disabled = true;
-    errBox.classList.add('hidden');
+    msg.classList.add('hidden'); // Hide previous errors
+
+    // 2. Prepare Data
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData.entries());
 
     try {
-        const res = await fetch('/login', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ email, password })
-        });
+      // 3. Send Request
+      const res = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
 
-        const data = await res.json();
+      const result = await res.json();
 
-        if (data.success) {
-            // Redirect based on role
-            if(data.role === 'ADMIN') window.location.href = '/admin/dashboard';
-            else if(data.role === 'INSTITUTE') window.location.href = '/school/dashboard';
-            else window.location.href = '/';
+      if (result.success) {
+        // 4. SUCCESS: Redirect based on Role
+        btn.innerText = "Redirecting...";
+        
+        if (result.role === 'admin') {
+            window.location.href = '/admin/dashboard';
+        } else if (result.role === 'institute') {
+            window.location.href = '/school/dashboard'; // <--- Redirects School Users
         } else {
-            errBox.innerText = data.error || "Login failed";
-            errBox.classList.remove('hidden');
-            btn.innerText = "Sign in";
-            btn.disabled = false;
+            // Fallback for unknown roles
+            window.location.href = '/'; 
         }
-    } catch (e) {
-        errBox.innerText = "Network Error";
-        errBox.classList.remove('hidden');
-        btn.disabled = false;
+      } else {
+        // 5. ERROR: Show message (Invalid password, etc.)
+        throw new Error(result.error || "Login failed");
+      }
+    } catch (err) {
+      console.error(err);
+      msg.innerText = err.message || "Connection error. Please try again.";
+      msg.classList.remove('hidden');
+      
+      // Reset Button
+      btn.innerText = originalText;
+      btn.disabled = false;
     }
-}
+  }
 </script>
 `;
