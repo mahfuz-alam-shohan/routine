@@ -1,11 +1,14 @@
 export function SchoolsPageHTML(schoolsList = []) {
-  // Convert the list of schools into HTML Table Rows
+  // Generate Rows
   const rows = schoolsList.map(school => `
-    <tr class="hover:bg-gray-50">
-        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${school.school_name}</td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${school.eiin_code || 'N/A'}</td>
+    <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
+        <td class="px-6 py-4 whitespace-nowrap">
+            <div class="text-sm font-medium text-gray-900">${school.school_name}</div>
+            <div class="text-xs text-gray-500 md:hidden">EIIN: ${school.eiin_code || 'N/A'}</div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap hidden md:table-cell text-sm text-gray-500">${school.eiin_code || 'N/A'}</td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${school.email}</td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        <td class="px-6 py-4 whitespace-nowrap">
             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                 Active
             </span>
@@ -16,94 +19,94 @@ export function SchoolsPageHTML(schoolsList = []) {
   return `
     <div class="space-y-6">
         
-        <div class="flex items-center justify-between">
-            <h2 class="text-2xl font-bold text-gray-800">Managed Schools</h2>
-            <button onclick="toggleForm()" id="add-btn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center shadow-sm">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900">Schools</h2>
+                <p class="text-sm text-gray-500 mt-1">Manage all registered institutions.</p>
+            </div>
+            
+            <button onclick="toggleForm()" id="add-btn" class="w-full md:w-auto bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 flex items-center justify-center shadow-sm transition-all focus:ring-4 focus:ring-blue-200">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                 Add New School
             </button>
         </div>
 
-        <div id="list-view" class="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">School Name</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EIIN Code</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin Email</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    ${rows.length > 0 ? rows : '<tr><td colspan="4" class="px-6 py-10 text-center text-gray-500">No schools added yet. Click "Add New School" to start.</td></tr>'}
-                </tbody>
-            </table>
+        <div id="list-view" class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+            <div class="overflow-x-auto"> <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">School Name</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">EIIN Code</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin Email</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        ${rows.length > 0 ? rows : '<tr><td colspan="4" class="px-6 py-12 text-center text-gray-500">No schools found. <br><span class="text-sm">Click "Add New School" to create one.</span></td></tr>'}
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <div id="add-form" class="hidden bg-white shadow rounded-lg p-6 border border-gray-200 max-w-3xl">
-            <div class="flex justify-between items-center mb-6 border-b pb-4">
-                <h3 class="text-lg font-bold text-gray-900">Register New Institution</h3>
-                <button onclick="toggleForm()" class="text-gray-400 hover:text-gray-600">Close</button>
+        <div id="add-form" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="toggleForm()"></div>
+
+            <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
+                    
+                    <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start">
+                            <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
+                                <h3 class="text-xl font-semibold leading-6 text-gray-900" id="modal-title">Register New Institution</h3>
+                                <div class="mt-4">
+                                    <form onsubmit="createSchool(event)" class="space-y-4">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div class="col-span-2">
+                                                <label class="block text-sm font-medium text-gray-700">School Name</label>
+                                                <input type="text" name="school_name" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700">EIIN Code</label>
+                                                <input type="text" name="eiin" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700">Address</label>
+                                                <input type="text" name="address" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                            </div>
+
+                                            <div class="col-span-2 border-t pt-4 mt-2">
+                                                <span class="text-xs font-bold text-gray-500 uppercase">Admin Account</span>
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700">Email</label>
+                                                <input type="email" name="email" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700">Password</label>
+                                                <input type="password" name="password" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mt-6 sm:flex sm:flex-row-reverse">
+                                            <button type="submit" class="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:ml-3 sm:w-auto">Create School</button>
+                                            <button type="button" onclick="toggleForm()" class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto">Cancel</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-
-            <form onsubmit="createSchool(event)" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">School Name</label>
-                        <input type="text" name="school_name" required class="w-full border-gray-300 rounded-md shadow-sm p-2 border focus:ring-blue-500 focus:border-blue-500" placeholder="e.g. Greenwood High School">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">EIIN Code</label>
-                        <input type="text" name="eiin" class="w-full border-gray-300 rounded-md shadow-sm p-2 border" placeholder="e.g. 102345">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Address / Location</label>
-                        <input type="text" name="address" class="w-full border-gray-300 rounded-md shadow-sm p-2 border" placeholder="District, City">
-                    </div>
-
-                    <div class="col-span-2 mt-4">
-                        <h4 class="text-sm font-bold text-gray-900 uppercase tracking-wide mb-3 border-b pb-1">Admin Credentials</h4>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Admin Email</label>
-                        <input type="email" name="email" required class="w-full border-gray-300 rounded-md shadow-sm p-2 border" placeholder="admin@school.com">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                        <input type="password" name="password" required class="w-full border-gray-300 rounded-md shadow-sm p-2 border" placeholder="********">
-                    </div>
-                </div>
-
-                <div class="pt-4 flex justify-end space-x-3">
-                    <button type="button" onclick="toggleForm()" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-sm">Create School</button>
-                </div>
-            </form>
         </div>
 
     </div>
 
     <script>
         function toggleForm() {
-            const list = document.getElementById('list-view');
             const form = document.getElementById('add-form');
-            const btn = document.getElementById('add-btn');
-
-            if (list.classList.contains('hidden')) {
-                // Show List
-                list.classList.remove('hidden');
-                form.classList.add('hidden');
-                btn.classList.remove('hidden');
-            } else {
-                // Show Form
-                list.classList.add('hidden');
-                form.classList.remove('hidden');
-                btn.classList.add('hidden');
-            }
+            form.classList.toggle('hidden');
         }
 
         async function createSchool(e) {
@@ -113,7 +116,6 @@ export function SchoolsPageHTML(schoolsList = []) {
             btn.innerText = "Creating...";
             btn.disabled = true;
 
-            // Gather Data
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
 
@@ -127,8 +129,7 @@ export function SchoolsPageHTML(schoolsList = []) {
                 const result = await res.json();
                 
                 if (result.success) {
-                    alert("School Added Successfully!");
-                    window.location.reload(); // Refresh to see new list
+                    window.location.reload(); 
                 } else {
                     alert("Error: " + result.error);
                     btn.innerText = originalText;
