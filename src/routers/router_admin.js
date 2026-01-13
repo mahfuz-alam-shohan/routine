@@ -2,6 +2,7 @@ import { htmlResponse, jsonResponse } from '../core/utils.js';
 import { hashPassword } from '../core/auth.js';
 import { ADMIN_SETUP_HTML } from '../ui/admin/setup.js';
 import { ROLES } from '../config.js';
+import { SCHEMA_SQL } from '../db_schema.js'; // <--- Import this
 
 export async function handleAdminRequest(request, env) {
   const url = new URL(request.url);
@@ -9,7 +10,15 @@ export async function handleAdminRequest(request, env) {
   // --- SUB-ROUTE: SETUP (Create first admin) ---
   if (url.pathname === '/admin/setup') {
     
-    // Check if admin already exists
+    // 1. ENSURE TABLES EXIST (Run this ONLY here)
+    // We run this here so the homepage never crashes.
+    try {
+        await env.DB.exec(SCHEMA_SQL);
+    } catch (e) {
+        return htmlResponse(`<h1>DB Error</h1><p>${e.message}</p>`);
+    }
+
+    // 2. Check if admin already exists
     const check = await env.DB.prepare("SELECT count(*) as count FROM auth_accounts WHERE role = ?").bind(ROLES.ADMIN).first();
     
     if (check.count > 0) {
