@@ -1,13 +1,29 @@
-import { htmlResponse } from '../core/utils.js';
+import { htmlResponse, getCookie } from '../core/utils.js'; // Import getCookie
 import { InstituteLayout } from '../ui/institute/layout.js';
 import { InstituteDashboardHTML } from '../ui/institute/dashboard.js';
 
 export async function handleInstituteRequest(request, env) {
   const url = new URL(request.url);
 
-  // MOCK DATA (We will connect real DB later)
-  let schoolName = "School Portal";
+  // 1. IDENTIFY THE SCHOOL
+  // We read the email from the cookie we just saved in login
+  const email = getCookie(request, 'user_email');
+  let schoolName = "School Portal"; // Default fallback
   let stats = { teachers: 0, classes: 0 };
+
+  if (email) {
+      // Fetch the School Profile linked to this email
+      const profile = await env.DB.prepare(`
+          SELECT p.school_name 
+          FROM profiles_institution p
+          JOIN auth_accounts a ON p.auth_id = a.id
+          WHERE a.email = ?
+      `).bind(email).first();
+
+      if (profile) {
+          schoolName = profile.school_name;
+      }
+  }
 
   // --- SUB-ROUTE: DASHBOARD ---
   if (url.pathname === '/school/dashboard') {

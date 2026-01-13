@@ -22,3 +22,18 @@ export async function getCompanyName(env) {
     return 'RoutineAI SaaS';
   }
 }
+
+// ... (keep existing code) ...
+
+// NEW: Helper to read a specific cookie from the request
+export function getCookie(request, name) {
+  const cookieString = request.headers.get('Cookie');
+  if (!cookieString) return null;
+  
+  const cookies = cookieString.split(';');
+  for (let cookie of cookies) {
+    const [key, value] = cookie.trim().split('=');
+    if (key === name) return value;
+  }
+  return null;
+}
