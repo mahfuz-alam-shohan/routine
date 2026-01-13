@@ -38,23 +38,20 @@ export const LOGIN_HTML = `
 
 <script>
   async function handleLogin(e) {
-    e.preventDefault(); // Stop page reload
+    e.preventDefault(); 
     
     const btn = document.getElementById('login-btn');
     const msg = document.getElementById('error-msg');
     const originalText = btn.innerText;
     
-    // 1. Show Loading State
     btn.innerText = "Signing in...";
     btn.disabled = true;
-    msg.classList.add('hidden'); // Hide previous errors
+    msg.classList.add('hidden');
 
-    // 2. Prepare Data
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData.entries());
 
     try {
-      // 3. Send Request
       const res = await fetch('/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,27 +61,27 @@ export const LOGIN_HTML = `
       const result = await res.json();
 
       if (result.success) {
-        // 4. SUCCESS: Redirect based on Role
         btn.innerText = "Redirecting...";
         
-        if (result.role === 'admin') {
+        // --- FIX IS HERE: Convert role to lowercase before checking ---
+        const role = (result.role || '').toLowerCase();
+
+        if (role === 'admin') {
             window.location.href = '/admin/dashboard';
-        } else if (result.role === 'institute') {
-            window.location.href = '/school/dashboard'; // <--- Redirects School Users
+        } else if (role === 'institute') {
+            window.location.href = '/school/dashboard';
         } else {
-            // Fallback for unknown roles
+            // Debugging Help: If it fails, alert us why
+            alert('Login successful, but unknown role: ' + result.role);
             window.location.href = '/'; 
         }
       } else {
-        // 5. ERROR: Show message (Invalid password, etc.)
         throw new Error(result.error || "Login failed");
       }
     } catch (err) {
       console.error(err);
-      msg.innerText = err.message || "Connection error. Please try again.";
+      msg.innerText = err.message || "Connection error.";
       msg.classList.remove('hidden');
-      
-      // Reset Button
       btn.innerText = originalText;
       btn.disabled = false;
     }
