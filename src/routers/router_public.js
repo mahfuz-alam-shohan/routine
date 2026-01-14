@@ -6,10 +6,9 @@ export async function handlePublicRequest(request, env) {
   const url = new URL(request.url);
   const companyName = await getCompanyName(env);
 
-  // 1. AUTH STATUS
+  // AUTH STATUS CHECK
   let email = getCookie(request, 'user_email');
   let role = getCookie(request, 'user_role');
-  
   if (role) role = role.replace(/['"]+/g, '').trim(); 
   if (email) email = email.replace(/['"]+/g, '').trim();
 
@@ -22,15 +21,14 @@ export async function handlePublicRequest(request, env) {
     return htmlResponse(PublicLayout(HomeHTML(companyName), "Home", companyName, currentUser));
   }
   
-  // --- LOGIN PAGE (Protected) ---
+  // --- LOGIN PAGE ---
   if (url.pathname === '/login') {
     
-    // REDIRECT IF LOGGED IN (Strict Rule)
+    // STRICT REDIRECT: If logged in, go to dashboard
     if (isLoggedIn) {
         if (role === 'admin') return Response.redirect(url.origin + '/admin/dashboard', 302);
         if (role === 'institute') return Response.redirect(url.origin + '/school/dashboard', 302);
         if (role === 'teacher') return Response.redirect(url.origin + '/teacher/dashboard', 302);
-        // Fallback
         return Response.redirect(url.origin + '/', 302);
     }
 
@@ -48,6 +46,7 @@ export async function handlePublicRequest(request, env) {
             const safeRole = user.role || 'unknown'; 
             const isSecure = url.protocol === 'https:';
             const secureFlag = isSecure ? 'Secure;' : ''; 
+            // 7-Day Persistence
             const cookieSettings = `Path=/; HttpOnly; ${secureFlag} SameSite=Lax; Max-Age=604800`;
 
             headers.set('Content-Type', 'application/json');
