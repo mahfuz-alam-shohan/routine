@@ -9,9 +9,16 @@ export async function handleInstituteRequest(request, env) {
   // 1. AUTH CHECK
   const email = getCookie(request, 'user_email');
   
-  // UX FIX: If no session, redirect to Login instead of crashing
+  // DEBUG MODE: If cookie is missing, SHOW ERROR instead of redirecting
   if (!email) {
-      return Response.redirect(new URL('/login', request.url), 302);
+      return htmlResponse(`
+        <div style="padding: 50px; font-family: sans-serif; text-align: center;">
+            <h1 style="color: red;">Login Failed (No Cookie Found)</h1>
+            <p>The browser did not send the 'user_email' cookie.</p>
+            <p>Please try logging in again.</p>
+            <a href="/login" style="background: blue; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Go to Login</a>
+        </div>
+      `);
   }
 
   // 2. CONTEXT (Find the school_id)
