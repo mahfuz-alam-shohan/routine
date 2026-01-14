@@ -1,4 +1,4 @@
-// src/ui/admin/school_teachers.js (NEW FILE)
+// src/ui/admin/school_teachers.js
 
 export function SchoolTeachersHTML(school, teachers = []) {
     return `
@@ -31,13 +31,25 @@ export function SchoolTeachersHTML(school, teachers = []) {
                  </span>
              </div>
              <table class="min-w-full divide-y divide-gray-200">
+                 <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Name & Email</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Subject</th>
+                        <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Phone</th>
+                    </tr>
+                 </thead>
                  <tbody class="bg-white divide-y divide-gray-200">
                     ${teachers.map(t => `
                         <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${t.full_name}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${t.phone || '-'}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                                ${t.school_id ? 'Added by Institute' : 'System'}
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-bold text-gray-900">${t.full_name}</div>
+                                <div class="text-xs text-gray-500">${t.email || '-'}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <span class="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs">${t.subject || '-'}</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">
+                                ${t.phone || '-'}
                             </td>
                         </tr>
                     `).join('')}

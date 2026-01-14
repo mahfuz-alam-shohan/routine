@@ -19,15 +19,18 @@ const DEFINED_SCHEMA = {
     school_name: "TEXT",
     eiin_code: "TEXT",
     address: "TEXT", 
-    max_teachers: "INTEGER DEFAULT 10", // <--- NEW: Limit for monetization
+    max_teachers: "INTEGER DEFAULT 10", 
     "FOREIGN KEY(auth_id)": "REFERENCES auth_accounts(id)" 
   },
 
   profiles_teacher: {
     id: "INTEGER PRIMARY KEY AUTOINCREMENT",
-    auth_id: "INTEGER", // Optional (if teacher has login)
+    auth_id: "INTEGER",
     school_id: "INTEGER",
     full_name: "TEXT",
+    // NEW FIELDS
+    subject: "TEXT", 
+    email: "TEXT",
     phone: "TEXT",
     "FOREIGN KEY(auth_id)": "REFERENCES auth_accounts(id)"
   },
