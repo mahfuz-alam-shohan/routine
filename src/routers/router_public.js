@@ -6,11 +6,10 @@ export async function handlePublicRequest(request, env) {
   const url = new URL(request.url);
   const companyName = await getCompanyName(env);
 
-  // 1. ROBUST AUTH CHECK
+  // 1. AUTH STATUS
   let email = getCookie(request, 'user_email');
   let role = getCookie(request, 'user_role');
   
-  // Clean data to prevent logic errors
   if (role) role = role.replace(/['"]+/g, '').trim(); 
   if (email) email = email.replace(/['"]+/g, '').trim();
 
@@ -23,13 +22,16 @@ export async function handlePublicRequest(request, env) {
     return htmlResponse(PublicLayout(HomeHTML(companyName), "Home", companyName, currentUser));
   }
   
-  // --- LOGIN PAGE ---
+  // --- LOGIN PAGE (Protected) ---
   if (url.pathname === '/login') {
-    // Auto-Redirect if logged in
+    
+    // REDIRECT IF LOGGED IN (Strict Rule)
     if (isLoggedIn) {
         if (role === 'admin') return Response.redirect(url.origin + '/admin/dashboard', 302);
         if (role === 'institute') return Response.redirect(url.origin + '/school/dashboard', 302);
         if (role === 'teacher') return Response.redirect(url.origin + '/teacher/dashboard', 302);
+        // Fallback
+        return Response.redirect(url.origin + '/', 302);
     }
 
     if (request.method === 'POST') {
@@ -42,7 +44,6 @@ export async function handlePublicRequest(request, env) {
             const isValid = await verifyPassword(password, user.password_hash, user.salt);
             if (!isValid) return jsonResponse({ error: "Wrong password" }, 401);
 
-            // Set Cookies (7 Days)
             const headers = new Headers();
             const safeRole = user.role || 'unknown'; 
             const isSecure = url.protocol === 'https:';
@@ -60,7 +61,7 @@ export async function handlePublicRequest(request, env) {
     }
 
     const { LOGIN_HTML } = await import('../ui/public/login.js');
-    return htmlResponse(PublicLayout(LOGIN_HTML, "Login", companyName, null));
+    return htmlResponse(PublicLayout(LOGIN_HTML(companyName), "Sign In", companyName, null));
   }
 
   // --- LOGOUT ---
