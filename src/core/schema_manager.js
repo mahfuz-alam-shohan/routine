@@ -31,6 +31,17 @@ const DEFINED_SCHEMA = {
     "FOREIGN KEY(auth_id)": "REFERENCES auth_accounts(id)"
   },
 
+  // --- NEW TABLES START ---
+  academic_classes: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    school_id: "INTEGER",
+    class_name: "TEXT",  // e.g. "Class 9"
+    section_name: "TEXT", // e.g. "Padma" or "A"
+    shift: "TEXT",        // e.g. "Morning", "Day"
+    created_at: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+  },
+  // --- NEW TABLES END ---
+
   system_settings: {
     key: "TEXT PRIMARY KEY",
     value: "TEXT"
@@ -44,8 +55,7 @@ export async function syncDatabase(env) {
   // A. Get List of Existing Tables
   const existingTablesResult = await env.DB.prepare("PRAGMA table_list").all();
   
-  // --- SAFETY FIX IS HERE ---
-  // Filter out sqlite_, d1_, and anything starting with _ (internal CF tables)
+  // Filter out internal tables
   const existingTables = existingTablesResult.results
       .map(t => t.name)
       .filter(name => 
@@ -67,12 +77,10 @@ export async function syncDatabase(env) {
   // --- PHASE 2: CLEANUP (Drop Unused Tables) ---
   for (const existingTable of existingTables) {
     if (!DEFINED_SCHEMA[existingTable]) {
-      // DANGER: Table exists in DB but not in Code. DROP IT.
       try {
           await env.DB.prepare(`DROP TABLE "${existingTable}"`).run();
           report.push(`DROPPED unused table: ${existingTable}`);
       } catch(e) {
-          // If we can't drop it (auth error), just ignore it.
           report.push(`Skipped dropping protected table: ${existingTable}`);
       }
     }
@@ -97,7 +105,6 @@ async function syncColumns(env, tableName, schemaColumns, report) {
   const dbColsResult = await env.DB.prepare(`PRAGMA table_info("${tableName}")`).all();
   const dbColNames = dbColsResult.results.map(c => c.name);
 
-  // Add Missing Columns
   for (const [colName, colType] of Object.entries(schemaColumns)) {
     if (colName.includes(" ")) continue; 
 

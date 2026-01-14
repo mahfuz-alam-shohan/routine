@@ -2,6 +2,7 @@ import { htmlResponse, jsonResponse, getCookie } from '../core/utils.js';
 import { InstituteLayout } from '../ui/institute/layout.js';
 import { InstituteDashboardHTML } from '../ui/institute/dashboard.js';
 import { TeachersPageHTML } from '../ui/institute/teachers.js'; 
+import { ClassesPageHTML } from '../ui/institute/classes.js'; // <--- NEW IMPORT
 
 export async function handleInstituteRequest(request, env) {
   const url = new URL(request.url);
@@ -9,7 +10,6 @@ export async function handleInstituteRequest(request, env) {
   // 1. AUTH CHECK
   const email = getCookie(request, 'user_email');
   
-  // DEBUG MODE: If cookie is missing, SHOW ERROR instead of redirecting
   if (!email) {
       return htmlResponse(`
         <div style="padding: 50px; font-family: sans-serif; text-align: center;">
@@ -37,15 +37,15 @@ export async function handleInstituteRequest(request, env) {
   // --- ROUTE: DASHBOARD ---
   if (url.pathname === '/school/dashboard') {
     const tCount = await env.DB.prepare("SELECT count(*) as count FROM profiles_teacher WHERE school_id = ?").bind(schoolId).first();
-    const stats = { teachers: tCount.count, classes: 0 };
+    const cCount = await env.DB.prepare("SELECT count(*) as count FROM academic_classes WHERE school_id = ?").bind(schoolId).first(); // <--- Updated stats
+    
+    const stats = { teachers: tCount.count, classes: cCount.count };
     return htmlResponse(InstituteLayout(InstituteDashboardHTML(stats), "Dashboard", schoolName));
   }
 
 
   // --- ROUTE: TEACHERS ---
   if (url.pathname === '/school/teachers') {
-      
-      // POST: Add Teacher
       if (request.method === 'POST') {
           try {
               const body = await request.json();
@@ -61,15 +61,33 @@ export async function handleInstituteRequest(request, env) {
           }
       }
 
-      // GET: List Teachers
       const teachers = await env.DB.prepare("SELECT * FROM profiles_teacher WHERE school_id = ? ORDER BY id DESC").bind(schoolId).all();
       return htmlResponse(InstituteLayout(TeachersPageHTML(teachers.results), "Teachers", schoolName));
   }
 
 
-  // --- ROUTE: CLASSES ---
+  // --- ROUTE: CLASSES (UPDATED) ---
   if (url.pathname === '/school/classes') {
-      return htmlResponse(InstituteLayout("<h1>Classes Page (Coming Next)</h1>", "Classes", schoolName));
+      
+      // POST: Add Class/Section
+      if (request.method === 'POST') {
+          try {
+              const body = await request.json();
+              if(!body.class_name || !body.section_name) return jsonResponse({error:"Details required"}, 400);
+
+              await env.DB.prepare("INSERT INTO academic_classes (school_id, class_name, section_name, shift) VALUES (?, ?, ?, ?)")
+                .bind(schoolId, body.class_name, body.section_name, body.shift || 'Morning')
+                .run();
+              
+              return jsonResponse({ success: true });
+          } catch(e) {
+              return jsonResponse({ error: e.message }, 500);
+          }
+      }
+
+      // GET: List Classes
+      const classes = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ? ORDER BY class_name ASC").bind(schoolId).all();
+      return htmlResponse(InstituteLayout(ClassesPageHTML(classes.results), "Classes", schoolName));
   }
 
   return new Response("Page Not Found", { status: 404 });
