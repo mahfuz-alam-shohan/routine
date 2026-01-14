@@ -32,7 +32,7 @@ export async function handlePublicRequest(request, env) {
             const headers = new Headers();
             const safeRole = user.role || 'unknown'; 
 
-            // FIX: Changed SameSite=Strict to SameSite=Lax to prevent redirect dropping
+            // FIX: Changed SameSite=Strict to SameSite=Lax
             headers.append("Set-Cookie", `user_role=${safeRole}; Path=/; HttpOnly; Secure; SameSite=Lax`);
             headers.append("Set-Cookie", `user_email=${user.email}; Path=/; HttpOnly; Secure; SameSite=Lax`); 
             headers.append("Set-Cookie", `auth_status=active; Path=/; HttpOnly; Secure; SameSite=Lax`);
