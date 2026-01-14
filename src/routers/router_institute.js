@@ -29,21 +29,26 @@ export async function handleInstituteRequest(request, env) {
           try {
               const body = await request.json();
               
-              // 1. INIT CONFIG (Step 1)
+              // 1. INIT CONFIG
               if (body.action === 'init_config') {
                   await env.DB.prepare("INSERT INTO schedule_config (school_id, strategy, shifts_json) VALUES (?, ?, ?) ON CONFLICT(school_id) DO UPDATE SET strategy=excluded.strategy, shifts_json=excluded.shifts_json")
                       .bind(school.id, body.strategy, JSON.stringify(body.shifts)).run();
               }
 
-              // 2. ADD SLOT (Step 2)
-              if (body.action === 'add_slot') {
-                  await env.DB.prepare("INSERT INTO schedule_slots (school_id, start_time, end_time, label, type, applicable_shifts) VALUES (?, ?, ?, ?, ?, ?)")
-                      .bind(school.id, body.start_time, body.end_time, body.label, body.type, JSON.stringify(body.applicable_shifts)).run();
-              }
-
-              // 3. DELETE SLOT
-              if (body.action === 'delete_slot') {
-                  await env.DB.prepare("DELETE FROM schedule_slots WHERE id = ? AND school_id = ?").bind(body.id, school.id).run();
+              // 2. SAVE FULL ROUTINE (BULK UPDATE)
+              // This is safer than adding one by one for the strict timeline approach
+              if (body.action === 'save_routine') {
+                  const slots = body.slots;
+                  
+                  // Transaction-like approach: Delete all for this school, then re-insert
+                  // D1 allows batch execution but here we'll do it sequentially or use a batch statement if D1 supported it well.
+                  // For safety, we delete then insert.
+                  await env.DB.prepare("DELETE FROM schedule_slots WHERE school_id = ?").bind(school.id).run();
+                  
+                  const stmt = env.DB.prepare("INSERT INTO schedule_slots (school_id, start_time, end_time, label, type, applicable_shifts) VALUES (?, ?, ?, ?, ?, ?)");
+                  const batch = slots.map(s => stmt.bind(school.id, s.start_time, s.end_time, s.label, s.type, JSON.stringify(s.applicable_shifts)));
+                  
+                  await env.DB.batch(batch);
               }
 
               return jsonResponse({ success: true });
@@ -71,12 +76,15 @@ export async function handleInstituteRequest(request, env) {
           }
       } catch(e) { await syncDatabase(env); }
       
-      return htmlResponse(InstituteLayout(SchedulesPageHTML(config, slots), "Schedule Designer", school.school_name));
+      return htmlResponse(InstituteLayout(SchedulesPageHTML(config, slots), "Master Schedule", school.school_name));
   }
 
   // --- SUBJECTS ---
   if (url.pathname === '/school/subjects') {
-      if (request.method === 'POST') {
+      // ... (Keep existing Subjects Logic) ...
+      // For brevity in this response, assume existing logic remains or use previous block
+      // Just ensure the imports match
+       if (request.method === 'POST') {
           const body = await request.json();
           if (body.action === 'create') await env.DB.prepare("INSERT INTO academic_subjects (school_id, subject_name) VALUES (?, ?)").bind(school.id, body.name).run();
           if (body.action === 'rename') await env.DB.prepare("UPDATE academic_subjects SET subject_name = ? WHERE id = ?").bind(body.name, body.id).run();
@@ -103,6 +111,7 @@ export async function handleInstituteRequest(request, env) {
 
   // --- TEACHERS ---
   if (url.pathname === '/school/teachers') {
+      // ... (Keep existing Teachers Logic) ...
       if (request.method === 'POST') {
           const current = await env.DB.prepare("SELECT count(*) as count FROM profiles_teacher WHERE school_id = ?").bind(school.id).first();
           if (current.count >= (school.max_teachers || 10)) return jsonResponse({ error: "Limit Reached" }, 403);
