@@ -1,30 +1,33 @@
-import { htmlResponse, jsonResponse, getCookie, getCompanyName } from '../core/utils.js'; // <--- Import getCompanyName
+import { htmlResponse, jsonResponse, getCookie, getCompanyName } from '../core/utils.js';
 import { PublicLayout } from '../ui/public/layout.js';
 import { verifyPassword } from '../core/auth.js';
 
 export async function handlePublicRequest(request, env) {
   const url = new URL(request.url);
-  const companyName = await getCompanyName(env); // <--- Get real name from DB
+  const companyName = await getCompanyName(env); // <--- Fetch real name
 
-  // --- 1. CHECK LOGIN STATUS (For UI Logic) ---
-  const email = getCookie(request, 'user_email');
-  const role = getCookie(request, 'user_role');
+  // --- 1. CHECK LOGIN STATUS ---
+  let email = getCookie(request, 'user_email');
+  let role = getCookie(request, 'user_role');
+  
+  // SANITIZATION: Remove any potential quotes or whitespace that breaks logic
+  if (role) role = role.replace(/['"]+/g, '').trim(); 
+  if (email) email = email.replace(/['"]+/g, '').trim();
+
   const isLoggedIn = !!(email && role);
   const currentUser = isLoggedIn ? { email, role } : null;
 
   // --- HOME PAGE ---
   if (url.pathname === '/') {
-    // Note: We REMOVED the auto-redirect here so the user can see the landing page.
-    // The Layout will handle showing "Dashboard" button instead of "Login".
-    
-    // Dynamic Import to save resources
+    // Dynamic Import for performance
     const { HomeHTML } = await import('../ui/public/home.js');
+    // Pass 'companyName' to HomeHTML so the text updates
     return htmlResponse(PublicLayout(HomeHTML(companyName), "Home", companyName, currentUser));
   }
   
   // --- LOGIN PAGE ---
   if (url.pathname === '/login') {
-    // If already logged in, redirect to dashboard immediately
+    // Smart Redirect: If already logged in, go to dashboard
     if (isLoggedIn) {
         if (role === 'admin') return Response.redirect(url.origin + '/admin/dashboard', 302);
         if (role === 'institute') return Response.redirect(url.origin + '/school/dashboard', 302);
@@ -47,7 +50,7 @@ export async function handlePublicRequest(request, env) {
             const isSecure = url.protocol === 'https:';
             const secureFlag = isSecure ? 'Secure;' : ''; 
             
-            // FIX: Add 'Max-Age=604800' (7 Days) so login persists
+            // FIX: Max-Age=604800 (7 Days) to prevent "Login Every Time"
             const cookieSettings = `Path=/; HttpOnly; ${secureFlag} SameSite=Lax; Max-Age=604800`;
 
             headers.set('Content-Type', 'application/json');
@@ -67,6 +70,7 @@ export async function handlePublicRequest(request, env) {
   // --- LOGOUT ---
   if (url.pathname === '/logout') {
     const headers = new Headers();
+    // Clear cookies immediately
     headers.append("Set-Cookie", "user_role=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
     headers.append("Set-Cookie", "user_email=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
     headers.append("Set-Cookie", "auth_status=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
