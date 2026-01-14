@@ -1,108 +1,130 @@
-export function SettingsPageHTML(currentSiteName) {
-  return `
-    <div class="max-w-2xl mx-auto bg-white shadow rounded-lg p-6">
-        <h2 class="text-xl font-bold text-gray-800 mb-6 border-b pb-2">Global System Settings</h2>
-        
-        <form onsubmit="saveSettings(event)" class="space-y-4">
-            <div>
-                <label for="site_name" class="block text-sm font-medium text-gray-700">Application Name</label>
-                <input type="text" id="site_name" value="${currentSiteName}" 
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm border p-2"
-                    placeholder="e.g. My School Routine Manager">
-                <p class="mt-1 text-sm text-gray-500">This name will appear on the Login page and Public headers.</p>
-            </div>
+// src/ui/admin/settings.js
 
-            <div class="pt-2">
-                <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    Save Changes
-                </button>
-            </div>
-        </form>
+export function SettingsPageHTML(profile = {}, email = '') {
+    const p = profile || {};
+    
+    return `
+      <div class="max-w-2xl mx-auto space-y-8">
+          
+          <div class="text-center mb-8">
+              <h1 class="text-2xl font-bold text-gray-900">Account Settings</h1>
+              <p class="text-sm text-gray-500 mt-1">Manage your profile information and security.</p>
+          </div>
 
-        <div id="status-msg" class="mt-4 hidden text-sm font-medium"></div>
+          <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div class="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+                  <h2 class="text-sm font-bold text-gray-800 uppercase tracking-wide">Personal Information</h2>
+                  <span class="text-xs text-gray-400">Admin ID: ${p.auth_id || '-'}</span>
+              </div>
+              
+              <div class="p-8">
+                  <div class="flex flex-col items-center mb-8">
+                      <div class="w-24 h-24 rounded-full bg-gray-900 text-white flex items-center justify-center text-3xl font-bold mb-4 ring-4 ring-gray-100">
+                          ${(p.full_name || email || 'A').charAt(0).toUpperCase()}
+                      </div>
+                      <h3 class="text-lg font-bold text-gray-900">${p.full_name || 'Admin User'}</h3>
+                      <p class="text-sm text-gray-500">${email}</p>
+                  </div>
 
-        <div class="mt-10 bg-yellow-50 border-l-4 border-yellow-400 p-4">
-            <div class="flex">
-                <div class="ml-3">
-                    <h3 class="text-sm font-bold text-yellow-800">Database Maintenance</h3>
-                    <div class="mt-1 text-sm text-yellow-700">
-                        <p>If you have updated the code with new columns or tables, run this to sync the database.</p>
-                    </div>
-                    <div class="mt-3">
-                        <button onclick="runSync(event)" type="button" class="text-sm font-medium text-yellow-800 hover:text-yellow-900 underline">
-                            Run Schema Sync Now
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+                  <form onsubmit="updateProfile(event)" class="space-y-5">
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          <div>
+                              <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Full Name</label>
+                              <input type="text" name="full_name" value="${p.full_name || ''}" placeholder="Enter your name" 
+                                     class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none transition-all">
+                          </div>
+                          <div>
+                              <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Phone Number</label>
+                              <input type="text" name="phone" value="${p.phone || ''}" placeholder="+880..." 
+                                     class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none transition-all">
+                          </div>
+                      </div>
 
-    <script>
-        // 1. Save Settings Logic
-        async function saveSettings(e) {
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          <div>
+                              <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Date of Birth</label>
+                              <input type="date" name="dob" value="${p.dob || ''}" 
+                                     class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none transition-all">
+                          </div>
+                          <div>
+                              <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Email (Read Only)</label>
+                              <input type="text" value="${email}" disabled 
+                                     class="w-full border border-gray-200 bg-gray-50 text-gray-500 rounded-lg px-3 py-2.5 text-sm cursor-not-allowed">
+                          </div>
+                      </div>
+
+                      <div class="pt-4 flex justify-end">
+                          <button type="submit" class="bg-gray-900 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-black transition-transform active:scale-95 shadow-sm">
+                              Save Changes
+                          </button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+
+          <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div class="p-6 border-b border-gray-100 bg-gray-50/50">
+                  <h2 class="text-sm font-bold text-red-600 uppercase tracking-wide">Security</h2>
+              </div>
+              <div class="p-8">
+                  <form onsubmit="changePassword(event)" class="space-y-5">
+                      <div>
+                          <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">New Password</label>
+                          <input type="password" name="password" required placeholder="••••••••" 
+                                 class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none">
+                      </div>
+                      <div class="flex justify-end">
+                          <button type="submit" class="bg-white border border-gray-300 text-gray-700 px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-gray-50 transition-colors">
+                              Update Password
+                          </button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+
+      </div>
+
+      <script>
+        async function updateProfile(e) {
             e.preventDefault();
             const btn = e.target.querySelector('button');
-            const msg = document.getElementById('status-msg');
-            const newName = document.getElementById('site_name').value;
-
-            btn.disabled = true;
+            const originalText = btn.innerText;
             btn.innerText = "Saving...";
+            
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            data.action = 'update_profile';
 
             try {
                 const res = await fetch('/admin/settings', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ site_name: newName })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
                 });
-                
-                const data = await res.json();
-                
-                msg.classList.remove('hidden', 'text-red-600', 'text-green-600');
-                if(data.success) {
-                    msg.classList.add('text-green-600');
-                    msg.innerText = "Success! Settings saved.";
-                } else {
-                    msg.classList.add('text-red-600');
-                    msg.innerText = "Error: " + data.error;
-                }
-
-            } catch(err) {
-                console.error(err);
-                msg.classList.remove('hidden');
-                msg.classList.add('text-red-600');
-                msg.innerText = "Network Error";
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "Save Changes";
-            }
+                if(res.ok) alert("Profile updated successfully!");
+                else alert("Error saving profile");
+            } catch(e) { alert("Network error"); }
+            finally { btn.innerText = originalText; }
         }
 
-        // 2. Sync Database Logic
-        async function runSync(e) {
-            if(!confirm("This will add missing columns and DELETE unused tables/columns. Continue?")) return;
+        async function changePassword(e) {
+            e.preventDefault();
+            if(!confirm("Are you sure you want to change your password?")) return;
             
-            const btn = e.target;
-            const originalText = btn.innerText;
-            btn.innerText = "Syncing... Please wait...";
-            btn.disabled = true;
-            
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            data.action = 'change_password';
+
             try {
-                const res = await fetch('/admin/settings?action=sync_db');
-                const data = await res.json();
-                
-                if(data.success) {
-                    alert("Sync Complete! Log:\\n" + data.report.join("\\n"));
-                } else {
-                    alert("Sync Failed.");
-                }
-            } catch (err) {
-                alert("Error connecting to server.");
-            } finally {
-                btn.innerText = originalText;
-                btn.disabled = false;
-            }
+                const res = await fetch('/admin/settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                if(res.ok) { alert("Password changed!"); e.target.reset(); }
+                else alert("Error changing password");
+            } catch(e) { alert("Network error"); }
         }
-    </script>
-  `;
+      </script>
+    `;
 }
