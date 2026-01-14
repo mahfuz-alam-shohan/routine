@@ -4,267 +4,325 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
     if (!config) return WizardHTML();
 
     const shifts = JSON.parse(config.shifts_json || '["Standard"]');
+    // Ensure slots are sorted by time
     existingSlots.sort((a, b) => a.start_time.localeCompare(b.start_time));
-    const schoolStartTime = existingSlots.length > 0 ? existingSlots[0].start_time : "08:00";
+    
+    // Default start time if no slots exist
+    const initialSchoolStart = existingSlots.length > 0 ? existingSlots[0].start_time : "08:00";
 
     return `
       <div class="max-w-5xl mx-auto" id="schedule-app">
           
           <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4 border-b border-gray-200 pb-4">
               <div>
-                  <h2 class="text-lg font-bold text-gray-900 leading-none">Master Routine</h2>
-                  <p class="text-xs text-gray-500 mt-1">Design bell times. Shifts are layered on this timeline.</p>
+                  <h2 class="text-lg font-bold text-gray-900 leading-none">Routine Manager</h2>
+                  <p class="text-xs text-gray-500 mt-1">Design the timeline in 'Master', then assign periods to shifts.</p>
               </div>
               <div class="flex gap-2 w-full md:w-auto">
-                   <button onclick="saveRoutine()" class="flex-1 md:flex-none bg-gray-900 text-white px-5 py-2 md:py-1.5 rounded-lg md:rounded text-sm md:text-xs font-bold hover:bg-black transition-colors shadow-sm">
-                      Save Schedule
+                   <button onclick="app.save()" class="flex-1 md:flex-none bg-gray-900 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-black transition-all shadow-sm active:scale-95">
+                      Save All Changes
                    </button>
-                   <button onclick="resetConfig()" class="flex-1 md:flex-none text-red-600 bg-red-50 hover:bg-red-100 px-5 py-2 md:py-1.5 rounded-lg md:rounded text-sm md:text-xs font-bold transition-colors">
+                   <button onclick="app.reset()" class="flex-1 md:flex-none text-red-600 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-lg text-sm font-bold transition-colors">
                       Reset
                    </button>
               </div>
           </div>
 
-          <div class="bg-white border border-gray-300 rounded-lg mb-4 p-4 flex flex-col md:flex-row items-start md:items-center gap-4 shadow-sm">
-              <label class="flex flex-col w-full md:w-auto">
-                  <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">School Starts At</span>
-                  <input type="time" id="school_start_time" value="${schoolStartTime}" onchange="recalculateTimes()" 
-                         class="border border-gray-300 rounded px-3 py-2 text-base md:text-sm font-mono font-bold text-gray-900 focus:ring-1 focus:ring-blue-500 outline-none w-full md:w-32">
-              </label>
-              <div class="hidden md:block h-8 w-px bg-gray-200 mx-2"></div>
-              <div class="text-xs text-gray-500 bg-blue-50 p-2 rounded w-full md:w-auto">
-                  <span class="font-bold text-blue-700">Strict Mode:</span> 
-                  Periods are continuous. Changing one duration updates all subsequent times.
+          <div class="mb-0">
+              <div class="border-b border-gray-200">
+                  <nav class="-mb-px flex space-x-6 overflow-x-auto no-scrollbar" aria-label="Tabs" id="tab-container">
+                      </nav>
               </div>
           </div>
 
-          <div class="bg-white border border-gray-300 shadow-sm rounded-lg overflow-hidden flex flex-col">
+          <div class="bg-white border border-gray-200 border-t-0 shadow-sm rounded-b-lg min-h-[400px] relative">
               
+              <div id="master-controls" class="hidden p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row gap-4 items-start md:items-center">
+                  <label class="flex flex-col w-full md:w-auto">
+                      <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">School Starts At</span>
+                      <input type="time" id="school_start_time" value="${initialSchoolStart}" onchange="app.updateStartTime(this.value)" 
+                             class="border border-gray-300 rounded px-3 py-2 text-base md:text-sm font-mono font-bold text-gray-900 focus:ring-1 focus:ring-blue-500 outline-none w-full md:w-32">
+                  </label>
+                  <div class="text-xs text-gray-500">
+                      <span class="font-bold text-blue-700">Strict Mode:</span> Changes cascade automatically.
+                  </div>
+              </div>
+
               <div class="overflow-x-auto w-full">
-                  <table class="w-full text-left border-collapse min-w-[700px]">
+                  <table class="w-full text-left border-collapse min-w-[350px] md:min-w-full">
                       <thead>
-                          <tr class="bg-gray-100 text-[10px] uppercase font-bold text-gray-500 border-b border-gray-300">
-                              <th class="py-3 px-3 w-12 text-center border-r border-gray-200">#</th>
-                              <th class="py-3 px-3 border-r border-gray-200 w-36">Time Slot</th>
-                              <th class="py-3 px-3 border-r border-gray-200 w-24">Mins</th>
-                              <th class="py-3 px-3 border-r border-gray-200">Period Name</th>
-                              <th class="py-3 px-3 border-r border-gray-200 w-32">Type</th>
-                              <th class="py-3 px-3 border-r border-gray-200 w-48">Shifts</th>
-                              <th class="py-3 px-3 w-12"></th>
-                          </tr>
+                          <tr class="bg-white text-[10px] uppercase font-bold text-gray-500 border-b border-gray-200" id="table-header">
+                              </tr>
                       </thead>
-                      <tbody id="slot-container" class="text-sm text-gray-800 divide-y divide-gray-200">
+                      <tbody id="table-body" class="text-sm text-gray-800 divide-y divide-gray-100">
                           </tbody>
                   </table>
               </div>
-              
-              <div class="bg-gray-50 p-3 border-t border-gray-200 hover:bg-gray-100 cursor-pointer transition-colors flex justify-center active:bg-gray-200" onclick="addEmptyRow()">
+
+              <div id="add-btn-wrapper" class="hidden p-3 border-t border-gray-100 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors flex justify-center active:bg-gray-200" onclick="app.addPeriod()">
                   <div class="text-sm font-bold text-blue-600 flex items-center gap-2">
                       <span class="text-xl leading-none">+</span>
                       <span>Add Next Period</span>
                   </div>
               </div>
           </div>
-
       </div>
 
       <script>
-        const AVAILABLE_SHIFTS = ${JSON.stringify(shifts)};
-        const SERVER_SLOTS = ${JSON.stringify(existingSlots)};
+        // --- STATE MANAGEMENT ---
+        const AppState = {
+            shifts: ${JSON.stringify(shifts)},
+            slots: ${JSON.stringify(existingSlots)}.map(s => ({
+                ...s,
+                applicable_shifts: typeof s.applicable_shifts === 'string' ? JSON.parse(s.applicable_shifts) : (s.applicable_shifts || [])
+            })),
+            activeTab: 'Master', // 'Master' or Shift Name
+            startTime: "${initialSchoolStart}"
+        };
 
-        document.addEventListener('DOMContentLoaded', () => {
-            if(SERVER_SLOTS.length > 0) {
-                renderRows(SERVER_SLOTS);
-            } else {
-                addRow({ label: "1st Period", duration: 45, type: 'class', applicable_shifts: AVAILABLE_SHIFTS });
-            }
-            recalculateTimes();
-        });
+        // --- CORE LOGIC ---
+        const app = {
+            init: () => {
+                if(AppState.slots.length === 0) {
+                    app.addPeriod(false); // Add initial default row
+                }
+                app.recalculateTimes(); 
+                app.render();
+            },
 
-        function renderRows(data) {
-            const container = document.getElementById('slot-container');
-            container.innerHTML = '';
-            data.forEach(slot => {
-                const start = new Date("2000-01-01 " + slot.start_time);
-                const end = new Date("2000-01-01 " + slot.end_time);
-                const diffMins = Math.round((end - start) / 60000); 
-                const applied = JSON.parse(slot.applicable_shifts || '[]');
-                addRow({ 
-                    label: slot.label, 
-                    duration: diffMins > 0 ? diffMins : 45, 
-                    type: slot.type, 
-                    applicable_shifts: applied 
+            setTab: (tabName) => {
+                AppState.activeTab = tabName;
+                app.render();
+            },
+
+            updateStartTime: (val) => {
+                AppState.startTime = val;
+                app.recalculateTimes();
+                app.render();
+            },
+
+            addPeriod: (render = true) => {
+                AppState.slots.push({
+                    id: Date.now(), // temp id
+                    label: "New Period",
+                    duration: 40,
+                    type: 'class',
+                    applicable_shifts: [...AppState.shifts] // Default to all shifts
                 });
-            });
-        }
+                app.recalculateTimes();
+                if(render) app.render();
+            },
 
-        function addEmptyRow() {
-            addRow({ label: "New Period", duration: 40, type: 'class', applicable_shifts: AVAILABLE_SHIFTS });
-            recalculateTimes();
-        }
+            removePeriod: (index) => {
+                AppState.slots.splice(index, 1);
+                app.recalculateTimes();
+                app.render();
+            },
 
-        function addRow(data) {
-            const container = document.getElementById('slot-container');
-            const index = container.children.length;
-            const tr = document.createElement('tr');
-            tr.className = "group hover:bg-blue-50 transition-colors bg-white";
-            
-            let shiftsHtml = '<div class="flex flex-wrap gap-2">';
-            AVAILABLE_SHIFTS.forEach(s => {
-                const checked = data.applicable_shifts.includes(s) ? 'checked' : '';
-                shiftsHtml += \`
-                    <label class="flex items-center gap-1.5 cursor-pointer select-none bg-white border border-gray-200 rounded px-1.5 py-0.5">
-                        <input type="checkbox" class="shift-check w-3 h-3 text-blue-600 focus:ring-0" value="\${s}" \${checked}>
-                        <span class="text-[10px] font-medium text-gray-600">\${s}</span>
-                    </label>
-                \`;
-            });
-            shiftsHtml += '</div>';
+            updateSlot: (index, field, value) => {
+                AppState.slots[index][field] = value;
+                if(field === 'duration') app.recalculateTimes();
+                // We don't re-render entire table on text input to keep focus, 
+                // but for select/duration we might need to.
+                if(field === 'type' || field === 'duration') app.render();
+            },
 
-            tr.innerHTML = \`
-                <td class="py-2 px-3 text-center text-xs font-mono text-gray-400 border-r border-gray-200 select-none">\${index + 1}</td>
-                
-                <td class="py-2 px-3 border-r border-gray-200">
-                    <div class="text-xs font-mono font-bold text-gray-900 time-display bg-gray-50 px-2 py-1.5 rounded border border-gray-200 text-center whitespace-nowrap">
-                        --:-- - --:--
-                    </div>
-                </td>
-                
-                <td class="py-2 px-3 border-r border-gray-200">
-                    <div class="flex items-center relative">
-                        <input type="number" value="\${data.duration}" min="5" step="5" onchange="recalculateTimes()" 
-                            class="slot-duration w-full text-sm font-bold text-center border border-transparent hover:border-gray-200 focus:border-blue-500 rounded bg-transparent p-1 outline-none" placeholder="45">
-                    </div>
-                </td>
-                
-                <td class="py-2 px-3 border-r border-gray-200">
-                    <input type="text" value="\${data.label}" 
-                        class="slot-label w-full text-sm border-b border-transparent focus:border-blue-500 bg-transparent px-1 py-1 font-medium text-gray-800 placeholder-gray-400 outline-none transition-colors" placeholder="Period Name">
-                </td>
-                
-                <td class="py-2 px-3 border-r border-gray-200">
-                    <select class="slot-type w-full text-xs border border-transparent hover:border-gray-200 rounded bg-transparent p-1 font-medium \${data.type === 'break' ? 'text-orange-600' : 'text-blue-600'}" onchange="updateRowColor(this)">
-                        <option value="class" \${data.type === 'class' ? 'selected' : ''}>Class</option>
-                        <option value="break" \${data.type === 'break' ? 'selected' : ''}>Break</option>
-                        <option value="assembly" \${data.type === 'assembly' ? 'selected' : ''}>Assembly</option>
-                    </select>
-                </td>
+            toggleShift: (index, shiftName) => {
+                const shifts = AppState.slots[index].applicable_shifts;
+                if(shifts.includes(shiftName)) {
+                    AppState.slots[index].applicable_shifts = shifts.filter(s => s !== shiftName);
+                } else {
+                    AppState.slots[index].applicable_shifts.push(shiftName);
+                }
+                app.render(); // Re-render to show visual toggle state
+            },
 
-                <td class="py-2 px-3 border-r border-gray-200">
-                    \${shiftsHtml}
-                </td>
-
-                <td class="py-2 px-2 text-center">
-                    <button onclick="removeRow(this)" class="w-8 h-8 flex items-center justify-center rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors font-bold text-lg">&times;</button>
-                </td>
-            \`;
-            
-            if(data.type === 'break') tr.classList.add('bg-orange-50/50');
-            container.appendChild(tr);
-        }
-
-        function removeRow(btn) {
-            btn.closest('tr').remove();
-            const rows = document.querySelectorAll('#slot-container tr');
-            rows.forEach((r, i) => {
-                r.querySelector('td:first-child').innerText = i + 1;
-            });
-            recalculateTimes();
-        }
-
-        function updateRowColor(select) {
-            const tr = select.closest('tr');
-            if(select.value === 'break') {
-                tr.classList.add('bg-orange-50/50');
-                select.classList.remove('text-blue-600');
-                select.classList.add('text-orange-600');
-            } else {
-                tr.classList.remove('bg-orange-50/50');
-                select.classList.remove('text-orange-600');
-                select.classList.add('text-blue-600');
-            }
-        }
-
-        function recalculateTimes() {
-            let currentTimeStr = document.getElementById('school_start_time').value; 
-            if(!currentTimeStr) return;
-
-            const addMinutes = (timeStr, mins) => {
-                let [h, m] = timeStr.split(':').map(Number);
-                let date = new Date(2000, 0, 1, h, m);
-                date.setMinutes(date.getMinutes() + mins);
-                // Manual formatting to ensure 24h format HH:MM
-                let rh = date.getHours().toString().padStart(2, '0');
-                let rm = date.getMinutes().toString().padStart(2, '0');
-                return \`\${rh}:\${rm}\`;
-            };
-
-            const rows = document.querySelectorAll('#slot-container tr');
-            rows.forEach(row => {
-                const duration = parseInt(row.querySelector('.slot-duration').value) || 0;
-                const endTimeStr = addMinutes(currentTimeStr, duration);
-                
-                row.querySelector('.time-display').innerText = \`\${currentTimeStr} - \${endTimeStr}\`;
-                row.dataset.startTime = currentTimeStr;
-                row.dataset.endTime = endTimeStr;
-                currentTimeStr = endTimeStr;
-            });
-        }
-
-        async function saveRoutine() {
-            const rows = document.querySelectorAll('#slot-container tr');
-            const payload = [];
-
-            rows.forEach(row => {
-                const shifts = [];
-                row.querySelectorAll('.shift-check:checked').forEach(cb => shifts.push(cb.value));
-
-                payload.push({
-                    start_time: row.dataset.startTime,
-                    end_time: row.dataset.endTime,
-                    label: row.querySelector('.slot-label').value,
-                    type: row.querySelector('.slot-type').value,
-                    applicable_shifts: shifts
+            recalculateTimes: () => {
+                let current = AppState.startTime;
+                AppState.slots.forEach(slot => {
+                    slot.start_time = current;
+                    
+                    // Add minutes
+                    let [h, m] = current.split(':').map(Number);
+                    let date = new Date(2000, 0, 1, h, m);
+                    date.setMinutes(date.getMinutes() + parseInt(slot.duration));
+                    
+                    let rh = date.getHours().toString().padStart(2, '0');
+                    let rm = date.getMinutes().toString().padStart(2, '0');
+                    slot.end_time = \`\${rh}:\${rm}\`;
+                    
+                    current = slot.end_time;
                 });
-            });
+            },
 
-            if(payload.length === 0) return alert("Please add at least one period.");
+            save: async () => {
+                const btn = document.querySelector('button[onclick="app.save()"]');
+                const oldText = btn.innerText;
+                btn.innerText = "Saving...";
+                btn.disabled = true;
 
-            const btn = document.querySelector('button[onclick="saveRoutine()"]');
-            const originalText = btn.innerText;
-            btn.innerText = "Saving...";
-            
-            try {
-                const res = await fetch('/school/schedules', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ action: 'save_routine', slots: payload })
-                });
-                if(res.ok) window.location.reload();
-                else alert("Error saving routine");
-            } catch(e) {
-                alert("Network error");
-            } finally {
-                btn.innerText = originalText;
+                try {
+                    const res = await fetch('/school/schedules', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ action: 'save_routine', slots: AppState.slots })
+                    });
+                    if(res.ok) window.location.reload();
+                    else alert("Save failed");
+                } catch(e) {
+                    alert("Network Error");
+                } finally {
+                    btn.innerText = oldText;
+                    btn.disabled = false;
+                }
+            },
+
+            reset: async () => {
+                 if(confirm("Reset entire configuration?")) {
+                     await fetch('/school/schedules', { method: 'DELETE' });
+                     window.location.reload();
+                 }
+            },
+
+            // --- RENDERING ---
+            render: () => {
+                app.renderTabs();
+                app.renderHeader();
+                app.renderBody();
+                
+                // Show/Hide Controls based on Tab
+                const isMaster = AppState.activeTab === 'Master';
+                document.getElementById('master-controls').classList.toggle('hidden', !isMaster);
+                document.getElementById('add-btn-wrapper').classList.toggle('hidden', !isMaster);
+            },
+
+            renderTabs: () => {
+                const container = document.getElementById('tab-container');
+                const tabs = ['Master', ...AppState.shifts];
+                
+                container.innerHTML = tabs.map(t => {
+                    const isActive = t === AppState.activeTab;
+                    const borderClass = isActive ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300';
+                    return \`
+                        <button onclick="app.setTab('\${t}')" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors \${borderClass}">
+                            \${t === 'Master' ? 'Start Here: Master Timeline' : t + ' Shift'}
+                        </button>
+                    \`;
+                }).join('');
+            },
+
+            renderHeader: () => {
+                const tr = document.getElementById('table-header');
+                const isMaster = AppState.activeTab === 'Master';
+                
+                if(isMaster) {
+                    tr.innerHTML = \`
+                        <th class="py-3 px-3 w-12 text-center border-r border-gray-100">#</th>
+                        <th class="py-3 px-3 border-r border-gray-100 w-32">Time Slot</th>
+                        <th class="py-3 px-3 border-r border-gray-100 w-20">Mins</th>
+                        <th class="py-3 px-3 border-r border-gray-100">Period Label</th>
+                        <th class="py-3 px-3 border-r border-gray-100 w-32">Type</th>
+                        <th class="py-3 px-3 w-10"></th>
+                    \`;
+                } else {
+                    // Shift View Header
+                    tr.innerHTML = \`
+                        <th class="py-3 px-3 w-12 text-center border-r border-gray-100">#</th>
+                        <th class="py-3 px-3 border-r border-gray-100 w-32">Time</th>
+                        <th class="py-3 px-3 border-r border-gray-100">Details</th>
+                        <th class="py-3 px-3 w-32 text-center">Status in \${AppState.activeTab}</th>
+                    \`;
+                }
+            },
+
+            renderBody: () => {
+                const tbody = document.getElementById('table-body');
+                const isMaster = AppState.activeTab === 'Master';
+                
+                tbody.innerHTML = AppState.slots.map((slot, i) => {
+                    // Row Logic
+                    if(isMaster) {
+                        return \`
+                        <tr class="group hover:bg-gray-50 transition-colors bg-white">
+                            <td class="py-2 px-3 text-center text-xs font-mono text-gray-400 border-r border-gray-100 select-none">\${i + 1}</td>
+                            
+                            <td class="py-2 px-3 border-r border-gray-100">
+                                <div class="text-xs font-mono font-bold text-gray-900 bg-gray-50 px-2 py-1.5 rounded border border-gray-200 text-center whitespace-nowrap">
+                                    \${slot.start_time} - \${slot.end_time}
+                                </div>
+                            </td>
+                            
+                            <td class="py-2 px-3 border-r border-gray-100">
+                                <input type="number" value="\${slot.duration}" step="5" min="5" 
+                                    onchange="app.updateSlot(\${i}, 'duration', this.value)"
+                                    class="w-full text-sm font-bold text-center border border-transparent hover:border-gray-200 focus:border-blue-500 rounded bg-transparent p-1 outline-none">
+                            </td>
+                            
+                            <td class="py-2 px-3 border-r border-gray-100">
+                                <input type="text" value="\${slot.label}" 
+                                    onchange="app.updateSlot(\${i}, 'label', this.value)"
+                                    class="w-full text-sm font-medium text-gray-800 border-b border-transparent focus:border-blue-500 bg-transparent px-1 py-1 outline-none" placeholder="Period Name">
+                            </td>
+                            
+                            <td class="py-2 px-3 border-r border-gray-100">
+                                <select onchange="app.updateSlot(\${i}, 'type', this.value)"
+                                    class="w-full text-xs font-medium bg-transparent p-1 outline-none \${slot.type==='break'?'text-orange-600':'text-blue-600'}">
+                                    <option value="class" \${slot.type==='class'?'selected':''}>Class</option>
+                                    <option value="break" \${slot.type==='break'?'selected':''}>Break</option>
+                                    <option value="assembly" \${slot.type==='assembly'?'selected':''}>Assembly</option>
+                                </select>
+                            </td>
+
+                            <td class="py-2 px-2 text-center">
+                                <button onclick="app.removePeriod(\${i})" class="text-gray-300 hover:text-red-500 font-bold text-lg">&times;</button>
+                            </td>
+                        </tr>
+                        \`;
+                    } else {
+                        // SHIFT VIEW (Read Only + Toggle)
+                        const isActive = slot.applicable_shifts.includes(AppState.activeTab);
+                        const rowClass = isActive ? 'bg-white' : 'bg-gray-50 opacity-60';
+                        const statusColor = isActive ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-400 border-gray-200';
+                        const statusText = isActive ? 'Active' : 'Skipped';
+
+                        return \`
+                        <tr class="transition-colors \${rowClass}">
+                            <td class="py-3 px-3 text-center text-xs font-mono text-gray-400 border-r border-gray-100">\${i + 1}</td>
+                            
+                            <td class="py-3 px-3 border-r border-gray-100">
+                                <span class="text-xs font-mono font-bold text-gray-700">\${slot.start_time} - \${slot.end_time}</span>
+                            </td>
+                            
+                            <td class="py-3 px-3 border-r border-gray-100">
+                                <div class="font-bold text-sm text-gray-800">\${slot.label}</div>
+                                <div class="text-[10px] uppercase text-gray-500">\${slot.type} • \${slot.duration} min</div>
+                            </td>
+                            
+                            <td class="py-3 px-3 text-center cursor-pointer select-none" onclick="app.toggleShift(\${i}, '\${AppState.activeTab}')">
+                                <div class="inline-flex items-center justify-center px-3 py-1.5 rounded-full border text-xs font-bold \${statusColor} w-24">
+                                    \${statusText}
+                                </div>
+                            </td>
+                        </tr>
+                        \`;
+                    }
+                }).join('');
             }
-        }
+        };
 
-        async function resetConfig() {
-             if(!confirm("Reset configuration?")) return;
-             await fetch('/school/schedules', { method: 'DELETE' });
-             window.location.reload();
-        }
+        // Initialize
+        document.addEventListener('DOMContentLoaded', app.init);
       </script>
     `;
 }
 
-// Wizard stays mostly same but responsive wrapper added
+// Wizard remains same
 function WizardHTML() {
     return `
       <div class="max-w-xl mx-auto py-10 px-4">
           <div class="text-center mb-8">
-              <h1 class="text-2xl font-bold text-gray-900">Initial Setup</h1>
-              <p class="text-sm text-gray-500">How does your school operate?</p>
+              <h1 class="text-2xl font-bold text-gray-900">Setup Routine</h1>
+              <p class="text-sm text-gray-500">Define your school's operating structure.</p>
           </div>
           
           <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden p-6 space-y-4">
@@ -274,7 +332,7 @@ function WizardHTML() {
                       <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 peer-checked:bg-blue-600 peer-checked:text-white">1</div>
                       <div>
                           <h3 class="font-bold text-sm text-gray-900">Single Shift</h3>
-                          <p class="text-xs text-gray-500">Everyone follows one timeline.</p>
+                          <p class="text-xs text-gray-500">Entire school runs on one timeline.</p>
                       </div>
                   </div>
               </label>
@@ -284,8 +342,8 @@ function WizardHTML() {
                   <div class="flex items-center gap-3">
                       <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 peer-checked:bg-purple-600 peer-checked:text-white">2</div>
                       <div>
-                          <h3 class="font-bold text-sm text-gray-900">Multiple Shifts</h3>
-                          <p class="text-xs text-gray-500">Morning/Day shifts share the same bells.</p>
+                          <h3 class="font-bold text-sm text-gray-900">Multi-Shift (Connected)</h3>
+                          <p class="text-xs text-gray-500">Morning/Day shifts share the master bell times.</p>
                       </div>
                   </div>
               </label>
@@ -296,7 +354,7 @@ function WizardHTML() {
               </div>
 
               <button onclick="saveConfig()" class="w-full bg-gray-900 text-white py-3 rounded-lg text-sm font-bold hover:bg-black mt-4">
-                  Create Master Schedule
+                  Initialize Schedule
               </button>
           </div>
       </div>
