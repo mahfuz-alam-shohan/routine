@@ -4,7 +4,7 @@ import { InstituteDashboardHTML } from '../ui/institute/dashboard.js';
 import { TeachersPageHTML } from '../ui/institute/teachers.js'; 
 import { ClassesPageHTML } from '../ui/institute/classes.js'; 
 import { SubjectsPageHTML } from '../ui/institute/subjects.js'; 
-import { SchedulesPageHTML } from '../ui/institute/schedules.js'; // <--- NEW IMPORT
+import { SchedulesPageHTML } from '../ui/institute/schedules.js'; 
 import { syncDatabase } from '../core/schema_manager.js';
 
 export async function handleInstituteRequest(request, env) {
@@ -22,37 +22,56 @@ export async function handleInstituteRequest(request, env) {
     return htmlResponse(InstituteLayout(InstituteDashboardHTML({teachers: tCount.count, classes: cCount.count}), "Dashboard", school.school_name));
   }
 
-  // --- SCHEDULES (NEW) ---
+  // --- SCHEDULES (CONFIG & DESIGNER) ---
   if (url.pathname === '/school/schedules') {
       
-      // SAVE CONFIG
       if (request.method === 'POST') {
           try {
               const body = await request.json();
+              
+              // 1. INIT CONFIG (Step 1)
               if (body.action === 'init_config') {
-                  // Save main config
                   await env.DB.prepare("INSERT INTO schedule_config (school_id, strategy, shifts_json) VALUES (?, ?, ?) ON CONFLICT(school_id) DO UPDATE SET strategy=excluded.strategy, shifts_json=excluded.shifts_json")
                       .bind(school.id, body.strategy, JSON.stringify(body.shifts)).run();
-                  return jsonResponse({ success: true });
               }
+
+              // 2. ADD SLOT (Step 2)
+              if (body.action === 'add_slot') {
+                  await env.DB.prepare("INSERT INTO schedule_slots (school_id, start_time, end_time, label, type, applicable_shifts) VALUES (?, ?, ?, ?, ?, ?)")
+                      .bind(school.id, body.start_time, body.end_time, body.label, body.type, JSON.stringify(body.applicable_shifts)).run();
+              }
+
+              // 3. DELETE SLOT
+              if (body.action === 'delete_slot') {
+                  await env.DB.prepare("DELETE FROM schedule_slots WHERE id = ? AND school_id = ?").bind(body.id, school.id).run();
+              }
+
+              return jsonResponse({ success: true });
+
           } catch(e) { 
               if(e.message.includes("no such table")) await syncDatabase(env);
               return jsonResponse({ error: e.message }, 500); 
           }
       }
 
-      // RESET CONFIG
+      // RESET EVERYTHING
       if (request.method === 'DELETE') {
           await env.DB.prepare("DELETE FROM schedule_config WHERE school_id = ?").bind(school.id).run();
           await env.DB.prepare("DELETE FROM schedule_slots WHERE school_id = ?").bind(school.id).run();
           return jsonResponse({ success: true });
       }
 
-      // GET CONFIG
+      // LOAD DATA
       let config = null;
-      try { config = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first(); } catch(e) { await syncDatabase(env); }
+      let slots = [];
+      try { 
+          config = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first(); 
+          if(config) {
+              slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY start_time ASC").bind(school.id).all()).results;
+          }
+      } catch(e) { await syncDatabase(env); }
       
-      return htmlResponse(InstituteLayout(SchedulesPageHTML(config), "Schedule Designer", school.school_name));
+      return htmlResponse(InstituteLayout(SchedulesPageHTML(config, slots), "Schedule Designer", school.school_name));
   }
 
   // --- SUBJECTS ---
