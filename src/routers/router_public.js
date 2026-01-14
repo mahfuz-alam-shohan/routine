@@ -32,13 +32,16 @@ export async function handlePublicRequest(request, env) {
             const headers = new Headers();
             const safeRole = user.role || 'unknown'; 
 
-            // FIX: Changed SameSite=Strict to SameSite=Lax
+            // IMPORTANT: Set Content-Type on the Headers object itself
+            headers.set('Content-Type', 'application/json');
+
+            // Add cookies (Now all 3 will be sent because we pass the 'headers' object directly)
             headers.append("Set-Cookie", `user_role=${safeRole}; Path=/; HttpOnly; Secure; SameSite=Lax`);
             headers.append("Set-Cookie", `user_email=${user.email}; Path=/; HttpOnly; Secure; SameSite=Lax`); 
             headers.append("Set-Cookie", `auth_status=active; Path=/; HttpOnly; Secure; SameSite=Lax`);
 
             return new Response(JSON.stringify({ success: true, role: safeRole }), {
-                headers: { ...Object.fromEntries(headers), 'Content-Type': 'application/json' }
+                headers: headers // <--- Passing the Headers object directly fixes the bug
             });
 
         } catch (e) {

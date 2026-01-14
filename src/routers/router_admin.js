@@ -1,17 +1,31 @@
-import { htmlResponse, jsonResponse } from '../core/utils.js';
+import { htmlResponse, jsonResponse, getCookie } from '../core/utils.js'; // <--- Added getCookie
 import { getCompanyName } from '../core/utils.js'; 
 import { hashPassword } from '../core/auth.js';
 import { ADMIN_SETUP_HTML } from '../ui/admin/setup.js';
 import { AdminLayout } from '../ui/admin/layout.js';
 import { SettingsPageHTML } from '../ui/admin/settings.js';
 import { SchoolsPageHTML } from '../ui/admin/schools.js'; 
-import { SchoolDetailHTML } from '../ui/admin/school_detail.js'; // <--- NEW IMPORT
+import { SchoolDetailHTML } from '../ui/admin/school_detail.js'; 
 import { ROLES } from '../config.js';
 import { syncDatabase } from '../core/schema_manager.js';
 
 export async function handleAdminRequest(request, env) {
   const url = new URL(request.url);
   const companyName = await getCompanyName(env);
+
+  // --- 1. SECURITY CHECK (New) ---
+  // Allow access to /admin/setup without login, but block everything else if no cookie
+  const email = getCookie(request, 'user_email');
+  if (!email && url.pathname !== '/admin/setup') {
+      return htmlResponse(`
+        <div style="display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; font-family:sans-serif;">
+            <h1>Unauthorized Access</h1>
+            <p>You must be logged in to view the Admin Panel.</p>
+            <a href="/login" style="color:blue; text-decoration:underline;">Go to Login</a>
+        </div>
+      `, 401);
+  }
+  // --------------------------------
 
   // --- SUB-ROUTE: DASHBOARD ---
   if (url.pathname === '/admin/dashboard') {
@@ -59,7 +73,7 @@ export async function handleAdminRequest(request, env) {
   }
 
 
-  // --- SUB-ROUTE: SCHOOL MASTER VIEW (NEW) ---
+  // --- SUB-ROUTE: SCHOOL MASTER VIEW ---
   if (url.pathname === '/admin/school/view') {
     const schoolId = url.searchParams.get('id');
     if (!schoolId) return htmlResponse("<h1>Invalid School ID</h1>");
