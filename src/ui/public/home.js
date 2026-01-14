@@ -1,59 +1,54 @@
 // src/ui/public/home.js
 
-export const LANDING_PAGE_CONTENT = `
-<section class="bg-white dark:bg-gray-900">
-    <div class="grid max-w-screen-xl px-4 py-8 mx-auto lg:gap-8 xl:gap-0 lg:py-16 lg:grid-cols-12">
-        <div class="mr-auto place-self-center lg:col-span-7">
-            <h1 class="max-w-2xl mb-4 text-4xl font-extrabold tracking-tight leading-none md:text-5xl xl:text-6xl text-gray-900">
-                School Routines, <br>
-                <span class="text-blue-600">Solved in Seconds.</span>
+export function HomeHTML(companyName) {
+    return `
+    <div class="flex flex-col items-center justify-center text-center py-12 md:py-24 space-y-8">
+        
+        <div class="space-y-4 max-w-3xl">
+            <h1 class="text-4xl md:text-6xl font-bold tracking-tight text-gray-900">
+                Simplify Your <br>
+                <span class="text-blue-600">School Routine</span>
             </h1>
-            <p class="max-w-2xl mb-6 font-light text-gray-500 lg:mb-8 md:text-lg lg:text-xl">
-                The smart scheduling platform for Bangladesh. Automatically generate conflict-free class routines for Teachers, Sections, and Labs without the headache.
+            <p class="text-lg md:text-xl text-gray-600 leading-relaxed max-w-2xl mx-auto">
+                ${companyName} automates your class scheduling, teacher management, and conflict resolution. 
+                Built specifically for educational institutions in Bangladesh.
             </p>
-            <a href="/login" class="inline-flex items-center justify-center px-5 py-3 mr-3 text-base font-medium text-center text-white rounded-lg bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300">
-                Get Started
-                <svg class="w-5 h-5 ml-2 -mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
-            </a>
-            <a href="#features" class="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:ring-gray-100">
-                How it works
-            </a>
         </div>
-        <div class="hidden lg:mt-0 lg:col-span-5 lg:flex">
-            <img src="https://placehold.co/600x400/png?text=Routine+Dashboard" alt="mockup" class="rounded-lg shadow-lg">
-        </div>
-    </div>
-</section>
 
-<section id="features" class="bg-gray-50 py-16">
-    <div class="py-8 px-4 mx-auto max-w-screen-xl sm:py-16 lg:px-6">
-        <div class="max-w-screen-md mb-8 lg:mb-16">
-            <h2 class="mb-4 text-4xl tracking-tight font-extrabold text-gray-900">Designed for Education</h2>
-            <p class="text-gray-500 sm:text-xl">We understand the complexity of Sections, Fixed Teachers, and Lab conflicts.</p>
+        <div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+            <a href="/login" class="inline-flex items-center justify-center px-8 py-3.5 text-base font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200">
+                Create Routine Now
+                <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
+            </a>
+            <a href="#features" class="inline-flex items-center justify-center px-8 py-3.5 text-base font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all">
+                Learn More
+            </a>
         </div>
-        <div class="space-y-8 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-12 md:space-y-0">
-            <div>
-                <div class="flex justify-center items-center mb-4 w-10 h-10 rounded-full bg-blue-100 lg:h-12 lg:w-12">
-                   <span class="text-blue-600 text-xl font-bold">1</span>
+
+        <div id="features" class="grid grid-cols-1 md:grid-cols-3 gap-8 w-full mt-20 text-left">
+            <div class="p-6 rounded-2xl bg-gray-50 border border-gray-100 hover:border-blue-100 transition-colors">
+                <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 mb-4">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
-                <h3 class="mb-2 text-xl font-bold text-gray-900">Auto-Balancing</h3>
-                <p class="text-gray-500">Ensures no teacher is overworked. The system distributes load evenly across the week.</p>
+                <h3 class="text-lg font-bold text-gray-900 mb-2">Auto-Balancing</h3>
+                <p class="text-gray-500">Automatically distributes teacher workload evenly across the week.</p>
             </div>
-            <div>
-                <div class="flex justify-center items-center mb-4 w-10 h-10 rounded-full bg-blue-100 lg:h-12 lg:w-12">
-                    <span class="text-blue-600 text-xl font-bold">2</span>
+            <div class="p-6 rounded-2xl bg-gray-50 border border-gray-100 hover:border-green-100 transition-colors">
+                <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center text-green-600 mb-4">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
-                <h3 class="mb-2 text-xl font-bold text-gray-900">Fixed Teacher Support</h3>
-                <p class="text-gray-500">Assign specific teachers to specific sections. We calculate the perfect time slot for them.</p>
+                <h3 class="text-lg font-bold text-gray-900 mb-2">Conflict Free</h3>
+                <p class="text-gray-500">Detects and resolves teacher overlap and lab conflicts instantly.</p>
             </div>
-            <div>
-                <div class="flex justify-center items-center mb-4 w-10 h-10 rounded-full bg-blue-100 lg:h-12 lg:w-12">
-                    <span class="text-blue-600 text-xl font-bold">3</span>
+            <div class="p-6 rounded-2xl bg-gray-50 border border-gray-100 hover:border-purple-100 transition-colors">
+                <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600 mb-4">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                 </div>
-                <h3 class="mb-2 text-xl font-bold text-gray-900">PDF Export</h3>
-                <p class="text-gray-500">Download printable routines for the Notice Board instantly.</p>
+                <h3 class="text-lg font-bold text-gray-900 mb-2">PDF Export</h3>
+                <p class="text-gray-500">Generate print-ready routines for notice boards in one click.</p>
             </div>
         </div>
+
     </div>
-</section>
-`;
+    `;
+}
