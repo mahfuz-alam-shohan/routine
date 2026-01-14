@@ -1,8 +1,5 @@
-// src/ui/admin/school_detail.js
-
 export function SchoolDetailHTML(school, classes = []) {
     
-    // Generate the list of existing classes for this school
     const classRows = classes.map(c => `
         <div class="flex items-center justify-between p-3 bg-gray-50 border rounded-md mb-2">
             <div>
@@ -33,7 +30,6 @@ export function SchoolDetailHTML(school, classes = []) {
              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                  <p><strong class="text-gray-500">Email:</strong> <br>${school.email}</p>
                  <p><strong class="text-gray-500">Address:</strong> <br>${school.address || 'N/A'}</p>
-                 <p><strong class="text-gray-500">Joined:</strong> <br>${school.created_at}</p>
              </div>
           </div>
 
@@ -49,15 +45,7 @@ export function SchoolDetailHTML(school, classes = []) {
                 <form onsubmit="addClass(event)" class="flex flex-col md:flex-row gap-3 items-end">
                     <div class="flex-1 w-full">
                         <label class="block text-xs font-bold text-blue-800 mb-1">Class Name</label>
-                        <select name="class_name" class="w-full border-gray-300 rounded text-sm p-2 border">
-                            <option>Class 6</option>
-                            <option>Class 7</option>
-                            <option>Class 8</option>
-                            <option>Class 9</option>
-                            <option>Class 10</option>
-                            <option>HSC 1st Year</option>
-                            <option>HSC 2nd Year</option>
-                        </select>
+                        <input type="text" name="class_name" required placeholder="e.g. Class 10, A-Level" class="w-full border-gray-300 rounded text-sm p-2 border">
                     </div>
                     <div class="flex-1 w-full">
                         <label class="block text-xs font-bold text-blue-800 mb-1">Section Name</label>
@@ -68,6 +56,7 @@ export function SchoolDetailHTML(school, classes = []) {
                         <select name="shift" class="w-full border-gray-300 rounded text-sm p-2 border">
                             <option value="Morning">Morning</option>
                             <option value="Day">Day</option>
+                            <option value="Evening">Evening</option>
                         </select>
                     </div>
                     <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-blue-700 shadow-sm w-full md:w-auto">
@@ -83,9 +72,7 @@ export function SchoolDetailHTML(school, classes = []) {
       </div>
 
       <script>
-        // Only Master Admin sees this page, so we can use these scripts safely
-        
-        const SCHOOL_ID = ${school.id}; // The Profiles Institution ID
+        const SCHOOL_ID = ${school.id}; 
 
         async function addClass(e) {
             e.preventDefault();
@@ -96,7 +83,7 @@ export function SchoolDetailHTML(school, classes = []) {
 
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
-            data.school_id = SCHOOL_ID; // Send the ID of the school we are managing
+            data.school_id = SCHOOL_ID; 
 
             try {
                 const res = await fetch('/admin/school/view?action=add_class', {
@@ -119,20 +106,15 @@ export function SchoolDetailHTML(school, classes = []) {
         }
 
         async function deleteClass(classId) {
-            if(!confirm("Are you sure you want to delete this class/section?")) return;
-            
+            if(!confirm("Delete this section?")) return;
             try {
                 const res = await fetch('/admin/school/view?action=delete_class', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id: classId })
                 });
-                
                 if(res.ok) window.location.reload();
-                else alert("Failed to delete");
-            } catch(err) {
-                alert("Network Error");
-            }
+            } catch(err) { alert("Network Error"); }
         }
       </script>
     `;
