@@ -4,72 +4,63 @@ export function LOGIN_HTML(companyName) {
     return `
     <div class="flex min-h-[calc(100vh-64px)]">
         
-        <div class="hidden lg:flex lg:w-1/2 bg-blue-600 items-center justify-center p-12 relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-64 h-64 bg-white/10 rounded-full mix-blend-overlay filter blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-            <div class="absolute bottom-0 right-0 w-96 h-96 bg-white/10 rounded-full mix-blend-overlay filter blur-3xl translate-x-1/2 translate-y-1/2"></div>
+        <div class="hidden lg:flex lg:w-1/2 bg-blue-700 relative overflow-hidden items-center justify-center">
             
-            <div class="relative z-10 text-white max-w-lg">
-                <h2 class="text-4xl font-bold mb-6">Manage your institution with confidence.</h2>
-                <p class="text-blue-100 text-lg leading-relaxed mb-8">
-                    "${companyName} has transformed how we handle our academic scheduling. It's not just software; it's peace of mind."
-                </p>
-                <div class="flex items-center gap-4">
-                    <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold">P</div>
-                    <div>
-                        <p class="font-bold text-sm">Principal, Dhaka Model College</p>
-                        <p class="text-xs text-blue-200">Verified User</p>
-                    </div>
+            <div class="absolute top-0 left-0 w-full h-full overflow-hidden">
+                <div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-500/30 rounded-full mix-blend-overlay filter blur-3xl"></div>
+                <div class="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-500/30 rounded-full mix-blend-overlay filter blur-3xl"></div>
+                <div class="absolute top-[20%] right-[20%] w-32 h-32 bg-white/10 rounded-full mix-blend-overlay filter blur-2xl"></div>
+            </div>
+            
+            <div class="relative z-10 p-12 text-white max-w-lg">
+                <div class="mb-6 inline-block p-3 bg-white/10 backdrop-blur-md rounded-lg border border-white/20">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
                 </div>
+                <h2 class="text-4xl font-bold mb-4 tracking-tight">Academic Management Simplified.</h2>
+                <p class="text-blue-100 text-lg leading-relaxed">
+                    Access your institution's dashboard to manage routines, teachers, and classes efficiently.
+                </p>
             </div>
         </div>
 
         <div class="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
-            <div class="w-full max-w-md space-y-8">
+            <div class="w-full max-w-sm space-y-8">
                 
-                <div class="text-left">
-                    <h1 class="text-3xl font-bold text-gray-900 tracking-tight">Welcome back</h1>
-                    <p class="mt-2 text-sm text-gray-500">Please enter your details to sign in.</p>
+                <div class="text-center md:text-left">
+                    <h1 class="text-3xl font-bold text-gray-900 tracking-tight">Sign In</h1>
+                    <p class="mt-2 text-sm text-gray-500">Continue to ${companyName}</p>
                 </div>
 
                 <form class="space-y-6" id="loginForm" onsubmit="handleLogin(event)">
                     
-                    <div class="space-y-5">
+                    <div class="space-y-4">
                         <div>
-                            <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                            <label for="email" class="block text-xs font-bold text-gray-700 uppercase mb-1">Email Address</label>
                             <input id="email" name="email" type="email" required 
-                                class="appearance-none relative block w-full px-4 py-3 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent sm:text-sm transition-all" 
-                                placeholder="name@school.edu">
+                                class="appearance-none block w-full px-4 py-3 bg-gray-50 border border-gray-200 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all" 
+                                placeholder="admin@school.edu">
                         </div>
                         <div>
-                            <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                            <label for="password" class="block text-xs font-bold text-gray-700 uppercase mb-1">Password</label>
                             <input id="password" name="password" type="password" required 
-                                class="appearance-none relative block w-full px-4 py-3 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent sm:text-sm transition-all" 
+                                class="appearance-none block w-full px-4 py-3 bg-gray-50 border border-gray-200 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all" 
                                 placeholder="••••••••">
                         </div>
                     </div>
 
                     <div class="flex items-center justify-between">
-                        <div class="flex items-center">
+                        <label class="flex items-center cursor-pointer">
                             <input id="remember-me" name="remember-me" type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                            <label for="remember-me" class="ml-2 block text-sm text-gray-900">Remember me</label>
-                        </div>
-                        <div class="text-sm">
-                            <a href="#" class="font-medium text-blue-600 hover:text-blue-500">Forgot password?</a>
-                        </div>
+                            <span class="ml-2 text-sm text-gray-600">Keep me logged in</span>
+                        </label>
+                        <a href="#" class="text-sm font-medium text-blue-600 hover:text-blue-500">Forgot password?</a>
                     </div>
 
-                    <div>
-                        <button type="submit" id="submitBtn"
-                            class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-gray-900 hover:bg-black focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-all shadow-sm">
-                            Sign in
-                        </button>
-                    </div>
+                    <button type="submit" id="submitBtn"
+                        class="w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-gray-900 hover:bg-black focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-all shadow-lg shadow-gray-200">
+                        Access Dashboard
+                    </button>
                 </form>
-
-                <p class="mt-2 text-center text-sm text-gray-500">
-                    Don't have an account? 
-                    <a href="#" class="font-medium text-blue-600 hover:text-blue-500">Contact Sales</a>
-                </p>
             </div>
         </div>
     </div>
@@ -79,7 +70,7 @@ export function LOGIN_HTML(companyName) {
             e.preventDefault();
             const btn = document.getElementById('submitBtn');
             const originalText = btn.innerText;
-            btn.innerText = "Signing in...";
+            btn.innerText = "Verifying...";
             btn.disabled = true;
 
             const formData = new FormData(e.target);
@@ -94,7 +85,6 @@ export function LOGIN_HTML(companyName) {
 
                 if (response.ok) {
                     const result = await response.json();
-                    // Redirect based on role
                     if (result.role === 'admin') window.location.href = '/admin/dashboard';
                     else if (result.role === 'institute') window.location.href = '/school/dashboard';
                     else if (result.role === 'teacher') window.location.href = '/teacher/dashboard';
