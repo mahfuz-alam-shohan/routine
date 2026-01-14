@@ -2,12 +2,13 @@
 
 export function PublicLayout(contentHTML, title = "Home", companyName = "RoutineAI", user = null) {
   
-  // Determine where the "Dashboard" button should link to
-  let dashboardLink = '/login';
-  if (user) {
-      if (user.role === 'admin') dashboardLink = '/admin/dashboard';
-      else if (user.role === 'institute') dashboardLink = '/school/dashboard';
-      else if (user.role === 'teacher') dashboardLink = '/teacher/dashboard';
+  // ROBUST LINK LOGIC
+  let dashboardLink = '/login'; // Default
+  if (user && user.role) {
+      const r = user.role.toLowerCase(); // Handle 'Institute' vs 'institute'
+      if (r === 'admin') dashboardLink = '/admin/dashboard';
+      else if (r === 'institute') dashboardLink = '/school/dashboard';
+      else if (r === 'teacher') dashboardLink = '/teacher/dashboard';
   }
 
   return `
@@ -26,7 +27,7 @@ export function PublicLayout(contentHTML, title = "Home", companyName = "Routine
   </head>
   <body class="bg-white text-gray-900 flex flex-col min-h-screen">
 
-      <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
+      <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 transition-all">
           <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div class="flex justify-between items-center h-16">
                   
@@ -36,25 +37,26 @@ export function PublicLayout(contentHTML, title = "Home", companyName = "Routine
                       </a>
                   </div>
 
-                  <div class="flex items-center gap-4">
+                  <div class="flex items-center gap-6">
                       
                       ${user ? `
                         <div class="flex items-center gap-3">
-                            <span class="hidden md:block text-xs font-medium text-gray-500 uppercase tracking-wide">
-                                ${user.role} Account
-                            </span>
-                            <a href="${dashboardLink}" class="flex items-center gap-2 pl-1 pr-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition-all border border-gray-200 group">
-                                <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs group-hover:bg-blue-700">
+                            <a href="${dashboardLink}" class="group flex items-center gap-3 hover:opacity-80 transition-opacity">
+                                <span class="hidden md:block text-sm font-medium text-gray-700 group-hover:text-blue-600">
+                                    My Dashboard
+                                </span>
+                                <div class="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-sm ring-2 ring-white">
                                     ${user.email.charAt(0).toUpperCase()}
                                 </div>
-                                <span class="text-sm font-medium text-gray-700 group-hover:text-gray-900">Dashboard</span>
                             </a>
                         </div>
                       ` : `
-                        <a href="/login" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Log in</a>
-                        <a href="/login" class="hidden sm:inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-gray-900 hover:bg-black transition-all shadow-sm">
-                            Get Started
-                        </a>
+                        <div class="flex items-center gap-4">
+                            <a href="/login" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Log in</a>
+                            <a href="/login" class="hidden sm:inline-flex items-center justify-center px-5 py-2 text-sm font-medium rounded-lg text-white bg-gray-900 hover:bg-black transition-all shadow-sm">
+                                Get Started
+                            </a>
+                        </div>
                       `}
                       
                   </div>
@@ -67,12 +69,12 @@ export function PublicLayout(contentHTML, title = "Home", companyName = "Routine
       </main>
 
       <footer class="bg-gray-50 border-t border-gray-200 mt-auto">
-          <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
-              <p class="text-sm text-gray-400">© ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
-              <div class="flex gap-4 text-sm text-gray-400">
-                  <a href="#" class="hover:text-gray-600">Privacy</a>
-                  <a href="#" class="hover:text-gray-600">Terms</a>
-                  <a href="#" class="hover:text-gray-600">Contact</a>
+          <div class="max-w-7xl mx-auto py-10 px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
+              <p class="text-sm text-gray-500">© ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
+              <div class="flex gap-6 text-sm text-gray-500">
+                  <a href="#" class="hover:text-gray-900 transition-colors">Privacy Policy</a>
+                  <a href="#" class="hover:text-gray-900 transition-colors">Terms of Service</a>
+                  <a href="#" class="hover:text-gray-900 transition-colors">Contact Support</a>
               </div>
           </div>
       </footer>
