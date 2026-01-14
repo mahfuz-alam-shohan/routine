@@ -13,17 +13,6 @@ const DEFINED_SCHEMA = {
     created_at: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
   },
 
-  // --- NEW: ADMIN PROFILE ---
-  profiles_admin: {
-    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
-    auth_id: "INTEGER",
-    full_name: "TEXT",
-    phone: "TEXT",
-    dob: "DATE",
-    avatar_url: "TEXT", 
-    "FOREIGN KEY(auth_id)": "REFERENCES auth_accounts(id)"
-  },
-
   profiles_institution: {
     id: "INTEGER PRIMARY KEY AUTOINCREMENT",
     auth_id: "INTEGER",
@@ -32,6 +21,15 @@ const DEFINED_SCHEMA = {
     address: "TEXT", 
     max_teachers: "INTEGER DEFAULT 10", 
     "FOREIGN KEY(auth_id)": "REFERENCES auth_accounts(id)" 
+  },
+
+  profiles_admin: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    auth_id: "INTEGER",
+    full_name: "TEXT",
+    phone: "TEXT",
+    dob: "DATE",
+    "FOREIGN KEY(auth_id)": "REFERENCES auth_accounts(id)"
   },
 
   profiles_teacher: {
@@ -66,6 +64,26 @@ const DEFINED_SCHEMA = {
     class_name: "TEXT", 
     subject_id: "INTEGER",
     "FOREIGN KEY(subject_id)": "REFERENCES academic_subjects(id)"
+  },
+
+  // --- NEW: SCHEDULE CONFIGURATION ---
+  schedule_config: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    school_id: "INTEGER UNIQUE", // One config per school
+    strategy: "TEXT", // 'single', 'disconnected', 'connected'
+    shifts_json: "TEXT" // JSON array: ["Morning", "Day"]
+  },
+
+  schedule_slots: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    school_id: "INTEGER",
+    slot_index: "INTEGER", // 1, 2, 3...
+    start_time: "TEXT", // "08:00"
+    end_time: "TEXT",   // "08:45"
+    type: "TEXT",       // 'class', 'break'
+    label: "TEXT",      // "1st Period", "Tiffin"
+    applicable_shifts: "TEXT", // JSON: ["Morning", "Full"]
+    "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)"
   },
 
   system_settings: {
