@@ -3,7 +3,7 @@ import { InstituteLayout } from '../ui/institute/layout.js';
 import { InstituteDashboardHTML } from '../ui/institute/dashboard.js';
 import { TeachersPageHTML } from '../ui/institute/teachers.js'; 
 import { ClassesPageHTML } from '../ui/institute/classes.js'; 
-import { syncDatabase } from '../core/schema_manager.js'; // <--- Auto-Fix Import
+import { syncDatabase } from '../core/schema_manager.js';
 
 export async function handleInstituteRequest(request, env) {
   const url = new URL(request.url);
@@ -39,12 +39,12 @@ export async function handleInstituteRequest(request, env) {
   if (url.pathname === '/school/dashboard') {
     const tCount = await env.DB.prepare("SELECT count(*) as count FROM profiles_teacher WHERE school_id = ?").bind(schoolId).first();
     
-    // Auto-fix attempt for dashboard stats too
+    // Auto-fix attempt for dashboard stats
     let cCount = { count: 0 };
     try {
         cCount = await env.DB.prepare("SELECT count(*) as count FROM academic_classes WHERE school_id = ?").bind(schoolId).first();
     } catch(e) {
-        // If table missing, we just show 0 for now to prevent crash
+        // If table missing, ignore
     }
     
     const stats = { teachers: tCount.count, classes: cCount.count };
@@ -74,51 +74,21 @@ export async function handleInstituteRequest(request, env) {
   }
 
 
-  // --- ROUTE: CLASSES (WITH AUTO-FIX) ---
+  // --- ROUTE: CLASSES (READ ONLY) ---
   if (url.pathname === '/school/classes') {
+      // NOTE: POST method removed to prevent Institutes from creating classes.
       
-      // POST: Add Class/Section
-      if (request.method === 'POST') {
-          try {
-              const body = await request.json();
-              if(!body.class_name || !body.section_name) return jsonResponse({error:"Details required"}, 400);
-
-              // 1. Try to insert
-              await env.DB.prepare("INSERT INTO academic_classes (school_id, class_name, section_name, shift) VALUES (?, ?, ?, ?)")
-                .bind(schoolId, body.class_name, body.section_name, body.shift || 'Morning')
-                .run();
-              
-              return jsonResponse({ success: true });
-          } catch(e) {
-              // 2. If table missing, create it and retry
-              if (e.message && e.message.includes("no such table")) {
-                  await syncDatabase(env);
-                  try {
-                      await env.DB.prepare("INSERT INTO academic_classes (school_id, class_name, section_name, shift) VALUES (?, ?, ?, ?)")
-                        .bind(schoolId, body.class_name, body.section_name, body.shift || 'Morning')
-                        .run();
-                      return jsonResponse({ success: true });
-                  } catch(retryErr) {
-                      return jsonResponse({ error: retryErr.message }, 500);
-                  }
-              }
-              return jsonResponse({ error: e.message }, 500);
-          }
-      }
-
       // GET: List Classes
       try {
-          // 1. Try to fetch
           const classes = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ? ORDER BY class_name ASC").bind(schoolId).all();
           return htmlResponse(InstituteLayout(ClassesPageHTML(classes.results), "Classes", schoolName));
       } catch (e) {
-          // 2. If table missing, create it and retry
           if (e.message && (e.message.includes("no such table") || e.message.includes("prepare"))) {
              await syncDatabase(env);
              const classesRetry = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ? ORDER BY class_name ASC").bind(schoolId).all();
              return htmlResponse(InstituteLayout(ClassesPageHTML(classesRetry.results), "Classes", schoolName));
           }
-          throw e; // Throw real errors
+          throw e; 
       }
   }
 

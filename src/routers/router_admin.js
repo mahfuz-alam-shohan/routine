@@ -1,4 +1,4 @@
-import { htmlResponse, jsonResponse, getCookie } from '../core/utils.js'; // <--- Added getCookie
+import { htmlResponse, jsonResponse, getCookie } from '../core/utils.js';
 import { getCompanyName } from '../core/utils.js'; 
 import { hashPassword } from '../core/auth.js';
 import { ADMIN_SETUP_HTML } from '../ui/admin/setup.js';
@@ -13,19 +13,11 @@ export async function handleAdminRequest(request, env) {
   const url = new URL(request.url);
   const companyName = await getCompanyName(env);
 
-  // --- 1. SECURITY CHECK (New) ---
-  // Allow access to /admin/setup without login, but block everything else if no cookie
+  // --- 1. SECURITY CHECK ---
   const email = getCookie(request, 'user_email');
   if (!email && url.pathname !== '/admin/setup') {
-      return htmlResponse(`
-        <div style="display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; font-family:sans-serif;">
-            <h1>Unauthorized Access</h1>
-            <p>You must be logged in to view the Admin Panel.</p>
-            <a href="/login" style="color:blue; text-decoration:underline;">Go to Login</a>
-        </div>
-      `, 401);
+      return htmlResponse(`<h1>Unauthorized</h1><p>Admin login required.</p>`, 401);
   }
-  // --------------------------------
 
   // --- SUB-ROUTE: DASHBOARD ---
   if (url.pathname === '/admin/dashboard') {
@@ -73,24 +65,57 @@ export async function handleAdminRequest(request, env) {
   }
 
 
-  // --- SUB-ROUTE: SCHOOL MASTER VIEW ---
+  // --- SUB-ROUTE: SCHOOL MASTER VIEW & CLASS MANAGER ---
   if (url.pathname === '/admin/school/view') {
-    const schoolId = url.searchParams.get('id');
-    if (!schoolId) return htmlResponse("<h1>Invalid School ID</h1>");
+    
+    // 1. Handle POST Actions (Add/Delete Classes)
+    if (request.method === 'POST') {
+        const action = url.searchParams.get('action');
+        const body = await request.json();
 
-    // Fetch School Data by Auth ID
+        try {
+            if (action === 'add_class') {
+                await env.DB.prepare("INSERT INTO academic_classes (school_id, class_name, section_name, shift) VALUES (?, ?, ?, ?)")
+                  .bind(body.school_id, body.class_name, body.section_name, body.shift)
+                  .run();
+                return jsonResponse({ success: true });
+            }
+            if (action === 'delete_class') {
+                await env.DB.prepare("DELETE FROM academic_classes WHERE id = ?").bind(body.id).run();
+                return jsonResponse({ success: true });
+            }
+        } catch (e) {
+            // Auto-fix table if missing during admin action
+            if (e.message && e.message.includes("no such table")) {
+                 await syncDatabase(env);
+                 return jsonResponse({ error: "Database synced. Try again." }, 500);
+            }
+            return jsonResponse({ error: e.message }, 500);
+        }
+    }
+
+    // 2. Render View
+    const authId = url.searchParams.get('id');
+    if (!authId) return htmlResponse("<h1>Invalid ID</h1>");
+
     const school = await env.DB.prepare(`
         SELECT p.*, a.email, a.created_at 
         FROM profiles_institution p 
         JOIN auth_accounts a ON p.auth_id = a.id 
         WHERE a.id = ?
-    `).bind(schoolId).first();
+    `).bind(authId).first();
 
     if (!school) return htmlResponse("<h1>School Not Found</h1>");
 
-    const stats = { teachers: 0, students: 0, routines: 0 }; // Mock stats
-    const content = SchoolDetailHTML(school, stats);
-    return htmlResponse(AdminLayout(content, "School Overview", companyName));
+    // Fetch the Classes for this school to display
+    let classes = [];
+    try {
+        const res = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ? ORDER BY class_name ASC").bind(school.id).all();
+        classes = res.results || [];
+    } catch(e) { /* Table might not exist yet, that is ok */ }
+
+    const content = SchoolDetailHTML(school, classes);
+    return htmlResponse(AdminLayout(content, "Manage Client", companyName));
   }
 
 
