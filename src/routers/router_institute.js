@@ -3,7 +3,7 @@ import { InstituteLayout } from '../ui/institute/layout.js';
 import { InstituteDashboardHTML } from '../ui/institute/dashboard.js';
 import { TeachersPageHTML } from '../ui/institute/teachers.js'; 
 import { ClassesPageHTML } from '../ui/institute/classes.js'; 
-import { SubjectsPageHTML } from '../ui/institute/subjects.js'; // <--- NEW IMPORT
+import { SubjectsPageHTML } from '../ui/institute/subjects.js'; 
 import { syncDatabase } from '../core/schema_manager.js';
 
 export async function handleInstituteRequest(request, env) {
@@ -21,20 +21,23 @@ export async function handleInstituteRequest(request, env) {
     return htmlResponse(InstituteLayout(InstituteDashboardHTML({teachers: tCount.count, classes: cCount.count}), "Dashboard", school.school_name));
   }
 
-  // --- ROUTE: SUBJECTS (NEW) ---
+  // --- ROUTE: SUBJECTS (UPDATED) ---
   if (url.pathname === '/school/subjects') {
       
       if (request.method === 'POST') {
           try {
               const body = await request.json();
               
-              // Action 1: Create Global Subject
+              // 1. CREATE
               if (body.action === 'create') {
                   await env.DB.prepare("INSERT INTO academic_subjects (school_id, subject_name) VALUES (?, ?)").bind(school.id, body.name).run();
               }
-              // Action 2: Assign to Class
+              // 2. RENAME (NEW)
+              if (body.action === 'rename') {
+                  await env.DB.prepare("UPDATE academic_subjects SET subject_name = ? WHERE id = ? AND school_id = ?").bind(body.name, body.id, school.id).run();
+              }
+              // 3. ASSIGN
               if (body.action === 'assign') {
-                   // Prevent duplicates
                    const exists = await env.DB.prepare("SELECT id FROM class_subjects_link WHERE class_name = ? AND subject_id = ?").bind(body.class_name, body.subject_id).first();
                    if(!exists) {
                        await env.DB.prepare("INSERT INTO class_subjects_link (school_id, class_name, subject_id) VALUES (?, ?, ?)").bind(school.id, body.class_name, body.subject_id).run();
@@ -49,8 +52,18 @@ export async function handleInstituteRequest(request, env) {
 
       if (request.method === 'DELETE') {
           const body = await request.json();
-          await env.DB.prepare("DELETE FROM academic_subjects WHERE id = ?").bind(body.id).run();
-          await env.DB.prepare("DELETE FROM class_subjects_link WHERE subject_id = ?").bind(body.id).run(); // Cascade delete
+          
+          // REMOVE FROM BANK
+          if (body.type === 'bank') {
+              await env.DB.prepare("DELETE FROM academic_subjects WHERE id = ? AND school_id = ?").bind(body.id, school.id).run();
+              await env.DB.prepare("DELETE FROM class_subjects_link WHERE subject_id = ?").bind(body.id).run(); 
+          }
+          // REMOVE FROM CURRICULUM (NEW)
+          if (body.type === 'curriculum') {
+               await env.DB.prepare("DELETE FROM class_subjects_link WHERE class_name = ? AND subject_id = ? AND school_id = ?")
+                .bind(body.class_name, body.subject_id, school.id).run();
+          }
+
           return jsonResponse({ success: true });
       }
 
@@ -58,8 +71,6 @@ export async function handleInstituteRequest(request, env) {
       try {
           const subjects = await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
           const classes = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ?").bind(school.id).all();
-          
-          // Get allocations (Join to get names)
           const allocations = await env.DB.prepare(`
             SELECT l.*, s.subject_name 
             FROM class_subjects_link l 
@@ -75,7 +86,7 @@ export async function handleInstituteRequest(request, env) {
   }
 
 
-  // --- TEACHERS (UPDATED FOR MULTI-SUBJECT) ---
+  // --- TEACHERS ---
   if (url.pathname === '/school/teachers') {
       if (request.method === 'POST') {
           try {
@@ -84,30 +95,22 @@ export async function handleInstituteRequest(request, env) {
             if (current.count >= limit) return jsonResponse({ error: "Limit Reached" }, 403);
 
             const body = await request.json();
-            
-            // Validate & Format
             if(!body.full_name || !body.subject || !body.email || !body.phone_digits) return jsonResponse({ error: "Missing fields" }, 400);
             const cleanPhone = body.phone_digits.replace(/\D/g, ''); 
             if (cleanPhone.length !== 10) return jsonResponse({ error: "Phone must be 10 digits" }, 400);
             const formattedPhone = `880-${cleanPhone}`;
 
-            // Save (Subject is now a JSON string)
             await env.DB.prepare("INSERT INTO profiles_teacher (school_id, full_name, subject, email, phone) VALUES (?, ?, ?, ?, ?)")
-                .bind(school.id, body.full_name, body.subject, body.email, formattedPhone)
-                .run();
+                .bind(school.id, body.full_name, body.subject, body.email, formattedPhone).run();
             
             return jsonResponse({ success: true });
           } catch(e) { return jsonResponse({ error: e.message }, 500); }
       }
-
-      // Load List (Fetch subjects too for the dropdown)
       try {
         const teachers = await env.DB.prepare("SELECT * FROM profiles_teacher WHERE school_id = ? ORDER BY id DESC").bind(school.id).all();
         const allSubjects = await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
-        
         return htmlResponse(InstituteLayout(TeachersPageHTML(teachers.results, allSubjects.results), "Teachers", school.school_name));
       } catch(e) {
-        await syncDatabase(env); 
         return htmlResponse(InstituteLayout(TeachersPageHTML([], []), "Teachers", school.school_name));
       }
   }
