@@ -1,6 +1,6 @@
 // src/core/schema_manager.js
 
-// 1. THE DEFINITION (The "Truth")
+// 1. THE DEFINITION
 const DEFINED_SCHEMA = {
   
   auth_accounts: {
@@ -19,25 +19,25 @@ const DEFINED_SCHEMA = {
     school_name: "TEXT",
     eiin_code: "TEXT",
     address: "TEXT", 
+    max_teachers: "INTEGER DEFAULT 10", // <--- NEW: Limit for monetization
     "FOREIGN KEY(auth_id)": "REFERENCES auth_accounts(id)" 
   },
 
   profiles_teacher: {
     id: "INTEGER PRIMARY KEY AUTOINCREMENT",
-    auth_id: "INTEGER",
+    auth_id: "INTEGER", // Optional (if teacher has login)
     school_id: "INTEGER",
     full_name: "TEXT",
     phone: "TEXT",
     "FOREIGN KEY(auth_id)": "REFERENCES auth_accounts(id)"
   },
 
-  // --- NEW TABLES ---
   academic_classes: {
     id: "INTEGER PRIMARY KEY AUTOINCREMENT",
     school_id: "INTEGER",
-    class_name: "TEXT",  // e.g. "Class 9"
-    section_name: "TEXT", // e.g. "Padma" or "A"
-    shift: "TEXT",        // e.g. "Morning"
+    class_name: "TEXT",  
+    section_name: "TEXT", 
+    shift: "TEXT",        
     created_at: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
   },
 
@@ -47,23 +47,15 @@ const DEFINED_SCHEMA = {
   }
 };
 
-// 2. THE SYNC LOGIC (The "Engine")
+// 2. THE SYNC LOGIC
 export async function syncDatabase(env) {
   const report = []; 
-
-  // A. Get List of Existing Tables
   const existingTablesResult = await env.DB.prepare("PRAGMA table_list").all();
   
-  // Filter out internal tables
   const existingTables = existingTablesResult.results
       .map(t => t.name)
-      .filter(name => 
-          !name.startsWith("sqlite_") && 
-          !name.startsWith("d1_") && 
-          !name.startsWith("_")
-      );
+      .filter(name => !name.startsWith("sqlite_") && !name.startsWith("d1_") && !name.startsWith("_"));
 
-  // --- PHASE 1: CREATE or UPDATE Tables ---
   for (const [tableName, columns] of Object.entries(DEFINED_SCHEMA)) {
     if (!existingTables.includes(tableName)) {
       await createTable(env, tableName, columns);
@@ -73,7 +65,6 @@ export async function syncDatabase(env) {
     }
   }
 
-  // --- PHASE 2: CLEANUP (Drop Unused Tables) ---
   for (const existingTable of existingTables) {
     if (!DEFINED_SCHEMA[existingTable]) {
       try {
@@ -88,16 +79,12 @@ export async function syncDatabase(env) {
   return report;
 }
 
-// --- HELPER FUNCTIONS ---
-
 async function createTable(env, tableName, columns) {
   const colDefs = Object.entries(columns).map(([colName, colType]) => {
     if (colName.includes(" ")) return `${colName} ${colType}`; 
     return `"${colName}" ${colType}`;
   }).join(", ");
-  
-  const sql = `CREATE TABLE IF NOT EXISTS "${tableName}" (${colDefs});`;
-  await env.DB.prepare(sql).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS "${tableName}" (${colDefs});`).run();
 }
 
 async function syncColumns(env, tableName, schemaColumns, report) {
@@ -106,7 +93,6 @@ async function syncColumns(env, tableName, schemaColumns, report) {
 
   for (const [colName, colType] of Object.entries(schemaColumns)) {
     if (colName.includes(" ")) continue; 
-
     if (!dbColNames.includes(colName)) {
       try {
         await env.DB.prepare(`ALTER TABLE "${tableName}" ADD COLUMN "${colName}" ${colType}`).run();
