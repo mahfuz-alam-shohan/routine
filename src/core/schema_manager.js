@@ -31,16 +31,15 @@ const DEFINED_SCHEMA = {
     "FOREIGN KEY(auth_id)": "REFERENCES auth_accounts(id)"
   },
 
-  // --- NEW TABLES START ---
+  // --- NEW TABLES ---
   academic_classes: {
     id: "INTEGER PRIMARY KEY AUTOINCREMENT",
     school_id: "INTEGER",
     class_name: "TEXT",  // e.g. "Class 9"
     section_name: "TEXT", // e.g. "Padma" or "A"
-    shift: "TEXT",        // e.g. "Morning", "Day"
+    shift: "TEXT",        // e.g. "Morning"
     created_at: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
   },
-  // --- NEW TABLES END ---
 
   system_settings: {
     key: "TEXT PRIMARY KEY",

@@ -1,4 +1,4 @@
-import { htmlResponse, jsonResponse } from '../core/utils.js';
+import { htmlResponse, jsonResponse, getCookie } from '../core/utils.js'; // <--- Added getCookie
 import { PublicLayout } from '../ui/public/layout.js';
 import { LOGIN_HTML } from '../ui/public/login.js';
 import { verifyPassword } from '../core/auth.js';
@@ -6,8 +6,21 @@ import { verifyPassword } from '../core/auth.js';
 export async function handlePublicRequest(request, env) {
   const url = new URL(request.url);
 
-  // --- HOME PAGE ---
+  // --- HOME PAGE (Now with Auto-Redirect) ---
   if (url.pathname === '/') {
+    
+    // 1. Check if user is already logged in
+    const email = getCookie(request, 'user_email');
+    const role = getCookie(request, 'user_role');
+
+    if (email && role) {
+        // Redirect to their respective dashboard
+        if (role === 'admin') return Response.redirect(url.origin + '/admin/dashboard', 302);
+        if (role === 'institute') return Response.redirect(url.origin + '/school/dashboard', 302);
+        if (role === 'teacher') return Response.redirect(url.origin + '/teacher/dashboard', 302);
+    }
+
+    // 2. If not logged in, show the Landing Page
     const { LANDING_PAGE_CONTENT } = await import('../ui/public/home.js');
     return htmlResponse(PublicLayout(LANDING_PAGE_CONTENT, "RoutineAI - Home"));
   }
@@ -31,17 +44,20 @@ export async function handlePublicRequest(request, env) {
             // 3. Login Success (Set Cookies)
             const headers = new Headers();
             const safeRole = user.role || 'unknown'; 
+            
+            // SMART COOKIE: Detect if we are on HTTPS or Localhost
+            const isSecure = url.protocol === 'https:';
+            const secureFlag = isSecure ? 'Secure;' : ''; 
 
-            // IMPORTANT: Set Content-Type on the Headers object itself
             headers.set('Content-Type', 'application/json');
 
-            // Add cookies (Now all 3 will be sent because we pass the 'headers' object directly)
-            headers.append("Set-Cookie", `user_role=${safeRole}; Path=/; HttpOnly; Secure; SameSite=Lax`);
-            headers.append("Set-Cookie", `user_email=${user.email}; Path=/; HttpOnly; Secure; SameSite=Lax`); 
-            headers.append("Set-Cookie", `auth_status=active; Path=/; HttpOnly; Secure; SameSite=Lax`);
+            // We use 'Lax' so the cookie survives the redirect
+            headers.append("Set-Cookie", `user_role=${safeRole}; Path=/; HttpOnly; ${secureFlag} SameSite=Lax`);
+            headers.append("Set-Cookie", `user_email=${user.email}; Path=/; HttpOnly; ${secureFlag} SameSite=Lax`); 
+            headers.append("Set-Cookie", `auth_status=active; Path=/; HttpOnly; ${secureFlag} SameSite=Lax`);
 
             return new Response(JSON.stringify({ success: true, role: safeRole }), {
-                headers: headers // <--- Passing the Headers object directly fixes the bug
+                headers: headers 
             });
 
         } catch (e) {
@@ -55,9 +71,10 @@ export async function handlePublicRequest(request, env) {
   // --- LOGOUT ---
   if (url.pathname === '/logout') {
     const headers = new Headers();
-    headers.append("Set-Cookie", "user_role=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
-    headers.append("Set-Cookie", "user_email=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
-    headers.append("Set-Cookie", "auth_status=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+    // Clear cookies with matching attributes
+    headers.append("Set-Cookie", "user_role=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax");
+    headers.append("Set-Cookie", "user_email=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax");
+    headers.append("Set-Cookie", "auth_status=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax");
     headers.append("Location", "/login"); 
     return new Response("Logging out...", { status: 302, headers: headers });
   }

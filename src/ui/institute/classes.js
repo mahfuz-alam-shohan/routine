@@ -11,7 +11,7 @@ export function ClassesPageHTML(classes = []) {
                 </div>
             </div>
             <div class="text-sm text-gray-400">
-                <button onclick="deleteClass(${c.id})" class="text-red-400 hover:text-red-600 transition-colors">Remove</button>
+                <button class="text-red-400 hover:text-red-600 transition-colors cursor-not-allowed" title="Delete coming soon">Remove</button>
             </div>
         </div>
     `).join('');
@@ -92,13 +92,6 @@ export function ClassesPageHTML(classes = []) {
                 btn.innerText = originalText;
                 btn.disabled = false;
             }
-        }
-
-        async function deleteClass(id) {
-            if(!confirm("Remove this section?")) return;
-            // For now, just reload. We will add delete API logic later if needed.
-            // Or you can implement DELETE method in router.
-            alert("Delete feature coming in next update!"); 
         }
       </script>
     `;
