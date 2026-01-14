@@ -13,6 +13,17 @@ const DEFINED_SCHEMA = {
     created_at: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
   },
 
+  // --- NEW: ADMIN PROFILE ---
+  profiles_admin: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    auth_id: "INTEGER",
+    full_name: "TEXT",
+    phone: "TEXT",
+    dob: "DATE",
+    avatar_url: "TEXT", 
+    "FOREIGN KEY(auth_id)": "REFERENCES auth_accounts(id)"
+  },
+
   profiles_institution: {
     id: "INTEGER PRIMARY KEY AUTOINCREMENT",
     auth_id: "INTEGER",
@@ -28,7 +39,7 @@ const DEFINED_SCHEMA = {
     auth_id: "INTEGER",
     school_id: "INTEGER",
     full_name: "TEXT",
-    subject: "TEXT", // Will now store JSON array: ["Math", "Science"]
+    subject: "TEXT", 
     email: "TEXT",
     phone: "TEXT",
     "FOREIGN KEY(auth_id)": "REFERENCES auth_accounts(id)"
@@ -43,18 +54,16 @@ const DEFINED_SCHEMA = {
     created_at: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
   },
 
-  // --- NEW: SUBJECT BANK (Global List for School) ---
   academic_subjects: {
     id: "INTEGER PRIMARY KEY AUTOINCREMENT",
     school_id: "INTEGER",
     subject_name: "TEXT" 
   },
 
-  // --- NEW: CLASS CURRICULUM (Which class has which subject) ---
   class_subjects_link: {
     id: "INTEGER PRIMARY KEY AUTOINCREMENT",
     school_id: "INTEGER",
-    class_name: "TEXT", // e.g., "Class 9" (Links to group of sections)
+    class_name: "TEXT", 
     subject_id: "INTEGER",
     "FOREIGN KEY(subject_id)": "REFERENCES academic_subjects(id)"
   },
