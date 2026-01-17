@@ -34,19 +34,19 @@ export function TeachersPageHTML(teachers = [], allSubjects = []) {
     `).join('');
 
     return `
-      <div class="max-w-4xl mx-auto pt-6">
-          <div class="flex items-center justify-between mb-6">
+      <div class="max-w-4xl mx-auto pt-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <div>
-                <h1 class="text-2xl font-light text-gray-900">Teachers</h1>
+                <h1 class="text-2xl font-semibold text-gray-900">Teachers</h1>
                 <p class="text-sm text-gray-500 mt-1">Manage faculty members.</p>
               </div>
-              <button onclick="toggleAdd()" class="text-sm bg-gray-900 text-white px-5 py-2 hover:bg-black transition-colors">
+              <button onclick="toggleAdd()" class="text-sm bg-gray-900 text-white px-4 py-2 rounded hover:bg-black transition-colors w-full sm:w-auto">
                   + Add Teacher
               </button>
           </div>
 
-          <div id="add-box" class="hidden mb-10 bg-white p-6 border border-gray-200 rounded-lg shadow-sm">
-              <h3 class="text-lg font-medium text-gray-900 mb-4">New Teacher Profile</h3>
+          <div id="add-box" class="hidden mb-6 bg-white p-4 border border-gray-200 rounded-lg shadow-sm">
+              <h3 class="text-base font-semibold text-gray-900 mb-3">New Teacher Profile</h3>
               <form onsubmit="addTeacher(event)" class="space-y-4">
                   
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -92,19 +92,36 @@ export function TeachersPageHTML(teachers = [], allSubjects = []) {
           </div>
 
           <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-              <table class="min-w-full divide-y divide-gray-200">
-                  <thead class="bg-gray-50">
-                      <tr>
-                          <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Teacher</th>
-                          <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Subjects</th>
-                          <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Phone</th>
-                          <th class="px-6 py-3"></th>
-                      </tr>
-                  </thead>
-                  <tbody class="bg-white divide-y divide-gray-200">
-                      ${teachers.length > 0 ? rows : '<tr><td colspan="4" class="px-6 py-12 text-center text-gray-400">No teachers added yet.</td></tr>'}
-                  </tbody>
-              </table>
+              <div class="md:hidden p-4 space-y-3">
+                  ${teachers.map(t => `
+                      <div class="border border-gray-200 rounded-lg p-3">
+                          <div class="text-sm font-semibold text-gray-900">${t.full_name}</div>
+                          <div class="text-xs text-gray-500">${t.email}</div>
+                          <div class="flex flex-wrap gap-1 mt-2">
+                              ${formatSub(t.subject).split(', ').map(s => 
+                                  `<span class="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px] uppercase font-bold tracking-wide border border-blue-100">${s}</span>`
+                              ).join('')}
+                          </div>
+                          <div class="text-xs font-mono text-gray-600 mt-2">${t.phone}</div>
+                      </div>
+                  `).join('')}
+                  ${teachers.length > 0 ? '' : '<div class="py-8 text-center text-gray-400 text-sm">No teachers added yet.</div>'}
+              </div>
+              <div class="hidden md:block overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200">
+                      <thead class="bg-gray-50">
+                          <tr>
+                              <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Teacher</th>
+                              <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Subjects</th>
+                              <th class="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Phone</th>
+                              <th class="px-6 py-3"></th>
+                          </tr>
+                      </thead>
+                      <tbody class="bg-white divide-y divide-gray-200">
+                          ${teachers.length > 0 ? rows : '<tr><td colspan="4" class="px-6 py-12 text-center text-gray-400">No teachers added yet.</td></tr>'}
+                      </tbody>
+                  </table>
+              </div>
           </div>
       </div>
 

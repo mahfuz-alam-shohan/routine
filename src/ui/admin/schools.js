@@ -20,6 +20,26 @@ export function SchoolsPageHTML(schoolsList = []) {
     </tr>
   `).join('');
 
+  const mobileCards = schoolsList.map(school => `
+    <div class="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <div class="text-sm font-semibold text-gray-900">${school.school_name}</div>
+                <div class="text-xs text-gray-500 mt-1">EIIN: ${school.eiin_code || 'N/A'}</div>
+                <div class="text-xs text-gray-500 mt-1">${school.email}</div>
+            </div>
+            <span class="px-2 inline-flex text-[10px] leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                Active
+            </span>
+        </div>
+        <div class="mt-3">
+            <a href="/admin/school/view?id=${school.auth_id}" class="inline-flex items-center text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded">
+                Manage
+            </a>
+        </div>
+    </div>
+  `).join('');
+
   return `
     <div class="space-y-6">
         
@@ -29,14 +49,17 @@ export function SchoolsPageHTML(schoolsList = []) {
                 <p class="text-sm text-gray-500 mt-1">Manage all registered institutions.</p>
             </div>
             
-            <button onclick="toggleForm()" id="add-btn" class="w-full md:w-auto bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 flex items-center justify-center shadow-sm transition-all focus:ring-4 focus:ring-blue-200">
+            <button onclick="toggleForm()" id="add-btn" class="w-full md:w-auto bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center justify-center shadow-sm transition-all focus:ring-2 focus:ring-blue-200 text-sm">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                 Add New School
             </button>
         </div>
 
         <div id="list-view" class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
-            <div class="overflow-x-auto">
+            <div class="md:hidden space-y-3 p-4">
+                ${mobileCards.length > 0 ? mobileCards : '<div class="py-10 text-center text-gray-500 text-sm">No schools found.</div>'}
+            </div>
+            <div class="hidden md:block overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>

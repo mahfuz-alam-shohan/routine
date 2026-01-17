@@ -21,9 +21,9 @@ export function SubjectsPageHTML(subjects = [], classes = [], allocations = []) 
               </button>
           </div>
 
-          <div class="flex flex-col md:flex-row h-full gap-0 md:gap-8 overflow-visible md:overflow-hidden">
+          <div class="flex flex-col md:flex-row h-full gap-4 md:gap-8 overflow-visible md:overflow-hidden">
               
-              <div id="view-bank" class="w-full md:w-1/2 flex flex-col h-[500px] md:h-full bg-white rounded-xl border border-gray-200 shadow-sm md:overflow-hidden">
+              <div id="view-bank" class="w-full md:w-1/2 flex flex-col h-auto max-h-[70vh] md:h-full md:max-h-none bg-white rounded-xl border border-gray-200 shadow-sm md:overflow-hidden">
                   
                   <div class="p-4 border-b border-gray-100 bg-gray-50 shrink-0">
                       <h2 class="text-lg font-bold text-gray-800 mb-3 flex items-center justify-between">
