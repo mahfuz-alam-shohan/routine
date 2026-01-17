@@ -23,23 +23,23 @@ export function SchoolClassesHTML(school, classesData = []) {
             
             <div class="divide-y divide-gray-100">
                 ${grouped[className].map(sec => `
-                    <div class="px-8 py-3 flex justify-between items-center hover:bg-gray-50">
-                        <div class="flex items-center gap-2">
+                    <div class="px-4 py-3 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 hover:bg-gray-50">
+                        <div class="flex items-center gap-2 flex-wrap">
                             <span class="w-2 h-2 rounded-full bg-blue-400"></span>
                             <span class="text-sm font-medium text-gray-700">${sec.section_name}</span>
                             <span class="text-xs text-gray-400 ml-2">(${sec.shift})</span>
                         </div>
-                        <button onclick="deleteClass(${sec.id})" class="text-red-400 hover:text-red-600 text-xs">Remove</button>
+                        <button onclick="deleteClass(${sec.id})" class="text-red-400 hover:text-red-600 text-xs self-start sm:self-auto">Remove</button>
                     </div>
                 `).join('')}
                 
                 <div id="form-${className.replace(/\s/g, '')}" class="hidden bg-blue-50 p-3 border-t border-blue-100">
-                    <form onsubmit="addSection(event, '${className}')" class="flex gap-2 items-center">
+                    <form onsubmit="addSection(event, '${className}')" class="flex flex-col sm:flex-row gap-2 sm:items-center">
                          <input type="text" name="section_name" placeholder="Section Name (e.g. A)" required class="text-sm border rounded px-2 py-1 w-full">
-                         <select name="shift" class="text-sm border rounded px-2 py-1">
+                         <select name="shift" class="text-sm border rounded px-2 py-1 w-full sm:w-auto">
                             <option>Morning</option><option>Day</option>
                          </select>
-                         <button type="submit" class="bg-blue-600 text-white text-xs px-3 py-1.5 rounded">Save</button>
+                         <button type="submit" class="bg-blue-600 text-white text-xs px-3 py-1.5 rounded w-full sm:w-auto">Save</button>
                     </form>
                 </div>
             </div>
@@ -55,7 +55,7 @@ export function SchoolClassesHTML(school, classesData = []) {
          </div>
 
          <div class="mb-6">
-             <form onsubmit="createClassGroup(event)" class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex gap-4 items-end">
+             <form onsubmit="createClassGroup(event)" class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex flex-col md:flex-row gap-3 md:items-end">
                  <div class="flex-1">
                      <label class="block text-xs font-bold text-gray-500 mb-1">CREATE NEW CLASS FOLDER</label>
                      <input type="text" name="class_name" placeholder="Enter Class Name (e.g. Class 10)" required class="w-full border p-2 rounded text-sm">
@@ -64,7 +64,7 @@ export function SchoolClassesHTML(school, classesData = []) {
                      <label class="block text-xs font-bold text-gray-500 mb-1">FIRST SECTION</label>
                      <input type="text" name="section_name" placeholder="e.g. A" required class="w-full border p-2 rounded text-sm">
                  </div>
-                 <button type="submit" class="bg-gray-900 text-white px-5 py-2 rounded text-sm font-bold hover:bg-black">Create Class</button>
+                 <button type="submit" class="bg-gray-900 text-white px-5 py-2 rounded text-sm font-bold hover:bg-black w-full md:w-auto">Create Class</button>
              </form>
          </div>
 
