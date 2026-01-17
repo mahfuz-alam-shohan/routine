@@ -23,11 +23,34 @@ export function PublicLayout(contentHTML, title = "Home", companyName = "Routine
       <style>
         body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
         .smooth-scroll { -webkit-overflow-scrolling: touch; }
+        .page-shell { animation: pageFadeIn 320ms ease-out both; }
+        .page-leave .page-shell { opacity: 0; transform: translateY(6px); transition: opacity 180ms ease, transform 180ms ease; }
+        .ui-glow::before {
+          content: "";
+          position: fixed;
+          inset: -10% -10% auto -10%;
+          height: 40vh;
+          background:
+            radial-gradient(circle at top left, rgba(59, 130, 246, 0.18), transparent 55%),
+            radial-gradient(circle at top right, rgba(168, 85, 247, 0.16), transparent 55%),
+            radial-gradient(circle at 40% 10%, rgba(16, 185, 129, 0.12), transparent 50%);
+          pointer-events: none;
+          z-index: 0;
+        }
+        @keyframes pageFadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .page-shell { animation: none; }
+          .page-leave .page-shell { transition: none; }
+        }
       </style>
   </head>
-  <body class="bg-white text-gray-900 flex flex-col min-h-screen">
+  <body class="ui-glow bg-slate-50 text-gray-900 flex flex-col min-h-screen relative overflow-x-hidden">
 
       <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 transition-all">
+          <div class="h-0.5 w-full bg-gradient-to-r from-blue-500 via-purple-500 to-emerald-400"></div>
           <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div class="flex justify-between items-center h-16">
                   
@@ -64,7 +87,7 @@ export function PublicLayout(contentHTML, title = "Home", companyName = "Routine
           </div>
       </nav>
 
-      <main class="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 smooth-scroll">
+      <main class="page-shell flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 smooth-scroll relative z-10">
           ${contentHTML}
       </main>
 
@@ -79,6 +102,44 @@ export function PublicLayout(contentHTML, title = "Home", companyName = "Routine
           </div>
       </footer>
 
+      <script>
+        const enablePageTransitions = () => {
+          if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+          document.addEventListener('click', (event) => {
+            const link = event.target.closest('a');
+            if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
+            const href = link.getAttribute('href') || '';
+            if (href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+            const url = new URL(link.href, window.location.href);
+            if (url.origin !== window.location.origin) return;
+            event.preventDefault();
+            document.body.classList.add('page-leave');
+            setTimeout(() => { window.location.href = link.href; }, 180);
+          });
+        };
+
+        const enableAutoRefresh = () => {
+          let lastInteraction = Date.now();
+          const mark = () => { lastInteraction = Date.now(); };
+          ['click', 'keydown', 'scroll', 'mousemove', 'touchstart'].forEach((evt) => {
+            document.addEventListener(evt, mark, { passive: true });
+          });
+          const intervalMs = 120000;
+          setInterval(() => {
+            if (document.hidden) return;
+            const active = document.activeElement;
+            if (active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) return;
+            if (Date.now() - lastInteraction < intervalMs) return;
+            window.location.reload();
+          }, intervalMs);
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+          enablePageTransitions();
+          enableAutoRefresh();
+        });
+      </script>
   </body>
   </html>
   `;
