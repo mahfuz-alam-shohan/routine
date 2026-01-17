@@ -16,11 +16,34 @@ export function AdminLayout(contentHTML, title = "Dashboard", companyName = "Rou
         body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
         .sidebar-transition { transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
+        .page-shell { animation: pageFadeIn 320ms ease-out both; }
+        .page-leave .page-shell { opacity: 0; transform: translateY(6px); transition: opacity 180ms ease, transform 180ms ease; }
+        .ui-glow::before {
+          content: "";
+          position: fixed;
+          inset: -10% -10% auto -10%;
+          height: 40vh;
+          background:
+            radial-gradient(circle at top left, rgba(59, 130, 246, 0.14), transparent 55%),
+            radial-gradient(circle at top right, rgba(168, 85, 247, 0.14), transparent 55%),
+            radial-gradient(circle at 40% 10%, rgba(16, 185, 129, 0.1), transparent 50%);
+          pointer-events: none;
+          z-index: 0;
+        }
+        @keyframes pageFadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .page-shell { animation: none; }
+          .page-leave .page-shell { transition: none; }
+        }
       </style>
   </head>
-  <body class="bg-gray-50 h-[100dvh] overflow-hidden flex flex-col text-gray-900">
+  <body class="ui-glow bg-gray-50 h-[100dvh] overflow-hidden flex flex-col text-gray-900 relative">
 
       <header class="md:hidden bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 z-30 shrink-0">
+          <div class="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-blue-500 via-purple-500 to-emerald-400"></div>
           <div class="flex items-center gap-3">
               <button onclick="toggleSidebar()" class="text-gray-500 hover:text-gray-900 p-2 -ml-2">
                   <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
@@ -73,13 +96,45 @@ export function AdminLayout(contentHTML, title = "Dashboard", companyName = "Rou
           </aside>
 
           <div class="flex-1 flex flex-col min-w-0 bg-gray-50">
-              <main class="flex-1 overflow-y-auto p-4 md:p-8 pb-20">
+              <main class="page-shell flex-1 overflow-y-auto p-4 md:p-8 pb-20 relative z-10">
                   ${contentHTML}
               </main>
           </div>
       </div>
 
       <script>
+        const enablePageTransitions = () => {
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            document.addEventListener('click', (event) => {
+                const link = event.target.closest('a');
+                if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
+                const href = link.getAttribute('href') || '';
+                if (href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+                const url = new URL(link.href, window.location.href);
+                if (url.origin !== window.location.origin) return;
+                event.preventDefault();
+                document.body.classList.add('page-leave');
+                setTimeout(() => { window.location.href = link.href; }, 180);
+            });
+        };
+
+        const enableAutoRefresh = () => {
+            let lastInteraction = Date.now();
+            const mark = () => { lastInteraction = Date.now(); };
+            ['click', 'keydown', 'scroll', 'mousemove', 'touchstart'].forEach((evt) => {
+                document.addEventListener(evt, mark, { passive: true });
+            });
+            const intervalMs = 120000;
+            setInterval(() => {
+                if (document.hidden) return;
+                const active = document.activeElement;
+                if (active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) return;
+                if (Date.now() - lastInteraction < intervalMs) return;
+                window.location.reload();
+            }, intervalMs);
+        };
+
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebar-overlay');
@@ -87,6 +142,11 @@ export function AdminLayout(contentHTML, title = "Dashboard", companyName = "Rou
             if (isClosed) { sidebar.classList.remove('-translate-x-full'); overlay.classList.remove('hidden'); }
             else { sidebar.classList.add('-translate-x-full'); overlay.classList.add('hidden'); }
         }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            enablePageTransitions();
+            enableAutoRefresh();
+        });
       </script>
   </body>
   </html>
