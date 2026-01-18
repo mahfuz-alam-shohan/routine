@@ -3,12 +3,16 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
     if (!config || !config.strategy) return WizardHTML();
 
     // 2. PARSE SHIFTS: Ensure we get the array correctly
+    const defaultShiftNames = ["Morning", "Day"];
     let shifts = [];
     try {
         shifts = typeof config.shifts_json === 'string' 
             ? JSON.parse(config.shifts_json) 
             : (config.shifts_json || ["Standard"]);
     } catch (e) { shifts = ["Standard"]; }
+    if (config.strategy !== 'single' && (!Array.isArray(shifts) || shifts.length === 0 || (shifts.length === 1 && shifts[0] === "Standard"))) {
+        shifts = defaultShiftNames;
+    }
 
     // 3. SORT & DEFAULTS
     existingSlots.sort((a, b) => a.start_time.localeCompare(b.start_time));
@@ -18,25 +22,24 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
       <div class="max-w-5xl mx-auto pb-24 md:pb-10 select-none" id="schedule-app">
           
           <div class="bg-white sticky top-0 z-30 border-b border-gray-200 shadow-sm">
-              <div class="flex justify-between items-center px-3 py-3">
+              <div class="flex flex-col gap-2 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 class="text-sm font-bold text-gray-900">Routine Manager</h2>
                     <p class="text-[10px] text-gray-500">${config.strategy === 'single' ? 'Single Shift' : 'Multi-Shift Mode'}</p>
                   </div>
                   <div class="flex gap-2">
-                       <button onclick="app.save()" class="bg-black text-white px-4 py-1.5 rounded text-xs font-bold active:scale-95 transition-transform">Save</button>
-                       <button onclick="app.reset()" class="text-red-600 bg-red-50 px-3 py-1.5 rounded text-xs font-bold">Reset</button>
+                       <button onclick="app.save()" class="bg-black text-white px-4 py-2 rounded text-xs font-bold active:scale-95 transition-transform">Save</button>
+                       <button onclick="app.reset()" class="text-red-600 bg-red-50 px-3 py-2 rounded text-xs font-bold">Reset</button>
                   </div>
               </div>
               
-              <div class="px-2 flex space-x-1 overflow-x-auto no-scrollbar bg-gray-50 border-t border-gray-100 pt-1" id="tab-container">
-                  </div>
+              <div class="px-2 pb-2" id="tab-container"></div>
           </div>
 
           <div id="master-controls" class="mx-2 mt-2 p-2 bg-blue-50 border border-blue-100 rounded flex items-center justify-between">
-              <span class="text-[10px] font-bold text-blue-800 uppercase tracking-wide">Day Starts At:</span>
+              <span class="text-[10px] font-bold text-blue-800 uppercase tracking-wide">Day Starts At</span>
               <input type="time" id="school_start_time" value="${initialSchoolStart}" onchange="app.updateStartTime(this.value)" 
-                     class="bg-white border border-blue-200 text-blue-900 text-xs font-bold rounded px-2 py-1 outline-none w-20 text-center focus:ring-1 focus:ring-blue-500">
+                     class="bg-white border border-blue-200 text-blue-900 text-xs font-bold rounded px-2 py-1 outline-none w-24 text-center focus:ring-1 focus:ring-blue-500">
           </div>
 
           <div class="mt-2 bg-white border-t border-b border-gray-200 md:border md:rounded-lg md:mx-2 md:shadow-sm overflow-hidden">
@@ -220,15 +223,18 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
 
             renderTabs: function() {
                 const tabs = ['Master', ...AppState.shifts];
-                document.getElementById('tab-container').innerHTML = tabs.map(t => {
-                    const active = t === AppState.activeTab;
-                    return \`
-                        <button onclick="app.setTab('\${t}')" 
-                            class="whitespace-nowrap px-4 py-2 text-[11px] font-bold uppercase tracking-wide border-b-2 transition-colors 
-                            \${active ? 'border-black text-black' : 'border-transparent text-gray-400 hover:text-gray-600'}">
-                            \${t}
-                        </button>\`;
-                }).join('');
+                document.getElementById('tab-container').innerHTML = \`
+                  <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+                    \${tabs.map(t => {
+                        const active = t === AppState.activeTab;
+                        return \`
+                          <button onclick="app.setTab('\${t}')" 
+                              class="px-3 py-2 text-[11px] font-bold uppercase tracking-wide rounded border transition-colors 
+                              \${active ? 'border-black text-black bg-white' : 'border-gray-200 text-gray-400 hover:text-gray-600'}">
+                              \${t}
+                          </button>\`;
+                    }).join('')}
+                  </div>\`;
             },
 
             // --- COMPACT ROW DESIGN (The "Slim Strip") ---
@@ -264,38 +270,41 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
                     </div>
 
                     <div class="md:hidden p-2 border-l-4 \${slot.type==='break'?'border-orange-200':'border-blue-200'}">
-                        <div class="flex items-center gap-2 mb-2">
+                        <div class="flex items-center gap-2">
                             <span class="text-[10px] font-bold text-gray-400 w-4">\${i+1}</span>
-                            
-                            <div class="relative flex-1">
-                                <input type="time" value="\${slot.start_time}" onchange="app.handleInput(\${i}, 'start_time', this.value)"
-                                class="w-full text-xs font-mono text-center bg-gray-50 border border-gray-200 rounded py-1 text-gray-500">
+                            <div class="flex-1">
+                                <div class="text-[9px] text-gray-400 uppercase mb-1">Time</div>
+                                <div class="flex items-center gap-2">
+                                    <input type="time" value="\${slot.start_time}" onchange="app.handleInput(\${i}, 'start_time', this.value)"
+                                    class="w-full text-xs font-mono text-center bg-gray-50 border border-gray-200 rounded py-1 text-gray-500">
+                                    <span class="text-gray-300 text-[10px]">&rarr;</span>
+                                    <input type="time" value="\${slot.end_time}" onchange="app.handleInput(\${i}, 'end_time', this.value)"
+                                    class="w-full text-xs font-mono font-bold text-center bg-white border border-gray-300 rounded py-1 text-gray-900 focus:border-blue-500">
+                                </div>
                             </div>
-                            <span class="text-gray-300 text-[10px]">&rarr;</span>
-                            
-                            <div class="relative flex-1">
-                                <input type="time" value="\${slot.end_time}" onchange="app.handleInput(\${i}, 'end_time', this.value)"
-                                class="w-full text-xs font-mono font-bold text-center bg-white border border-gray-300 rounded py-1 text-gray-900 focus:border-blue-500">
-                            </div>
-
-                            <div class="w-12">
+                            <div class="w-16">
+                                <div class="text-[9px] text-gray-400 uppercase mb-1 text-center">Mins</div>
                                 <input type="number" value="\${slot.duration}" onchange="app.handleInput(\${i}, 'duration', this.value)"
                                 class="w-full text-xs font-bold text-center bg-blue-50 text-blue-800 rounded py-1 border-none focus:ring-1 focus:ring-blue-500">
                             </div>
                         </div>
 
-                        <div class="flex items-center gap-2 pl-6">
-                            <input type="text" value="\${slot.label}" onchange="app.handleInput(\${i}, 'label', this.value)" 
-                            class="flex-1 text-sm font-medium border-b border-gray-200 focus:border-blue-500 py-0.5 outline-none rounded-none bg-transparent placeholder-gray-300" placeholder="Label...">
-                            
-                            <select onchange="app.handleInput(\${i}, 'type', this.value)" 
-                            class="text-[10px] font-bold uppercase bg-white border border-gray-200 rounded px-1 py-0.5 outline-none \${slot.type==='break'?'text-orange-500':'text-blue-500'}">
-                                <option value="class" \${slot.type==='class'?'selected':''}>CL</option>
-                                <option value="break" \${slot.type==='break'?'selected':''}>BR</option>
-                                <option value="assembly" \${slot.type==='assembly'?'selected':''}>AS</option>
-                            </select>
-
-                            <button onclick="app.removePeriod(\${i})" class="w-6 h-6 flex items-center justify-center text-gray-300 hover:text-red-500 active:bg-red-50 rounded">
+                        <div class="mt-2 grid grid-cols-[1fr_auto_auto] gap-2 items-center">
+                            <div>
+                                <div class="text-[9px] text-gray-400 uppercase mb-1">Label</div>
+                                <input type="text" value="\${slot.label}" onchange="app.handleInput(\${i}, 'label', this.value)" 
+                                class="w-full text-sm font-medium border border-gray-200 focus:border-blue-500 py-1 outline-none rounded bg-transparent placeholder-gray-300" placeholder="Label...">
+                            </div>
+                            <div>
+                                <div class="text-[9px] text-gray-400 uppercase mb-1 text-center">Type</div>
+                                <select onchange="app.handleInput(\${i}, 'type', this.value)" 
+                                class="text-[10px] font-bold uppercase bg-white border border-gray-200 rounded px-2 py-1 outline-none \${slot.type==='break'?'text-orange-500':'text-blue-500'}">
+                                    <option value="class" \${slot.type==='class'?'selected':''}>CL</option>
+                                    <option value="break" \${slot.type==='break'?'selected':''}>BR</option>
+                                    <option value="assembly" \${slot.type==='assembly'?'selected':''}>AS</option>
+                                </select>
+                            </div>
+                            <button onclick="app.removePeriod(\${i})" class="w-8 h-8 flex items-center justify-center text-gray-300 hover:text-red-500 active:bg-red-50 rounded">
                                 <span class="text-lg leading-none">&times;</span>
                             </button>
                         </div>
@@ -310,9 +319,9 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
                 return \`
                 <div class="flex items-center justify-between p-3 cursor-pointer transition-colors \${isActive ? 'bg-white' : 'bg-gray-50 opacity-60'}" onclick="app.toggleShift(\${i}, '\${AppState.activeTab}')">
                     <div class="flex items-center gap-3">
-                        <div class="flex flex-col items-center justify-center w-10 h-10 rounded bg-gray-100 border border-gray-200">
+                        <div class="flex flex-col items-center justify-center w-12 h-12 rounded bg-gray-100 border border-gray-200">
                             <span class="text-[10px] font-bold text-gray-800 leading-none">\${slot.start_time}</span>
-                            <div class="h-px w-4 bg-gray-300 my-0.5"></div>
+                            <div class="h-px w-5 bg-gray-300 my-0.5"></div>
                             <span class="text-[10px] text-gray-500 leading-none">\${slot.end_time}</span>
                         </div>
                         <div class="flex flex-col">
@@ -321,8 +330,8 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
                         </div>
                     </div>
                     
-                    <div class="w-10 h-6 rounded-full border flex items-center justify-center transition-all \${isActive ? 'bg-green-500 border-green-600' : 'bg-white border-gray-300'}">
-                        <div class="w-2.5 h-2.5 rounded-full \${isActive ? 'bg-white' : 'bg-gray-300'}"></div>
+                    <div class="w-12 h-7 rounded-full border flex items-center justify-center transition-all \${isActive ? 'bg-green-500 border-green-600' : 'bg-white border-gray-300'}">
+                        <div class="w-3 h-3 rounded-full \${isActive ? 'bg-white' : 'bg-gray-300'}"></div>
                     </div>
                 </div>
                 \`;
@@ -362,7 +371,7 @@ function WizardHTML() {
 
               <div id="shift-names-box" class="hidden pl-2 pt-2 animate-fade-in">
                   <label class="block text-[10px] font-bold text-gray-600 uppercase mb-1">Shift Names (e.g. Morning, Day)</label>
-                  <input type="text" id="shift-names" class="w-full border border-gray-300 rounded p-2 text-sm outline-none focus:border-purple-500" placeholder="Morning, Day">
+                  <input type="text" id="shift-names" value="Morning, Day" class="w-full border border-gray-300 rounded p-2 text-sm outline-none focus:border-purple-500" placeholder="Morning, Day">
               </div>
 
               <button onclick="saveConfig()" class="w-full bg-black text-white py-3 rounded-lg text-sm font-bold mt-4 active:scale-95">Initialize</button>
