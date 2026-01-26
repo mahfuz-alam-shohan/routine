@@ -22,33 +22,30 @@ export async function handleInstituteRequest(request, env) {
     return htmlResponse(InstituteLayout(InstituteDashboardHTML({teachers: tCount.count, classes: cCount.count}), "Dashboard", school.school_name));
   }
 
-  // --- SCHEDULES (CONFIG & DESIGNER) ---
+  // --- MASTER SCHEDULE ---
   if (url.pathname === '/school/schedules') {
       
       if (request.method === 'POST') {
           try {
               const body = await request.json();
               
-              // 1. INIT CONFIG
-              if (body.action === 'init_config') {
-                  await env.DB.prepare("INSERT INTO schedule_config (school_id, strategy, shifts_json) VALUES (?, ?, ?) ON CONFLICT(school_id) DO UPDATE SET strategy=excluded.strategy, shifts_json=excluded.shifts_json")
-                      .bind(school.id, body.strategy, JSON.stringify(body.shifts)).run();
-              }
-
-              // 2. SAVE FULL ROUTINE (BULK UPDATE)
-              // This is safer than adding one by one for the strict timeline approach
-              if (body.action === 'save_routine') {
+              // SAVE SCHEDULE
+              if (body.action === 'save_schedule') {
                   const slots = body.slots;
                   
-                  // Transaction-like approach: Delete all for this school, then re-insert
-                  // D1 allows batch execution but here we'll do it sequentially or use a batch statement if D1 supported it well.
-                  // For safety, we delete then insert.
+                  // Delete existing slots and re-insert
                   await env.DB.prepare("DELETE FROM schedule_slots WHERE school_id = ?").bind(school.id).run();
                   
-                  const stmt = env.DB.prepare("INSERT INTO schedule_slots (school_id, start_time, end_time, label, type, applicable_shifts) VALUES (?, ?, ?, ?, ?, ?)");
-                  const batch = slots.map(s => stmt.bind(school.id, s.start_time, s.end_time, s.label, s.type, JSON.stringify(s.applicable_shifts)));
+                  const stmt = env.DB.prepare("INSERT INTO schedule_slots (school_id, start_time, end_time, duration, label, type) VALUES (?, ?, ?, ?, ?, ?)");
+                  const batch = slots.map(s => stmt.bind(school.id, s.start_time, s.end_time, s.duration, s.label, s.type));
                   
                   await env.DB.batch(batch);
+                  
+                  // Update school start time
+                  if (slots.length > 0) {
+                      await env.DB.prepare("INSERT INTO schedule_config (school_id, start_time) VALUES (?, ?) ON CONFLICT(school_id) DO UPDATE SET start_time=excluded.start_time")
+                          .bind(school.id, slots[0].start_time).run();
+                  }
               }
 
               return jsonResponse({ success: true });
@@ -59,10 +56,10 @@ export async function handleInstituteRequest(request, env) {
           }
       }
 
-      // RESET EVERYTHING
+      // RESET SCHEDULE
       if (request.method === 'DELETE') {
-          await env.DB.prepare("DELETE FROM schedule_config WHERE school_id = ?").bind(school.id).run();
           await env.DB.prepare("DELETE FROM schedule_slots WHERE school_id = ?").bind(school.id).run();
+          await env.DB.prepare("DELETE FROM schedule_config WHERE school_id = ?").bind(school.id).run();
           return jsonResponse({ success: true });
       }
 
@@ -71,9 +68,7 @@ export async function handleInstituteRequest(request, env) {
       let slots = [];
       try { 
           config = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first(); 
-          if(config) {
-              slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY start_time ASC").bind(school.id).all()).results;
-          }
+          slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY start_time ASC").bind(school.id).all()).results;
       } catch(e) { await syncDatabase(env); }
       
       return htmlResponse(InstituteLayout(SchedulesPageHTML(config, slots), "Master Schedule", school.school_name));

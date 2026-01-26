@@ -66,23 +66,21 @@ const DEFINED_SCHEMA = {
     "FOREIGN KEY(subject_id)": "REFERENCES academic_subjects(id)"
   },
 
-  // --- NEW: SCHEDULE CONFIGURATION ---
+  // --- SIMPLIFIED SCHEDULE CONFIGURATION ---
   schedule_config: {
     id: "INTEGER PRIMARY KEY AUTOINCREMENT",
     school_id: "INTEGER UNIQUE", // One config per school
-    strategy: "TEXT", // 'single', 'disconnected', 'connected'
-    shifts_json: "TEXT" // JSON array: ["Morning", "Day"]
+    start_time: "TEXT DEFAULT '08:00'" // School start time
   },
 
   schedule_slots: {
     id: "INTEGER PRIMARY KEY AUTOINCREMENT",
     school_id: "INTEGER",
-    slot_index: "INTEGER", // 1, 2, 3...
     start_time: "TEXT", // "08:00"
     end_time: "TEXT",   // "08:45"
+    duration: "INTEGER", // Duration in minutes
     type: "TEXT",       // 'class', 'break'
     label: "TEXT",      // "1st Period", "Tiffin"
-    applicable_shifts: "TEXT", // JSON: ["Morning", "Full"]
     "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)"
   },
 
