@@ -107,22 +107,61 @@ export async function handleAdminRequest(request, env) {
       return htmlResponse(AdminLayout(SchoolTeachersHTML(school, teachers.results), "Teachers", companyName, {email}));
   }
 
-  // --- SCHOOL CLASSES (Hierarchy) ---
+  // --- SCHOOL CLASSES (New Logic) ---
   if (url.pathname === '/admin/school/classes') {
       if(request.method === 'POST') {
           const body = await request.json();
-          await env.DB.prepare("INSERT INTO academic_classes (school_id, class_name, section_name, shift) VALUES (?, ?, ?, ?)").bind(body.school_id, body.class_name, body.section_name, body.shift || 'Morning').run();
-          return jsonResponse({success:true});
+          
+          if(body.action === 'create_class') {
+              // Create new class
+              await env.DB.prepare("INSERT INTO academic_classes (school_id, class_name, has_groups) VALUES (?, ?, ?)")
+                  .bind(body.school_id, body.class_name, body.has_groups ? 1 : 0).run();
+              return jsonResponse({success:true});
+          }
+          
+          if(body.action === 'add_group') {
+              // Add group to existing class
+              await env.DB.prepare("INSERT INTO class_groups (school_id, class_id, group_name) VALUES (?, ?, ?)")
+                  .bind(body.school_id, body.class_id, body.group_name).run();
+              return jsonResponse({success:true});
+          }
+          
+          if(body.action === 'add_section') {
+              // Add section to class (with optional group)
+              await env.DB.prepare("INSERT INTO class_sections (school_id, class_id, group_id, section_name, shift) VALUES (?, ?, ?, ?, ?)")
+                  .bind(body.school_id, body.class_id, body.group_id || null, body.section_name, body.shift || 'Morning').run();
+              return jsonResponse({success:true});
+          }
       }
+      
       if(request.method === 'DELETE') {
-           const id = url.searchParams.get('id');
-           await env.DB.prepare("DELETE FROM academic_classes WHERE id=?").bind(id).run();
-           return jsonResponse({success:true});
+          const body = await request.json();
+          
+          if(body.action === 'delete_class') {
+              await env.DB.prepare("DELETE FROM academic_classes WHERE id=?").bind(body.id).run();
+              return jsonResponse({success:true});
+          }
+          
+          if(body.action === 'delete_group') {
+              await env.DB.prepare("DELETE FROM class_groups WHERE id=?").bind(body.id).run();
+              return jsonResponse({success:true});
+          }
+          
+          if(body.action === 'delete_section') {
+              await env.DB.prepare("DELETE FROM class_sections WHERE id=?").bind(body.id).run();
+              return jsonResponse({success:true});
+          }
       }
+      
       const authId = url.searchParams.get('id');
       const school = await env.DB.prepare(`SELECT * FROM profiles_institution WHERE auth_id = ?`).bind(authId).first();
+      
+      // Get all data
       const classes = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ? ORDER BY class_name ASC").bind(school.id).all();
-      return htmlResponse(AdminLayout(SchoolClassesHTML(school, classes.results), "Classes", companyName, {email}));
+      const groups = await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ? ORDER BY class_id, group_name").bind(school.id).all();
+      const sections = await env.DB.prepare("SELECT * FROM class_sections WHERE school_id = ? ORDER BY class_id, section_name").bind(school.id).all();
+      
+      return htmlResponse(AdminLayout(SchoolClassesHTML(school, classes.results, groups.results, sections.results), "Classes", companyName, {email}));
   }
 
   // --- SETUP ---

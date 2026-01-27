@@ -13,41 +13,41 @@ export function TeachersPageHTML(teachers = [], allSubjects = []) {
 
     const rows = teachers.map(t => `
         <tr class="hover:bg-gray-50">
-            <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm font-medium text-gray-900">${t.full_name}</div>
-                <div class="text-xs text-gray-500">${t.email}</div>
+            <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">
+                <div class="text-sm md:text-base font-medium text-gray-900">${t.full_name}</div>
+                <div class="text-xs md:text-sm text-gray-500">${t.email}</div>
             </td>
-            <td class="px-6 py-4 whitespace-normal max-w-xs">
+            <td class="px-4 md:px-6 py-3 md:py-4 whitespace-normal max-w-xs md:max-w-sm">
                 <div class="flex flex-wrap gap-1">
                     ${formatSub(t.subject).split(', ').map(s => 
-                        `<span class="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px] uppercase font-bold tracking-wide border border-blue-100">${s}</span>`
+                        `<span class="bg-blue-50 text-blue-700 px-1.5 md:px-2 py-0.5 md:py-1 rounded text-[10px] md:text-xs uppercase font-bold tracking-wide border border-blue-100">${s}</span>`
                     ).join('')}
                 </div>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">
+            <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap text-sm md:text-base font-mono text-gray-600">
                 ${t.phone}
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <button class="text-red-600 hover:text-red-900 text-xs">Remove</button>
+            <td class="px-4 md:px-6 py-3 md:py-4 whitespace-nowrap text-right text-sm md:text-base font-medium">
+                <button class="text-red-600 hover:text-red-900 text-xs md:text-sm">Remove</button>
             </td>
         </tr>
     `).join('');
 
     return `
-      <div class="max-w-4xl mx-auto pt-4">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+      <div class="max-w-5xl md:max-w-6xl mx-auto pt-4 md:pt-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-6">
               <div>
-                <h1 class="text-2xl font-semibold text-gray-900">Teachers</h1>
-                <p class="text-sm text-gray-500 mt-1">Manage faculty members.</p>
+                <h1 class="text-2xl md:text-3xl font-semibold text-gray-900">Teachers</h1>
+                <p class="text-sm md:text-base text-gray-500 mt-1">Manage faculty members.</p>
               </div>
-              <button onclick="toggleAdd()" class="text-sm bg-gray-900 text-white px-4 py-2 rounded hover:bg-black transition-colors w-full sm:w-auto">
+              <button onclick="toggleAdd()" class="text-sm md:text-base bg-gray-900 text-white px-4 md:px-6 py-2 md:py-2.5 rounded-lg hover:bg-black transition-colors w-full sm:w-auto">
                   + Add Teacher
               </button>
           </div>
 
-          <div id="add-box" class="hidden mb-6 bg-white p-4 border border-gray-200 rounded-lg shadow-sm">
-              <h3 class="text-base font-semibold text-gray-900 mb-3">New Teacher Profile</h3>
-              <form onsubmit="addTeacher(event)" class="space-y-4">
+          <div id="add-box" class="hidden mb-6 bg-white p-4 md:p-6 border border-gray-200 rounded-lg md:rounded-xl shadow-sm">
+              <h3 class="text-base md:text-lg font-semibold text-gray-900 mb-3 md:mb-4">New Teacher Profile</h3>
+              <form onsubmit="addTeacher(event)" class="space-y-4 md:space-y-6">
                   
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>

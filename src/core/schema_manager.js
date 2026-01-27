@@ -46,10 +46,30 @@ const DEFINED_SCHEMA = {
   academic_classes: {
     id: "INTEGER PRIMARY KEY AUTOINCREMENT",
     school_id: "INTEGER",
-    class_name: "TEXT",  
-    section_name: "TEXT", 
-    shift: "TEXT",        
-    created_at: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    class_name: "TEXT",
+    has_groups: "INTEGER DEFAULT 0", // 0 = no groups, 1 = has groups
+    "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)"
+  },
+
+  class_groups: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    school_id: "INTEGER",
+    class_id: "INTEGER",
+    group_name: "TEXT",
+    "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)",
+    "FOREIGN KEY(class_id)": "REFERENCES academic_classes(id)"
+  },
+
+  class_sections: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    school_id: "INTEGER",
+    class_id: "INTEGER",
+    group_id: "INTEGER", // null if class has no groups
+    section_name: "TEXT",
+    shift: "TEXT DEFAULT 'Morning'",
+    "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)",
+    "FOREIGN KEY(class_id)": "REFERENCES academic_classes(id)",
+    "FOREIGN KEY(group_id)": "REFERENCES class_groups(id)"
   },
 
   academic_subjects: {

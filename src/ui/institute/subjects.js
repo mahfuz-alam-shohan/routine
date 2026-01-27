@@ -10,7 +10,7 @@ export function SubjectsPageHTML(subjects = [], classes = [], allocations = []) 
     const uniqueClassNames = [...new Set(classes.map(c => c.class_name))].sort();
 
     return `
-      <div class="max-w-7xl mx-auto h-auto md:h-[calc(100vh-140px)] flex flex-col">
+      <div class="max-w-6xl md:max-w-7xl mx-auto h-auto md:h-[calc(100vh-140px)] flex flex-col">
           
           <div class="md:hidden flex border-b border-gray-200 mb-4 shrink-0">
               <button onclick="switchTab('bank')" id="tab-bank" class="flex-1 py-3 text-sm font-bold border-b-2 border-blue-600 text-blue-600 bg-blue-50 transition-colors">
@@ -25,8 +25,8 @@ export function SubjectsPageHTML(subjects = [], classes = [], allocations = []) 
               
               <div id="view-bank" class="w-full md:w-1/2 flex flex-col h-auto max-h-[70vh] md:h-full md:max-h-none bg-white rounded-xl border border-gray-200 shadow-sm md:overflow-hidden">
                   
-                  <div class="p-4 border-b border-gray-100 bg-gray-50 shrink-0">
-                      <h2 class="text-lg font-bold text-gray-800 mb-3 flex items-center justify-between">
+                  <div class="p-4 md:p-6 border-b border-gray-100 bg-gray-50 shrink-0">
+                      <h2 class="text-lg md:text-xl font-bold text-gray-800 mb-3 md:mb-4 flex items-center justify-between">
                           <span>Subject Bank</span>
                           <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">${subjects.length} Total</span>
                       </h2>
