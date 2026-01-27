@@ -2610,7 +2610,6 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
 
       <script>
         console.log('Teachers module loading...');
-        console.log('Available subjects:', ${JSON.stringify(allSubjects)});
         
         // Make functions globally available
         window.ALL_SUBJECTS = ${JSON.stringify(allSubjects)};
@@ -2690,11 +2689,10 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
             );
             
             if (query && filtered.length > 0) {
-                results.innerHTML = filtered.map(subject => 
-                    '<div class="px-3 py-2 hover:bg-gray-100 cursor-pointer" onclick="window.selectPrimarySubject(' + subject.id + ', '' + subject.subject_name.replace(/'/g, "\\'") + '')">' + 
-                    subject.subject_name + 
-                    '</div>'
-                ).join('');
+                results.innerHTML = filtered.map(subject => {
+                    const safeName = subject.subject_name.replace(/'/g, "\\'");
+                    return '<div class="px-3 py-2 hover:bg-gray-100 cursor-pointer" onclick="window.selectPrimarySubject(' + subject.id + ', '' + safeName + '')">' + subject.subject_name + '</div>';
+                }).join('');
                 results.classList.remove('hidden');
             } else {
                 results.classList.add('hidden');
@@ -2711,11 +2709,10 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
             );
             
             if (query && filtered.length > 0) {
-                results.innerHTML = filtered.map(subject => 
-                    '<div class="px-3 py-2 hover:bg-gray-100 cursor-pointer" onclick="window.selectAdditionalSubject(' + subject.id + ', '' + subject.subject_name.replace(/'/g, "\\'") + '')">' + 
-                    subject.subject_name + 
-                    '</div>'
-                ).join('');
+                results.innerHTML = filtered.map(subject => {
+                    const safeName = subject.subject_name.replace(/'/g, "\\'");
+                    return '<div class="px-3 py-2 hover:bg-gray-100 cursor-pointer" onclick="window.selectAdditionalSubject(' + subject.id + ', '' + safeName + '')">' + subject.subject_name + '</div>';
+                }).join('');
                 results.classList.remove('hidden');
             } else {
                 results.classList.add('hidden');
