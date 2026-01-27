@@ -348,6 +348,8 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             data.additional_subjects = additionalSubjects;
             data.action = 'assign_subjects';
             
+            console.log('Sending data:', data); // Debug log
+            
             try {
                 const response = await fetch('/school/teachers', {
                     method: 'POST',
@@ -355,7 +357,12 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                     body: JSON.stringify(data)
                 });
                 
+                console.log('Response status:', response.status); // Debug log
+                console.log('Response ok:', response.ok); // Debug log
+                
                 const result = await response.json();
+                console.log('Response data:', result); // Debug log
+                
                 if (result.success) {
                     closeAssignSubjectsModal();
                     window.location.reload();
@@ -363,6 +370,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                     alert('Error assigning subjects: ' + (result.error || 'Unknown error'));
                 }
             } catch (error) {
+                console.error('Fetch error:', error); // Debug log
                 alert('Network error. Please try again.');
             }
         }
