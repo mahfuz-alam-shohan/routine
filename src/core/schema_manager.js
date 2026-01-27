@@ -111,8 +111,11 @@ const DEFINED_SCHEMA = {
     strategy: "TEXT", // Keep for backward compatibility
     shifts_json: "TEXT", // Keep for backward compatibility  
     start_time: "TEXT DEFAULT '08:00'", // School start time
-    active_days: "INTEGER DEFAULT 5", // Number of active school days per week
-    periods_per_day: "INTEGER DEFAULT 8" // Number of periods per day
+    active_days: "INTEGER DEFAULT 5", // Keep for backward compatibility
+    periods_per_day: "INTEGER DEFAULT 8", // Keep for backward compatibility
+    // New working days fields
+    working_days: "TEXT DEFAULT '[\"monday\",\"tuesday\",\"wednesday\",\"thursday\",\"friday\"]'", // JSON array of working days
+    off_days: "TEXT DEFAULT '[\"saturday\",\"sunday\"]'" // JSON array of off days
   },
 
   schedule_slots: {

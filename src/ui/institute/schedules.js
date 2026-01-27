@@ -4,30 +4,84 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
     const initialSchoolStart = existingSlots.length > 0 ? existingSlots[0].start_time : (config?.start_time || "08:00");
 
     return `
-      <div class="max-w-6xl mx-auto pb-24 md:pb-10 select-none" id="schedule-app">
+      <div class="max-w-7xl xl:max-w-8xl mx-auto pb-24 md:pb-10 select-none" id="schedule-app">
           
           <div class="bg-white sticky top-0 z-30 border-b border-gray-200 shadow-sm">
-              <div class="flex justify-between items-center px-4 py-3 md:px-5 md:py-4">
+              <div class="flex justify-between items-center px-4 py-3 md:px-6 md:py-4">
                   <div>
-                    <h2 class="text-base md:text-xl font-bold text-gray-900">Master Schedule</h2>
-                    <p class="text-xs md:text-sm text-gray-500 mt-1">Configure your school's daily routine</p>
+                    <h2 class="text-lg md:text-2xl font-bold text-gray-900">Master Schedule</h2>
+                    <p class="text-sm md:text-base text-gray-500 mt-1">Configure your school's daily routine</p>
                   </div>
-                  <div class="flex gap-2 md:gap-3">
-                       <button onclick="app.save()" class="bg-black text-white px-3 py-2 md:px-5 md:py-2.5 rounded-lg text-sm md:text-base font-bold active:scale-95 transition-transform">Save</button>
-                       <button onclick="app.reset()" class="text-red-600 bg-red-50 px-3 py-2 md:px-4 md:py-2.5 rounded-lg text-sm md:text-base font-bold">Reset</button>
+                  <div class="flex gap-3 md:gap-4">
+                       <button onclick="app.save()" class="bg-black text-white px-4 py-2.5 md:px-6 md:py-3 rounded-lg text-sm md:text-base font-bold active:scale-95 transition-transform">Save</button>
+                       <button onclick="app.reset()" class="text-red-600 bg-red-50 px-4 py-2.5 md:px-5 md:py-3 rounded-lg text-sm md:text-base font-bold">Reset</button>
                   </div>
               </div>
           </div>
 
-          <div class="mx-3 md:mx-5 mt-3 md:mt-3 p-3 md:p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-between">
-              <span class="text-xs md:text-sm font-bold text-blue-800 uppercase tracking-wide">Day Starts At:</span>
-              <input type="time" id="school_start_time" value="${initialSchoolStart}" onchange="app.updateStartTime(this.value)" 
-                     class="bg-white border border-blue-200 text-blue-900 text-xs md:text-sm font-bold rounded-lg px-3 py-2 md:px-3 md:py-2 outline-none w-20 md:w-22 text-center focus:ring-2 focus:ring-blue-500">
+          <div class="mx-4 md:mx-6 mt-4 md:mt-4 p-4 md:p-4 bg-blue-50 border border-blue-100 rounded-lg">
+              <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                  <div class="flex items-center gap-4">
+                      <span class="text-sm md:text-base font-bold text-blue-800 uppercase tracking-wide">Day Starts At:</span>
+                      <input type="time" id="school_start_time" value="${initialSchoolStart}" onchange="app.updateStartTime(this.value)" 
+                             class="bg-white border border-blue-200 text-blue-900 text-sm md:text-base font-bold rounded-lg px-4 py-2.5 md:px-4 md:py-2.5 outline-none w-24 md:w-28 text-center focus:ring-2 focus:ring-blue-500">
+                  </div>
+                  <div class="flex-1">
+                      <div class="text-sm md:text-base font-bold text-blue-800 uppercase tracking-wide mb-3">Working Days:</div>
+                      <div class="grid grid-cols-7 gap-2" id="weekday-selector">
+                          <div class="text-center">
+                              <label class="flex flex-col items-center gap-1 cursor-pointer">
+                                  <input type="checkbox" name="weekday" value="monday" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                  <span class="text-xs font-medium text-gray-700">Mon</span>
+                              </label>
+                          </div>
+                          <div class="text-center">
+                              <label class="flex flex-col items-center gap-1 cursor-pointer">
+                                  <input type="checkbox" name="weekday" value="tuesday" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                  <span class="text-xs font-medium text-gray-700">Tue</span>
+                              </label>
+                          </div>
+                          <div class="text-center">
+                              <label class="flex flex-col items-center gap-1 cursor-pointer">
+                                  <input type="checkbox" name="weekday" value="wednesday" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                  <span class="text-xs font-medium text-gray-700">Wed</span>
+                              </label>
+                          </div>
+                          <div class="text-center">
+                              <label class="flex flex-col items-center gap-1 cursor-pointer">
+                                  <input type="checkbox" name="weekday" value="thursday" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                  <span class="text-xs font-medium text-gray-700">Thu</span>
+                              </label>
+                          </div>
+                          <div class="text-center">
+                              <label class="flex flex-col items-center gap-1 cursor-pointer">
+                                  <input type="checkbox" name="weekday" value="friday" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                  <span class="text-xs font-medium text-gray-700">Fri</span>
+                              </label>
+                          </div>
+                          <div class="text-center">
+                              <label class="flex flex-col items-center gap-1 cursor-pointer">
+                                  <input type="checkbox" name="weekday" value="saturday" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                  <span class="text-xs font-medium text-gray-700">Sat</span>
+                              </label>
+                          </div>
+                          <div class="text-center">
+                              <label class="flex flex-col items-center gap-1 cursor-pointer">
+                                  <input type="checkbox" name="weekday" value="sunday" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                                  <span class="text-xs font-medium text-gray-700">Sun</span>
+                              </label>
+                          </div>
+                      </div>
+                      <div class="mt-2 text-xs text-gray-600">
+                        <span id="working-days-count">5</span> working days selected
+                      </div>
+                  </div>
+              </div>
           </div>
 
-          <div class="mt-3 md:mt-3 bg-white border-t border-b border-gray-200 md:border md:rounded-lg md:mx-5 md:shadow-md overflow-hidden">
+          <div class="mt-4 md:mt-4 bg-white border-t border-b border-gray-200 md:border md:rounded-lg md:mx-6 md:shadow-md overflow-hidden">
               
-              <div class="hidden md:grid grid-cols-12 gap-2 md:gap-3 p-3 md:p-4 bg-gray-100 text-xs md:text-sm uppercase font-bold text-gray-500 border-b border-gray-200">
+              <div class="hidden lg:grid grid-cols-12 gap-3 md:gap-4 p-4 md:p-5 bg-gray-100 text-sm md:text-base uppercase font-bold text-gray-500 border-b border-gray-200">
                   <div class="col-span-1 text-center">#</div>
                   <div class="col-span-2">Start</div>
                   <div class="col-span-2">End</div>
@@ -39,7 +93,7 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
 
               <div id="slot-container" class="divide-y divide-gray-100"></div>
 
-              <button id="add-btn" onclick="app.addPeriod()" class="w-full py-3 md:py-3 text-center text-blue-600 font-bold text-sm md:text-base hover:bg-gray-50 active:bg-blue-50 transition-colors">
+              <button id="add-btn" onclick="app.addPeriod()" class="w-full py-4 md:py-4 text-center text-blue-600 font-bold text-base md:text-lg hover:bg-gray-50 active:bg-blue-50 transition-colors">
                   + Add Next Period
               </button>
           </div>
@@ -59,7 +113,8 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
       <script>
         const AppState = {
             slots: ${JSON.stringify(existingSlots)},
-            startTime: "${initialSchoolStart}"
+            startTime: "${initialSchoolStart}",
+            workingDays: ${config?.working_days ? JSON.stringify(config.working_days) : '["monday","tuesday","wednesday","thursday","friday"]'}
         };
 
         // --- HELPER FUNCTIONS ---
@@ -83,6 +138,34 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
                 if(AppState.slots.length === 0) this.addPeriod(false);
                 this.recalculateChain(); 
                 this.render();
+                // Set working days checkboxes
+                this.setWorkingDaysCheckboxes();
+                this.updateWorkingDaysCount();
+            },
+
+            setWorkingDaysCheckboxes: function() {
+                const checkboxes = document.querySelectorAll('input[name="weekday"]');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = AppState.workingDays.includes(checkbox.value);
+                });
+                
+                // Add event listeners
+                checkboxes.forEach(checkbox => {
+                    checkbox.addEventListener('change', () => {
+                        this.updateWorkingDays();
+                        this.updateWorkingDaysCount();
+                    });
+                });
+            },
+
+            updateWorkingDays: function() {
+                const checkboxes = document.querySelectorAll('input[name="weekday"]:checked');
+                AppState.workingDays = Array.from(checkboxes).map(cb => cb.value);
+            },
+
+            updateWorkingDaysCount: function() {
+                const count = document.querySelectorAll('input[name="weekday"]:checked').length;
+                document.getElementById('working-days-count').textContent = count;
             },
 
             updateStartTime: function(val) {
@@ -155,7 +238,11 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
                     await fetch('/school/schedules', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ action: 'save_schedule', slots: AppState.slots })
+                        body: JSON.stringify({ 
+                            action: 'save_schedule', 
+                            slots: AppState.slots,
+                            working_days: AppState.workingDays
+                        })
                     });
                     window.location.reload();
                 } catch(e) { alert("Save failed"); }
@@ -174,70 +261,70 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
                 container.innerHTML = AppState.slots.map((slot, i) => this.renderRow(slot, i)).join('');
             },
 
-            // --- COMPACT ROW DESIGN ---
+            // --- OPTIMIZED ROW DESIGN ---
             renderRow: function(slot, i) {
                 const isFirst = i === 0;
                 
                 return \`
                 <div class="group bg-white relative">
-                    <div class="hidden md:grid grid-cols-12 gap-2 md:gap-3 p-3 md:p-4 items-center hover:bg-gray-50">
-                        <div class="col-span-1 text-center text-sm md:text-base text-gray-400 font-bold">\${i+1}</div>
+                    <div class="hidden lg:grid grid-cols-12 gap-3 md:gap-4 p-4 md:p-5 items-center hover:bg-gray-50">
+                        <div class="col-span-1 text-center text-base md:text-lg text-gray-400 font-bold">\${i+1}</div>
                         <div class="col-span-2">
                              <input type="time" value="\${slot.start_time}" onchange="app.handleInput(\${i}, 'start_time', this.value)" 
-                             class="w-full text-sm md:text-base font-mono font-bold border border-gray-300 rounded-lg px-2 py-2 md:px-3 md:py-2 \${!isFirst ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-900'} focus:border-blue-500 focus:ring-2">
+                             class="w-full text-base md:text-lg font-mono font-bold border border-gray-300 rounded-lg px-3 py-2.5 md:px-4 md:py-3 \${!isFirst ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-900'} focus:border-blue-500 focus:ring-2">
                         </div>
                         <div class="col-span-2">
-                             <input type="time" value="\${slot.end_time}" onchange="app.handleInput(\${i}, 'end_time', this.value)" class="w-full text-sm md:text-base font-mono font-bold border border-gray-300 rounded-lg px-2 py-2 md:px-3 md:py-2 bg-white text-gray-900 focus:border-blue-500 focus:ring-2">
+                             <input type="time" value="\${slot.end_time}" onchange="app.handleInput(\${i}, 'end_time', this.value)" class="w-full text-base md:text-lg font-mono font-bold border border-gray-300 rounded-lg px-3 py-2.5 md:px-4 md:py-3 bg-white text-gray-900 focus:border-blue-500 focus:ring-2">
                         </div>
                         <div class="col-span-1">
-                             <input type="number" value="\${slot.duration}" onchange="app.handleInput(\${i}, 'duration', this.value)" class="w-full text-sm md:text-base text-center font-bold bg-blue-50 text-blue-700 rounded-lg px-2 py-2 md:px-2 md:py-2 border-none focus:ring-2 focus:ring-blue-500">
+                             <input type="number" value="\${slot.duration}" onchange="app.handleInput(\${i}, 'duration', this.value)" class="w-full text-base md:text-lg text-center font-bold bg-blue-50 text-blue-700 rounded-lg px-3 py-2.5 md:px-3 md:py-3 border-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div class="col-span-4">
-                             <input type="text" value="\${slot.label}" onchange="app.handleInput(\${i}, 'label', this.value)" class="w-full text-sm md:text-base border-b-2 border-transparent hover:border-gray-300 focus:border-blue-500 bg-transparent py-2 md:py-2 outline-none font-medium placeholder-gray-400" placeholder="Period Name...">
+                             <input type="text" value="\${slot.label}" onchange="app.handleInput(\${i}, 'label', this.value)" class="w-full text-base md:text-lg border-b-2 border-transparent hover:border-gray-300 focus:border-blue-500 bg-transparent py-2.5 md:py-3 outline-none font-medium placeholder-gray-400" placeholder="Period Name...">
                         </div>
                         <div class="col-span-1">
-                             <select onchange="app.handleInput(\${i}, 'type', this.value)" class="text-xs md:text-sm font-bold uppercase bg-transparent outline-none \${slot.type==='break'?'text-orange-500':'text-blue-600'}">
+                             <select onchange="app.handleInput(\${i}, 'type', this.value)" class="text-sm md:text-base font-bold uppercase bg-transparent outline-none \${slot.type==='break'?'text-orange-500':'text-blue-600'}">
                                 <option value="class" \${slot.type==='class'?'selected':''}>Class</option>
                                 <option value="break" \${slot.type==='break'?'selected':''}>Break</option>
                              </select>
                         </div>
                         <div class="col-span-1 text-right">
-                             <button onclick="app.removePeriod(\${i})" class="text-gray-300 hover:text-red-500 font-bold text-base md:text-lg transition-colors p-2 rounded-lg hover:bg-red-50">&times;</button>
+                             <button onclick="app.removePeriod(\${i})" class="text-gray-300 hover:text-red-500 font-bold text-lg md:text-xl transition-colors p-3 rounded-lg hover:bg-red-50">&times;</button>
                         </div>
                     </div>
 
-                    <div class="md:hidden p-2 border-l-2 \${slot.type==='break'?'border-orange-300':'border-blue-300'} bg-gray-50">
-                        <div class="flex items-center gap-1 mb-1">
-                            <span class="text-xs font-bold text-gray-500 w-3">\${i+1}</span>
+                    <div class="lg:hidden p-3 border-l-2 \${slot.type==='break'?'border-orange-300':'border-blue-300'} bg-gray-50">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-sm font-bold text-gray-500 w-3">\${i+1}</span>
                             
                             <div class="flex-1">
                                 <input type="time" value="\${slot.start_time}" onchange="app.handleInput(\${i}, 'start_time', this.value)"
-                                class="w-full text-xs font-mono text-center bg-white border border-gray-200 rounded py-1 text-gray-600">
+                                class="w-full text-sm font-mono text-center bg-white border border-gray-200 rounded py-1.5 text-gray-600">
                             </div>
-                            <span class="text-gray-400 text-xs mx-1">→</span>
+                            <span class="text-gray-400 text-sm mx-1">→</span>
                             
                             <div class="flex-1">
                                 <input type="time" value="\${slot.end_time}" onchange="app.handleInput(\${i}, 'end_time', this.value)"
-                                class="w-full text-xs font-mono font-bold text-center bg-white border border-gray-200 rounded py-1 text-gray-900">
+                                class="w-full text-sm font-mono font-bold text-center bg-white border border-gray-200 rounded py-1.5 text-gray-900">
                             </div>
 
-                            <div class="w-10">
+                            <div class="w-12">
                                 <input type="number" value="\${slot.duration}" onchange="app.handleInput(\${i}, 'duration', this.value)"
-                                class="w-full text-xs font-bold text-center bg-blue-50 text-blue-700 rounded py-1 border-none">
+                                class="w-full text-sm font-bold text-center bg-blue-50 text-blue-700 rounded py-1.5 border-none">
                             </div>
                         </div>
 
-                        <div class="flex items-center gap-1">
+                        <div class="flex items-center gap-2">
                             <input type="text" value="\${slot.label}" onchange="app.handleInput(\${i}, 'label', this.value)" 
-                            class="flex-1 text-xs font-medium border-b border-gray-200 focus:border-blue-500 py-0.5 outline-none bg-white placeholder-gray-400" placeholder="Label...">
+                            class="flex-1 text-sm font-medium border-b border-gray-200 focus:border-blue-500 py-1 outline-none bg-white placeholder-gray-400" placeholder="Label...">
                             
                             <select onchange="app.handleInput(\${i}, 'type', this.value)" 
-                            class="text-xs font-bold uppercase bg-white border border-gray-200 rounded px-1 py-0.5 outline-none \${slot.type==='break'?'text-orange-500':'text-blue-500'}">
+                            class="text-sm font-bold uppercase bg-white border border-gray-200 rounded px-2 py-1 outline-none \${slot.type==='break'?'text-orange-500':'text-blue-500'}">
                                 <option value="class" \${slot.type==='class'?'selected':''}>CL</option>
                                 <option value="break" \${slot.type==='break'?'selected':''}>BR</option>
                             </select>
 
-                            <button onclick="app.removePeriod(\${i})" class="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-red-500 bg-white rounded border border-gray-200">
+                            <button onclick="app.removePeriod(\${i})" class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-500 bg-white rounded border border-gray-200">
                                 <span class="text-sm leading-none">&times;</span>
                             </button>
                         </div>

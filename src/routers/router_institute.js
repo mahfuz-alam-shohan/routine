@@ -28,35 +28,25 @@ export async function handleInstituteRequest(request, env) {
       if (request.method === 'POST') {
           try {
               const body = await request.json();
-              
-              // SAVE SCHEDULE
-              if (body.action === 'save_schedule') {
-                  const slots = body.slots;
-                  
-                  // Delete existing slots and re-insert
+              if(body.action === 'save_schedule') {
+                  // Clear existing slots
                   await env.DB.prepare("DELETE FROM schedule_slots WHERE school_id = ?").bind(school.id).run();
                   
-                  const stmt = env.DB.prepare("INSERT INTO schedule_slots (school_id, start_time, end_time, duration, label, type) VALUES (?, ?, ?, ?, ?, ?)");
-                  const batch = slots.map(s => stmt.bind(school.id, s.start_time, s.end_time, s.duration, s.label, s.type));
-                  
-                  await env.DB.batch(batch);
-                  
-                  // Update school start time
-                  if (slots.length > 0) {
-                      await env.DB.prepare("UPDATE schedule_config SET start_time = ? WHERE school_id = ?")
-                          .bind(slots[0].start_time, school.id).run();
-                      
-                      // If no config exists, insert it
-                      const existing = await env.DB.prepare("SELECT id FROM schedule_config WHERE school_id = ?").bind(school.id).first();
-                      if (!existing) {
-                          await env.DB.prepare("INSERT INTO schedule_config (school_id, start_time) VALUES (?, ?)")
-                              .bind(school.id, slots[0].start_time).run();
-                      }
+                  // Insert new slots
+                  for(const slot of body.slots) {
+                      await env.DB.prepare("INSERT INTO schedule_slots (school_id, start_time, end_time, label, duration, type) VALUES (?, ?, ?, ?, ?, ?)")
+                          .bind(school.id, slot.start_time, slot.end_time, slot.label, slot.duration, slot.type).run();
                   }
+                  
+                  // Update working days in schedule config
+                  const workingDays = JSON.stringify(body.working_days || ["monday","tuesday","wednesday","thursday","friday"]);
+                  const allDays = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+                  const offDays = JSON.stringify(allDays.filter(day => !body.working_days?.includes(day)));
+                  
+                  await env.DB.prepare("UPDATE schedule_config SET working_days = ?, off_days = ?, active_days = ? WHERE school_id = ?")
+                      .bind(workingDays, offDays, body.working_days?.length || 5, school.id).run();
               }
-
               return jsonResponse({ success: true });
-
           } catch(e) { 
               if(e.message.includes("no such table")) await syncDatabase(env);
               return jsonResponse({ error: e.message }, 500); 
@@ -94,34 +84,119 @@ export async function handleInstituteRequest(request, env) {
       return htmlResponse(InstituteLayout(SchedulesPageHTML(config, slots), "Master Schedule", school.school_name));
   }
 
-  // --- SUBJECTS ---
+  // --- SUBJECTS (NEW STRUCTURE: Subject Bank + Class Curriculum) ---
   if (url.pathname === '/school/subjects') {
-      // ... (Keep existing Subjects Logic) ...
-      // For brevity in this response, assume existing logic remains or use previous block
-      // Just ensure the imports match
-       if (request.method === 'POST') {
-          const body = await request.json();
-          if (body.action === 'create') await env.DB.prepare("INSERT INTO academic_subjects (school_id, subject_name) VALUES (?, ?)").bind(school.id, body.name).run();
-          if (body.action === 'rename') await env.DB.prepare("UPDATE academic_subjects SET subject_name = ? WHERE id = ?").bind(body.name, body.id).run();
-          if (body.action === 'assign') {
-               const exists = await env.DB.prepare("SELECT id FROM class_subjects_link WHERE class_name = ? AND subject_id = ?").bind(body.class_name, body.subject_id).first();
-               if(!exists) await env.DB.prepare("INSERT INTO class_subjects_link (school_id, class_name, subject_id) VALUES (?, ?, ?)").bind(school.id, body.class_name, body.subject_id).run();
+      if(request.method === 'POST') {
+          try {
+              const body = await request.json();
+              
+              // Subject Bank actions
+              if(body.action === 'create') {
+                  await env.DB.prepare("INSERT INTO academic_subjects (school_id, subject_name) VALUES (?, ?)").bind(school.id, body.name).run();
+                  return jsonResponse({success:true});
+              }
+              if(body.action === 'rename') {
+                  await env.DB.prepare("UPDATE academic_subjects SET subject_name = ? WHERE id = ?").bind(body.name, body.id).run();
+                  return jsonResponse({success:true});
+              }
+              
+              // Class Curriculum actions
+              if(body.action === 'add_class_subject') {
+                  await env.DB.prepare("INSERT INTO class_subjects (school_id, class_id, subject_id, classes_per_week, min_classes, max_classes) VALUES (?, ?, ?, ?, ?, ?)")
+                      .bind(body.school_id, body.class_id, body.subject_id, body.classes_per_week, body.min_classes, body.max_classes).run();
+                  return jsonResponse({success:true});
+              }
+              if(body.action === 'add_group_subject') {
+                  await env.DB.prepare("INSERT INTO group_subjects (school_id, group_id, subject_id, classes_per_week, min_classes, max_classes) VALUES (?, ?, ?, ?, ?, ?)")
+                      .bind(body.school_id, body.group_id, body.subject_id, body.classes_per_week, body.min_classes, body.max_classes).run();
+                  return jsonResponse({success:true});
+              }
+              
+              return jsonResponse({error:"Invalid action"},400);
+          } catch(e) {
+              console.error('Subjects API Error:', e);
+              return jsonResponse({error: e.message}, 500);
           }
-          return jsonResponse({ success: true });
       }
-      if (request.method === 'DELETE') {
+      
+      if(request.method === 'DELETE') {
           const body = await request.json();
-          if (body.type === 'bank') {
+          
+          // Subject Bank actions
+          if(body.type === 'bank') {
               await env.DB.prepare("DELETE FROM academic_subjects WHERE id = ?").bind(body.id).run();
-              await env.DB.prepare("DELETE FROM class_subjects_link WHERE subject_id = ?").bind(body.id).run(); 
+              await env.DB.prepare("DELETE FROM class_subjects WHERE subject_id = ?").bind(body.id).run(); 
+              await env.DB.prepare("DELETE FROM group_subjects WHERE subject_id = ?").bind(body.id).run(); 
+              return jsonResponse({success:true});
           }
-          if (body.type === 'curriculum') await env.DB.prepare("DELETE FROM class_subjects_link WHERE class_name = ? AND subject_id = ?").bind(body.class_name, body.subject_id).run();
-          return jsonResponse({ success: true });
+          
+          // Class Curriculum actions
+          if(body.action === 'delete_class_subject') {
+              await env.DB.prepare("DELETE FROM class_subjects WHERE id=?").bind(body.id).run();
+              return jsonResponse({success:true});
+          }
+          if(body.action === 'delete_group_subject') {
+              await env.DB.prepare("DELETE FROM group_subjects WHERE id=?").bind(body.id).run();
+              return jsonResponse({success:true});
+          }
       }
+      
+      // Get all data for subjects page
       const subjects = await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
-      const classes = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ?").bind(school.id).all();
-      const allocations = await env.DB.prepare(`SELECT l.*, s.subject_name FROM class_subjects_link l JOIN academic_subjects s ON l.subject_id = s.id WHERE l.school_id = ?`).bind(school.id).all();
-      return htmlResponse(InstituteLayout(SubjectsPageHTML(subjects.results, classes.results, allocations.results), "Subjects", school.school_name));
+      const classes = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ? ORDER BY class_name ASC").bind(school.id).all();
+      const groups = await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ? ORDER BY class_id, group_name").bind(school.id).all();
+      const sections = await env.DB.prepare("SELECT cs.*, cg.group_name FROM class_sections cs LEFT JOIN class_groups cg ON cs.group_id = cg.id WHERE cs.school_id = ?").bind(school.id).all();
+      
+      // Get subject assignments
+      const classSubjects = await env.DB.prepare(`
+        SELECT cs.*, sub.subject_name 
+        FROM class_subjects cs 
+        JOIN academic_subjects sub ON cs.subject_id = sub.id 
+        WHERE cs.school_id = ?
+      `).bind(school.id).all();
+      
+      const groupSubjects = await env.DB.prepare(`
+        SELECT gs.*, sub.subject_name, g.group_name, g.class_id
+        FROM group_subjects gs 
+        JOIN academic_subjects sub ON gs.subject_id = sub.id
+        JOIN class_groups g ON gs.group_id = g.id
+        WHERE gs.school_id = ?
+      `).bind(school.id).all();
+      
+      // Get schedule configuration for capacity display
+      let scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+      if (!scheduleConfig) {
+        await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days) VALUES (?, ?, ?, ?, ?)")
+          .bind(school.id, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]').run();
+        scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+      }
+      
+      // Parse working days and calculate capacity
+      const workingDaysArray = scheduleConfig.working_days ? JSON.parse(scheduleConfig.working_days) : ["monday","tuesday","wednesday","thursday","friday"];
+      const workingDaysCount = workingDaysArray.length;
+      const scheduleSlots = await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? AND type = 'class'").bind(school.id).all();
+      const actualClassPeriodsPerDay = scheduleSlots.results.length || 8;
+      const maxClassesPerSection = workingDaysCount * actualClassPeriodsPerDay;
+      
+      scheduleConfig.actualClassPeriodsPerDay = actualClassPeriodsPerDay;
+      scheduleConfig.maxClassesPerSection = maxClassesPerSection;
+      scheduleConfig.workingDaysCount = workingDaysCount;
+      scheduleConfig.workingDaysArray = workingDaysArray;
+      
+      return htmlResponse(InstituteLayout(
+        SubjectsPageHTML(
+          school,
+          subjects.results, 
+          classes.results,
+          groups.results,
+          sections.results,
+          classSubjects.results,
+          groupSubjects.results,
+          scheduleConfig
+        ), 
+        "Subjects Management", 
+        school.school_name
+      ));
   }
 
   // --- TEACHERS ---
@@ -141,51 +216,14 @@ export async function handleInstituteRequest(request, env) {
       return htmlResponse(InstituteLayout(TeachersPageHTML(teachers.results, allSubjects.results), "Teachers", school.school_name));
   }
   
-  // --- CLASSES (CURRICULUM MANAGEMENT) ---
+  // --- CLASSES (READ-ONLY HIERARCHY VIEW) ---
   if (url.pathname === '/school/classes') {
-      if(request.method === 'POST') {
-          try {
-              const body = await request.json();
-              
-              if(body.action === 'add_class_subject') {
-                  // Add subject to class (common for all groups)
-                  await env.DB.prepare("INSERT INTO class_subjects (school_id, class_id, subject_id, classes_per_week, min_classes, max_classes) VALUES (?, ?, ?, ?, ?, ?)")
-                      .bind(body.school_id, body.class_id, body.subject_id, body.classes_per_week, body.min_classes, body.max_classes).run();
-                  return jsonResponse({success:true});
-              }
-              
-              if(body.action === 'add_group_subject') {
-                  // Add subject to specific group
-                  await env.DB.prepare("INSERT INTO group_subjects (school_id, group_id, subject_id, classes_per_week, min_classes, max_classes) VALUES (?, ?, ?, ?, ?, ?)")
-                      .bind(body.school_id, body.group_id, body.subject_id, body.classes_per_week, body.min_classes, body.max_classes).run();
-                  return jsonResponse({success:true});
-              }
-          } catch(e) {
-              console.error('Classes API Error:', e);
-              return jsonResponse({error: e.message}, 500);
-          }
-      }
-      
-      if(request.method === 'DELETE') {
-          const body = await request.json();
-          
-          if(body.action === 'delete_class_subject') {
-              await env.DB.prepare("DELETE FROM class_subjects WHERE id=?").bind(body.id).run();
-              return jsonResponse({success:true});
-          }
-          
-          if(body.action === 'delete_group_subject') {
-              await env.DB.prepare("DELETE FROM group_subjects WHERE id=?").bind(body.id).run();
-              return jsonResponse({success:true});
-          }
-      }
-      
-      // Get all data for curriculum management
+      // Get all data for read-only classes view
       const classes = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ? ORDER BY class_name ASC").bind(school.id).all();
       const groups = await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ? ORDER BY class_id, group_name").bind(school.id).all();
       const sections = await env.DB.prepare("SELECT cs.*, cg.group_name FROM class_sections cs LEFT JOIN class_groups cg ON cs.group_id = cg.id WHERE cs.school_id = ?").bind(school.id).all();
       
-      // Get subjects and assignments
+      // Get subjects for capacity display
       const subjects = await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
       const classSubjects = await env.DB.prepare(`
         SELECT cs.*, sub.subject_name 
@@ -202,23 +240,25 @@ export async function handleInstituteRequest(request, env) {
         WHERE gs.school_id = ?
       `).bind(school.id).all();
       
-      // Get schedule configuration and calculate capacity from master schedule
+      // Get schedule configuration for capacity display
       let scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
       if (!scheduleConfig) {
-        // Create default config if doesn't exist
-        await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day) VALUES (?, ?, ?)")
-          .bind(school.id, 5, 8).run();
+        await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days) VALUES (?, ?, ?, ?, ?)")
+          .bind(school.id, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]').run();
         scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
       }
-
-      // Calculate actual class periods from master schedule (excluding breaks)
-      const scheduleSlots = await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? AND type = 'class'").bind(school.id).all();
-      const actualClassPeriodsPerDay = scheduleSlots.results.length || 8; // Fallback to 8 if no slots found
-      const maxClassesPerSection = (scheduleConfig.active_days || 5) * actualClassPeriodsPerDay;
       
-      // Update scheduleConfig with calculated values
+      // Parse working days and calculate capacity
+      const workingDaysArray = scheduleConfig.working_days ? JSON.parse(scheduleConfig.working_days) : ["monday","tuesday","wednesday","thursday","friday"];
+      const workingDaysCount = workingDaysArray.length;
+      const scheduleSlots = await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? AND type = 'class'").bind(school.id).all();
+      const actualClassPeriodsPerDay = scheduleSlots.results.length || 8;
+      const maxClassesPerSection = workingDaysCount * actualClassPeriodsPerDay;
+      
       scheduleConfig.actualClassPeriodsPerDay = actualClassPeriodsPerDay;
       scheduleConfig.maxClassesPerSection = maxClassesPerSection;
+      scheduleConfig.workingDaysCount = workingDaysCount;
+      scheduleConfig.workingDaysArray = workingDaysArray;
       
       return htmlResponse(InstituteLayout(
         ClassesPageHTML(
@@ -231,7 +271,7 @@ export async function handleInstituteRequest(request, env) {
           groupSubjects.results,
           scheduleConfig
         ), 
-        "Classes & Curriculum", 
+        "Classes & Groups", 
         school.school_name
       ));
   }
