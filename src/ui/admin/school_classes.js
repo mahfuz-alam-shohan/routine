@@ -38,30 +38,30 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
         return `
             <tr class="hover:bg-gray-50 border-b border-gray-100">
                 <td class="px-4 py-3">
-                    <div class="font-medium text-gray-900">\${cls.class_name}</div>
+                    <div class="font-medium text-gray-900">${cls.class_name}</div>
                 </td>
                 <td class="px-4 py-3">
-                    <span class="px-2 py-1 text-xs rounded-full \${cls.has_groups ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}">
-                        \${cls.has_groups ? 'Has Groups' : 'No Groups'}
+                    <span class="px-2 py-1 text-xs rounded-full ${cls.has_groups ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}">
+                        ${cls.has_groups ? 'Has Groups' : 'No Groups'}
                     </span>
                 </td>
                 <td class="px-4 py-3">
-                    <div class="text-sm text-gray-600">\${groupNames}</div>
+                    <div class="text-sm text-gray-600">${groupNames}</div>
                 </td>
                 <td class="px-4 py-3">
-                    <div class="text-sm text-gray-900 max-w-xs truncate" title="\${sectionDisplay}">\${sectionDisplay}</div>
+                    <div class="text-sm text-gray-900 max-w-xs truncate" title="${sectionDisplay}">${sectionDisplay}</div>
                 </td>
                 <td class="px-4 py-3">
                     <div class="flex items-center gap-2">
-                        \${cls.has_groups ? \`
-                            <button onclick="openAddGroupModal(\${cls.id}, '\${cls.class_name}')" class="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">
+                        ${cls.has_groups ? `
+                            <button onclick="openAddGroupModal(${cls.id}, '${cls.class_name}')" class="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">
                                 + Add Group
                             </button>
-                        \` : ''}
-                        <button onclick="openAddSectionModal(\${cls.id}, '\${cls.class_name}', \${cls.has_groups})" class="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">
+                        ` : ''}
+                        <button onclick="openAddSectionModal(${cls.id}, '${cls.class_name}', ${cls.has_groups})" class="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">
                             + Add Section
                         </button>
-                        <button onclick="deleteClass(\${cls.id})" class="text-xs text-red-600 hover:text-red-800">
+                        <button onclick="deleteClass(${cls.id})" class="text-xs text-red-600 hover:text-red-800">
                             Delete
                         </button>
                     </div>
@@ -73,7 +73,7 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
     return `
       <div>
          <div class="flex items-center gap-2 text-sm text-gray-500 mb-6">
-            <a href="/admin/school/view?id=\${school.auth_id}" class="hover:text-blue-600">Back to Menu</a>
+            <a href="/admin/school/view?id=${school.auth_id}" class="hover:text-blue-600">Back to Menu</a>
             <span>/</span>
             <span class="text-gray-900 font-bold">Classes & Sections</span>
          </div>
@@ -108,7 +108,7 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                      </tr>
                  </thead>
                  <tbody>
-                     \${tableRows.length > 0 ? tableRows : '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No classes found.</td></tr>'}
+                     ${tableRows.length > 0 ? tableRows : '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No classes found.</td></tr>'}
                  </tbody>
              </table>
          </div>
@@ -169,8 +169,8 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
       </div>
 
       <script>
-        const SCHOOL_ID = \${school.id};
-        const CLASS_GROUPS = \${JSON.stringify(classGroups)};
+        const SCHOOL_ID = ${school.id};
+        const CLASS_GROUPS = ${JSON.stringify(classGroups)};
 
         function createClass(e) {
             e.preventDefault();
