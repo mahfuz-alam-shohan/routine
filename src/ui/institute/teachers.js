@@ -354,7 +354,8 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 const response = await fetch('/school/teachers', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(data),
+                    credentials: 'include'
                 });
                 
                 console.log('Response status:', response.status); // Debug log
