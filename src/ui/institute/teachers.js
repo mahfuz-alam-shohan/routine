@@ -339,7 +339,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             e.preventDefault();
             
             const formData = new FormData(e.target);
-            const data = Object.fromEntries(formData.entries);
+            const data = Object.fromEntries(formData.entries());
             
             // Get additional subjects
             const additionalSubjects = Array.from(document.querySelectorAll('input[name="additional_subjects"]:checked'))
