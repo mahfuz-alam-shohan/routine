@@ -153,38 +153,51 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
 
       <!-- Subject Editor Modal -->
       <div id="subject-editor-modal" class="fixed inset-0 modal-overlay z-[9999] hidden flex items-center justify-center p-4">
-          <div class="bg-white rounded-lg shadow-xl w-full max-w-lg">
+          <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
               <div class="p-4 border-b">
-                  <h3 class="font-semibold">Edit Subjects for <span id="teacher-name-display"></span></h3>
+                  <h3 class="font-semibold">Assign Subjects</h3>
+                  <p class="text-sm text-gray-600">For <span id="teacher-name-display"></span></p>
               </div>
               
               <div class="p-4">
                   <form id="subject-editor-form" onsubmit="saveSubjectAssignments(event)" class="space-y-4">
                       <input type="hidden" name="teacher_id" id="edit-teacher-id">
+                      <input type="hidden" name="primary_subject" id="selected-primary-subject">
                       
+                      <!-- Primary Subject Selection -->
                       <div>
                           <label class="block text-sm font-medium mb-2">Primary Subject</label>
-                          <div class="border rounded p-2 max-h-32 overflow-y-auto bg-gray-50">
-                              ${allSubjects.map(s => `
-                                  <label class="flex items-center gap-2 p-2 rounded hover:bg-white subject-checkbox cursor-pointer">
-                                      <input type="radio" name="primary_subject" value="${s.id}" required 
-                                             class="text-blue-600">
-                                      <span class="text-sm">${s.subject_name}</span>
-                                  </label>
-                              `).join('')}
+                          <div class="relative">
+                              <input type="text" id="primary-search" placeholder="Search and select primary subject..." 
+                                     class="w-full border rounded px-3 py-2 pr-8"
+                                     oninput="searchSubjects('primary', this.value)"
+                                     onfocus="showSubjectDropdown('primary')">
+                              <div id="primary-dropdown" class="hidden absolute top-full left-0 right-0 bg-white border rounded mt-1 max-h-32 overflow-y-auto z-10 shadow-lg">
+                                  <!-- Search results will appear here -->
+                              </div>
+                          </div>
+                          <div id="selected-primary-display" class="mt-2 hidden">
+                              <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
+                                  🎯 <span id="primary-name"></span>
+                                  <button type="button" onclick="clearPrimarySubject()" class="ml-1 text-green-600 hover:text-green-800">×</button>
+                              </span>
                           </div>
                       </div>
                       
+                      <!-- Additional Subjects -->
                       <div>
                           <label class="block text-sm font-medium mb-2">Additional Subjects</label>
-                          <div class="border rounded p-2 max-h-32 overflow-y-auto bg-gray-50">
-                              ${allSubjects.map(s => `
-                                  <label class="flex items-center gap-2 p-2 rounded hover:bg-white subject-checkbox cursor-pointer">
-                                      <input type="checkbox" name="additional_subjects" value="${s.id}" 
-                                             class="text-blue-600">
-                                      <span class="text-sm">${s.subject_name}</span>
-                                  </label>
-                              `).join('')}
+                          <div class="relative">
+                              <input type="text" id="additional-search" placeholder="Search and add additional subjects..." 
+                                     class="w-full border rounded px-3 py-2 pr-8"
+                                     oninput="searchSubjects('additional', this.value)"
+                                     onfocus="showSubjectDropdown('additional')">
+                              <div id="additional-dropdown" class="hidden absolute top-full left-0 right-0 bg-white border rounded mt-1 max-h-32 overflow-y-auto z-10 shadow-lg">
+                                  <!-- Search results will appear here -->
+                              </div>
+                          </div>
+                          <div id="selected-additional-display" class="mt-2 space-y-1">
+                              <!-- Selected additional subjects will appear here -->
                           </div>
                       </div>
                       
@@ -194,7 +207,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                           </button>
                           <button type="button" onclick="closeSubjectEditor()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
                               Cancel
-                      </button>
+                          </button>
                       </div>
                   </form>
               </div>
@@ -203,6 +216,9 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
 
       <script>
         const SCHOOL_ID = ${school.id};
+        const ALL_SUBJECTS = ${JSON.stringify(allSubjects)};
+        let selectedPrimarySubject = null;
+        let selectedAdditionalSubjects = [];
 
         function toggleAddTeacherForm() {
             const form = document.getElementById('add-teacher-form');
@@ -250,6 +266,10 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             document.getElementById('subject-editor-modal').classList.remove('hidden');
             document.body.style.overflow = 'hidden';
             
+            // Reset selections
+            selectedPrimarySubject = null;
+            selectedAdditionalSubjects = [];
+            
             // Load current subjects for this teacher
             loadCurrentSubjects(teacherId);
         }
@@ -258,47 +278,141 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             document.getElementById('subject-editor-modal').classList.add('hidden');
             document.body.style.overflow = '';
             document.getElementById('subject-editor-form').reset();
+            clearPrimarySubject();
+            clearAdditionalSubjects();
+            hideDropdowns();
+        }
+
+        function hideDropdowns() {
+            document.getElementById('primary-dropdown').classList.add('hidden');
+            document.getElementById('additional-dropdown').classList.add('hidden');
+        }
+
+        function searchSubjects(type, query) {
+            const dropdown = document.getElementById(type + '-dropdown');
+            const filteredSubjects = ALL_SUBJECTS.filter(subject => {
+                const matchesSearch = subject.subject_name.toLowerCase().includes(query.toLowerCase());
+                if (type === 'primary') {
+                    return matchesSearch && subject.id !== selectedPrimarySubject?.id;
+                } else {
+                    return matchesSearch && 
+                           subject.id !== selectedPrimarySubject?.id && 
+                           !selectedAdditionalSubjects.find(s => s.id === subject.id);
+                }
+            });
+            
+            if (query && filteredSubjects.length > 0) {
+                dropdown.innerHTML = filteredSubjects.map(subject => 
+                    '<div class="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm" onclick="selectSubject(\'' + type + '\', ' + subject.id + ', \'' + subject.subject_name + '\')">' + 
+                    subject.subject_name + 
+                    '</div>'
+                ).join('');
+                dropdown.classList.remove('hidden');
+            } else {
+                dropdown.classList.add('hidden');
+            }
+        }
+
+        function showSubjectDropdown(type) {
+            const searchInput = document.getElementById(type + '-search');
+            if (searchInput.value) {
+                searchSubjects(type, searchInput.value);
+            }
+        }
+
+        function selectSubject(type, id, name) {
+            if (type === 'primary') {
+                selectedPrimarySubject = { id, name };
+                document.getElementById('selected-primary-subject').value = id;
+                document.getElementById('primary-name').textContent = name;
+                document.getElementById('selected-primary-display').classList.remove('hidden');
+                document.getElementById('primary-search').value = '';
+                document.getElementById('primary-dropdown').classList.add('hidden');
+            } else {
+                selectedAdditionalSubjects.push({ id, name });
+                updateAdditionalDisplay();
+                document.getElementById('additional-search').value = '';
+                document.getElementById('additional-dropdown').classList.add('hidden');
+            }
+        }
+
+        function clearPrimarySubject() {
+            selectedPrimarySubject = null;
+            document.getElementById('selected-primary-subject').value = '';
+            document.getElementById('selected-primary-display').classList.add('hidden');
+            document.getElementById('primary-search').value = '';
+        }
+
+        function removeAdditionalSubject(id) {
+            selectedAdditionalSubjects = selectedAdditionalSubjects.filter(s => s.id !== id);
+            updateAdditionalDisplay();
+        }
+
+        function clearAdditionalSubjects() {
+            selectedAdditionalSubjects = [];
+            updateAdditionalDisplay();
+        }
+
+        function updateAdditionalDisplay() {
+            const display = document.getElementById('selected-additional-display');
+            if (selectedAdditionalSubjects.length > 0) {
+                display.innerHTML = selectedAdditionalSubjects.map(subject => 
+                    '<span class="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs">' + 
+                    subject.name + 
+                    '<button type="button" onclick="removeAdditionalSubject(' + subject.id + ')" class="ml-1 text-blue-600 hover:text-blue-800">×</button>' + 
+                    '</span>'
+                ).join('');
+            } else {
+                display.innerHTML = '';
+            }
         }
 
         function loadCurrentSubjects(teacherId) {
             // Get current subjects from the displayed table
-            const teacherRow = document.querySelector(\`tr:has(button[onclick*="\${teacherId}"])\`);
+            const teacherRow = document.querySelector('tr:has(button[onclick*="' + teacherId + '"])');
             if (!teacherRow) return;
             
             const subjectsCell = teacherRow.cells[1];
             const primaryBadge = subjectsCell.querySelector('.bg-green-100');
             const additionalBadges = subjectsCell.querySelectorAll('.bg-blue-50');
             
-            // Clear previous selections
-            document.querySelectorAll('input[name="primary_subject"]').forEach(radio => radio.checked = false);
-            document.querySelectorAll('input[name="additional_subjects"]').forEach(checkbox => checkbox.checked = false);
-            
             // Set primary subject
             if (primaryBadge) {
                 const primaryText = primaryBadge.textContent.replace('🎯 ', '').trim();
-                const primaryRadio = document.querySelector(\`input[name="primary_subject"][value="\${primaryText}"]\`);
-                if (primaryRadio) primaryRadio.checked = true;
+                const primarySubject = ALL_SUBJECTS.find(s => s.subject_name === primaryText);
+                if (primarySubject) {
+                    selectedPrimarySubject = { id: primarySubject.id, name: primarySubject.subject_name };
+                    document.getElementById('selected-primary-subject').value = primarySubject.id;
+                    document.getElementById('primary-name').textContent = primarySubject.subject_name;
+                    document.getElementById('selected-primary-display').classList.remove('hidden');
+                }
             }
             
             // Set additional subjects
             additionalBadges.forEach(badge => {
                 const subjectText = badge.textContent.trim();
-                const checkbox = document.querySelector(\`input[name="additional_subjects"][value="\${subjectText}"]\`);
-                if (checkbox) checkbox.checked = true;
+                const subject = ALL_SUBJECTS.find(s => s.subject_name === subjectText);
+                if (subject) {
+                    selectedAdditionalSubjects.push({ id: subject.id, name: subject.subject_name });
+                }
             });
+            updateAdditionalDisplay();
         }
 
         async function saveSubjectAssignments(e) {
             e.preventDefault();
             
-            const formData = new FormData(e.target);
-            const data = Object.fromEntries(formData.entries());
+            if (!selectedPrimarySubject) {
+                alert('Please select a primary subject');
+                return;
+            }
             
-            const additionalSubjects = Array.from(document.querySelectorAll('input[name="additional_subjects"]:checked'))
-                .map(cb => cb.value);
-            
-            data.additional_subjects = additionalSubjects;
-            data.action = 'assign_subjects';
+            const data = {
+                teacher_id: document.getElementById('edit-teacher-id').value,
+                primary_subject: selectedPrimarySubject.id,
+                additional_subjects: selectedAdditionalSubjects.map(s => s.id),
+                action: 'assign_subjects'
+            };
             
             try {
                 const response = await fetch('/school/teachers', {
@@ -350,6 +464,16 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
         document.getElementById('subject-editor-modal')?.addEventListener('click', function(e) {
             if (e.target === this) {
                 closeSubjectEditor();
+            }
+        });
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#primary-search') && !e.target.closest('#primary-dropdown')) {
+                document.getElementById('primary-dropdown').classList.add('hidden');
+            }
+            if (!e.target.closest('#additional-search') && !e.target.closest('#additional-dropdown')) {
+                document.getElementById('additional-dropdown').classList.add('hidden');
             }
         });
       </script>
