@@ -37,10 +37,22 @@ const DEFINED_SCHEMA = {
     auth_id: "INTEGER",
     school_id: "INTEGER",
     full_name: "TEXT",
-    subject: "TEXT", 
+    subject: "TEXT", // Keep for backward compatibility
     email: "TEXT",
     phone: "TEXT",
     "FOREIGN KEY(auth_id)": "REFERENCES auth_accounts(id)"
+  },
+
+  // --- TEACHER SUBJECT ASSIGNMENTS ---
+  teacher_subjects: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    school_id: "INTEGER",
+    teacher_id: "INTEGER",
+    subject_id: "INTEGER",
+    is_primary: "BOOLEAN DEFAULT 0", // Main subject vs additional subjects
+    "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)",
+    "FOREIGN KEY(teacher_id)": "REFERENCES profiles_teacher(id)",
+    "FOREIGN KEY(subject_id)": "REFERENCES academic_subjects(id)"
   },
 
   academic_classes: {

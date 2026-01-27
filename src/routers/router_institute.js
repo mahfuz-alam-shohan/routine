@@ -202,21 +202,81 @@ export async function handleInstituteRequest(request, env) {
       ));
   }
 
-  // --- TEACHERS ---
+  // --- TEACHERS (NEW SYSTEM: Table Interface + Subject Assignment) ---
   if (url.pathname === '/school/teachers') {
-      // ... (Keep existing Teachers Logic) ...
       if (request.method === 'POST') {
-          const current = await env.DB.prepare("SELECT count(*) as count FROM profiles_teacher WHERE school_id = ?").bind(school.id).first();
-          if (current.count >= (school.max_teachers || 10)) return jsonResponse({ error: "Limit Reached" }, 403);
           const body = await request.json();
-          const cleanPhone = body.phone_digits.replace(/\D/g, ''); 
-          await env.DB.prepare("INSERT INTO profiles_teacher (school_id, full_name, subject, email, phone) VALUES (?, ?, ?, ?, ?)")
-              .bind(school.id, body.full_name, body.subject, body.email, `880-${cleanPhone}`).run();
-          return jsonResponse({ success: true });
+          
+          // Add new teacher (without subjects)
+          if (body.full_name && body.email && body.phone_digits) {
+              const current = await env.DB.prepare("SELECT count(*) as count FROM profiles_teacher WHERE school_id = ?").bind(school.id).first();
+              if (current.count >= (school.max_teachers || 10)) return jsonResponse({ error: "Limit Reached" }, 403);
+              
+              const cleanPhone = body.phone_digits.replace(/\D/g, ''); 
+              await env.DB.prepare("INSERT INTO profiles_teacher (school_id, full_name, subject, email, phone) VALUES (?, ?, ?, ?, ?)")
+                  .bind(school.id, body.full_name, '', body.email, `880-${cleanPhone}`).run();
+              return jsonResponse({ success: true });
+          }
+          
+          // Assign subjects to teacher
+          if (body.action === 'assign_subjects') {
+              // Clear existing assignments for this teacher
+              await env.DB.prepare("DELETE FROM teacher_subjects WHERE teacher_id = ?").bind(body.teacher_id).run();
+              
+              // Add main subject
+              if (body.main_subject) {
+                  await env.DB.prepare("INSERT INTO teacher_subjects (school_id, teacher_id, subject_id, is_primary) VALUES (?, ?, ?, 1)")
+                      .bind(school.id, body.teacher_id, body.main_subject, 1).run();
+              }
+              
+              // Add additional subjects
+              if (body.additional_subjects && Array.isArray(body.additional_subjects)) {
+                  for (const subjectId of body.additional_subjects) {
+                      await env.DB.prepare("INSERT INTO teacher_subjects (school_id, teacher_id, subject_id, is_primary) VALUES (?, ?, ?, 0)")
+                          .bind(school.id, body.teacher_id, subjectId, 0).run();
+                  }
+              }
+              
+              return jsonResponse({ success: true });
+          }
+          
+          return jsonResponse({ error: "Invalid action" }, 400);
       }
+      
+      if (request.method === 'DELETE') {
+          const body = await request.json();
+          
+          // Remove teacher
+          if (body.id) {
+              await env.DB.prepare("DELETE FROM profiles_teacher WHERE id = ?").bind(body.id).run();
+              await env.DB.prepare("DELETE FROM teacher_subjects WHERE teacher_id = ?").bind(body.id).run();
+              return jsonResponse({ success: true });
+          }
+          
+          return jsonResponse({ error: "Invalid request" }, 400);
+      }
+      
+      // Get all data for teachers page
       const teachers = await env.DB.prepare("SELECT * FROM profiles_teacher WHERE school_id = ? ORDER BY id DESC").bind(school.id).all();
       const allSubjects = await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
-      return htmlResponse(InstituteLayout(TeachersPageHTML(teachers.results, allSubjects.results), "Teachers", school.school_name));
+      const teacherSubjects = await env.DB.prepare(`
+        SELECT ts.*, sub.subject_name 
+        FROM teacher_subjects ts 
+        JOIN academic_subjects sub ON ts.subject_id = sub.id 
+        WHERE ts.school_id = ?
+        ORDER BY ts.is_primary DESC, sub.subject_name ASC
+      `).bind(school.id).all();
+      
+      return htmlResponse(InstituteLayout(
+        TeachersPageHTML(
+          school,
+          teachers.results, 
+          allSubjects.results,
+          teacherSubjects.results
+        ), 
+        "Teachers Management", 
+        school.school_name
+      ));
   }
   
   // --- CLASSES (READ-ONLY HIERARCHY VIEW) ---
