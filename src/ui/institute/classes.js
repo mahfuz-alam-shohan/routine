@@ -28,8 +28,8 @@ export function ClassesPageHTML(school, classes = [], groups = [], sections = []
         subjectsByGroup[gs.group_id].push(gs);
     });
 
-    // Calculate capacity for each section
-    const maxClassesPerSection = (scheduleConfig.active_days || 5) * (scheduleConfig.periods_per_day || 8);
+    // Calculate capacity for each section based on master schedule
+    const maxClassesPerSection = scheduleConfig.maxClassesPerSection || 40;
     
     function calculateSectionCapacity(classId, groupId) {
         let totalClasses = 0;
@@ -348,22 +348,25 @@ export function ClassesPageHTML(school, classes = [], groups = [], sections = []
             <span class="text-gray-900 font-bold">Classes & Curriculum</span>
          </div>
 
-         <!-- Schedule Configuration -->
-         <div class="mb-6 bg-gray-50 p-4 border border-gray-300 schedule-config">
+         <!-- Master Schedule Information (Read-only) -->
+         <div class="mb-6 bg-gray-50 p-4 border border-gray-300">
              <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                  <div class="flex flex-col md:flex-row md:items-center gap-4">
-                     <span class="font-semibold text-sm md:text-base">📅 Schedule Configuration</span>
+                     <span class="font-semibold text-sm md:text-base">📅 Master Schedule Configuration</span>
                      <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                         <label class="text-sm">Active Days:</label>
-                         <input type="number" id="activeDays" value="${scheduleConfig.active_days || 5}" min="1" max="7" class="w-16 sm:w-20 border border-gray-300 px-2 py-1 text-sm">
-                         <label class="text-sm">Periods/Day:</label>
-                         <input type="number" id="periodsPerDay" value="${scheduleConfig.periods_per_day || 8}" min="1" max="15" class="w-16 sm:w-20 border border-gray-300 px-2 py-1 text-sm">
-                         <button onclick="updateScheduleConfig()" class="bg-blue-600 text-white px-3 py-1 text-sm hover-lift">Update</button>
+                         <span class="text-sm">Working Days: <strong>${scheduleConfig.active_days || 5}</strong></span>
+                         <span class="text-sm">Class Periods/Day: <strong>${scheduleConfig.actualClassPeriodsPerDay || 8}</strong></span>
                      </div>
                  </div>
                  <div class="text-sm text-gray-600">
                      <strong>Total Capacity:</strong> ${maxClassesPerSection} classes/week per section
+                     <div class="text-xs text-gray-500 mt-1">
+                         (Calculated from master schedule: ${scheduleConfig.active_days || 5} days × ${scheduleConfig.actualClassPeriodsPerDay || 8} class periods)
+                     </div>
                  </div>
+             </div>
+             <div class="text-xs text-gray-500 mt-2">
+                 ⚠️ Schedule configuration is managed in Master Schedule. This ensures consistency with routine generation.
              </div>
          </div>
 
@@ -494,33 +497,6 @@ export function ClassesPageHTML(school, classes = [], groups = [], sections = []
             const activeTab = document.getElementById(tabName + '-tab');
             activeTab.classList.add('active');
             activeTab.classList.remove('text-gray-500');
-        }
-
-        // Update schedule configuration
-        function updateScheduleConfig() {
-            const activeDays = parseInt(document.getElementById('activeDays').value);
-            const periodsPerDay = parseInt(document.getElementById('periodsPerDay').value);
-            
-            fetch('/school/classes', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    action: 'update_schedule_config',
-                    school_id: SCHOOL_ID,
-                    active_days: activeDays,
-                    periods_per_day: periodsPerDay
-                })
-            }).then(res => res.json()).then(response => {
-                if(response.success) {
-                    showToast('Schedule configuration updated successfully', 'success');
-                    setTimeout(() => window.location.reload(), 1000);
-                } else {
-                    showToast('Error updating schedule: ' + (response.error || 'Unknown error'), 'error');
-                }
-            }).catch(error => {
-                console.error('Network error:', error);
-                showToast('Network error. Please check your connection and try again.', 'error');
-            });
         }
 
         function openAddClassSubjectModal(classId, className) {

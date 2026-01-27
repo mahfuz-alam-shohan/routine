@@ -160,13 +160,6 @@ export async function handleInstituteRequest(request, env) {
                       .bind(body.school_id, body.group_id, body.subject_id, body.classes_per_week, body.min_classes, body.max_classes).run();
                   return jsonResponse({success:true});
               }
-              
-              if(body.action === 'update_schedule_config') {
-                  // Update master schedule configuration
-                  await env.DB.prepare("UPDATE schedule_config SET active_days = ?, periods_per_day = ? WHERE school_id = ?")
-                      .bind(body.active_days, body.periods_per_day, body.school_id).run();
-                  return jsonResponse({success:true});
-              }
           } catch(e) {
               console.error('Classes API Error:', e);
               return jsonResponse({error: e.message}, 500);
@@ -209,7 +202,7 @@ export async function handleInstituteRequest(request, env) {
         WHERE gs.school_id = ?
       `).bind(school.id).all();
       
-      // Get schedule configuration
+      // Get schedule configuration and calculate capacity from master schedule
       let scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
       if (!scheduleConfig) {
         // Create default config if doesn't exist
@@ -217,6 +210,15 @@ export async function handleInstituteRequest(request, env) {
           .bind(school.id, 5, 8).run();
         scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
       }
+
+      // Calculate actual class periods from master schedule (excluding breaks)
+      const scheduleSlots = await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? AND type = 'class'").bind(school.id).all();
+      const actualClassPeriodsPerDay = scheduleSlots.results.length || 8; // Fallback to 8 if no slots found
+      const maxClassesPerSection = (scheduleConfig.active_days || 5) * actualClassPeriodsPerDay;
+      
+      // Update scheduleConfig with calculated values
+      scheduleConfig.actualClassPeriodsPerDay = actualClassPeriodsPerDay;
+      scheduleConfig.maxClassesPerSection = maxClassesPerSection;
       
       return htmlResponse(InstituteLayout(
         ClassesPageHTML(
