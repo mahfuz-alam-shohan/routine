@@ -42,11 +42,11 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 </td>
                 <td class="p-3">
                     <div class="flex gap-2">
-                        <button onclick="openSubjectEditor(${t.id}, '${t.full_name}')" 
+                        <button onclick="openSubjectEditor(' + t.id + ', \'' + t.full_name.replace(/'/g, "\\'") + '\')" 
                                 class="text-blue-600 hover:text-blue-800 text-sm">
                             Edit Subjects
                         </button>
-                        <button onclick="removeTeacher(${t.id})" 
+                        <button onclick="removeTeacher(' + t.id + ')" 
                                 class="text-red-600 hover:text-red-800 text-sm">
                             Remove
                         </button>
