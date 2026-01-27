@@ -2439,7 +2439,7 @@ function InstituteDashboardHTML(stats) {
 }
 __name(InstituteDashboardHTML, "InstituteDashboardHTML");
 
-// src/ui/institute/teachers_workers.js
+// src/ui/institute/teachers.js
 init_checked_fetch();
 init_modules_watch_stub();
 function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjects = []) {

@@ -1,4 +1,4 @@
-// src/ui/institute/teachers.js - FIXED: Working Teacher Management
+// src/ui/institute/teachers.js - Cloudflare Workers Compatible Teacher Management
 
 export function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjects = []) {
     
@@ -18,22 +18,22 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
         return `
             <tr class="border-b hover:bg-gray-50">
                 <td class="p-4">
-                    <div class="font-medium text-gray-900">${t.full_name}</div>
-                    <div class="text-sm text-gray-500">${t.email}</div>
-                    <div class="text-sm text-gray-600">${t.phone}</div>
+                    <div class="font-medium text-gray-900">${safeHtml(t.full_name)}</div>
+                    <div class="text-sm text-gray-500">${safeHtml(t.email)}</div>
+                    <div class="text-sm text-gray-600">${safeHtml(t.phone)}</div>
                 </td>
                 <td class="p-4">
                     <div class="space-y-2">
                         ${primarySubject ? `
                             <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
-                                🎯 ${primarySubject.subject_name}
+                                🎯 ${safeHtml(primarySubject.subject_name)}
                             </span>
                         ` : '<span class="text-gray-400 text-xs">No primary subject</span>'}
                         ${additionalSubjects.length > 0 ? `
                             <div class="flex flex-wrap gap-1">
                                 ${additionalSubjects.map(s => `
                                     <span class="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
-                                        ${s.subject_name}
+                                        ${safeHtml(s.subject_name)}
                                     </span>
                                 `).join('')}
                             </div>
@@ -42,11 +42,11 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 </td>
                 <td class="p-4">
                     <div class="flex gap-2">
-                        <button onclick="window.openSubjectEditor(${t.id}, '${t.full_name.replace(/'/g, "\\'")}')" 
+                        <button type="button" onclick="editSubjects(${t.id}, '${safeHtml(t.full_name)}')" 
                                 class="text-blue-600 hover:text-blue-800 text-sm font-medium">
                             Edit Subjects
                         </button>
-                        <button onclick="window.removeTeacher(${t.id})" 
+                        <button type="button" onclick="removeTeacher(${t.id})" 
                                 class="text-red-600 hover:text-red-800 text-sm font-medium">
                             Remove
                         </button>
@@ -63,15 +63,15 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 <h1 class="text-2xl font-bold text-gray-900">Teachers Management</h1>
                 <p class="text-gray-600">Manage teachers and assign subjects</p>
               </div>
-              <button onclick="window.toggleAddTeacherForm()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+              <button type="button" onclick="toggleAddForm()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
                   + Add Teacher
               </button>
           </div>
 
           <!-- Add Teacher Form -->
-          <div id="add-teacher-form" class="hidden mb-6 bg-white rounded-lg border p-6">
+          <div id="add-form" class="hidden mb-6 bg-white rounded-lg border p-6">
               <h3 class="text-lg font-semibold mb-4">Add New Teacher</h3>
-              <form onsubmit="window.addTeacher(event)" class="space-y-4">
+              <form onsubmit="addTeacher(event)" class="space-y-4">
                   <div class="grid grid-cols-2 gap-4">
                       <input type="text" name="full_name" placeholder="Full Name" required 
                              class="border rounded px-3 py-2">
@@ -87,7 +87,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                       <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
                           Add Teacher
                       </button>
-                      <button type="button" onclick="window.toggleAddTeacherForm()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
+                      <button type="button" onclick="toggleAddForm()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
                           Cancel
                       </button>
                   </div>
@@ -123,49 +123,37 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
           </div>
       </div>
 
-      <!-- Subject Assignment Modal -->
+      <!-- Subject Modal -->
       <div id="subject-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
           <div class="bg-white rounded-lg max-w-md w-full">
               <div class="p-4 border-b">
                   <h3 class="font-semibold">Assign Subjects</h3>
-                  <p class="text-sm text-gray-600">For <span id="teacher-name-display"></span></p>
+                  <p class="text-sm text-gray-600">For <span id="teacher-name"></span></p>
               </div>
-              
               <div class="p-4">
-                  <form onsubmit="window.saveSubjectAssignments(event)" class="space-y-4">
-                      <input type="hidden" name="teacher_id" id="teacher-id">
-                      <input type="hidden" name="primary_subject" id="primary-subject">
-                      
+                  <form onsubmit="saveSubjects(event)" class="space-y-4">
+                      <input type="hidden" id="modal-teacher-id">
                       <div>
                           <label class="block text-sm font-medium mb-2">Primary Subject *</label>
-                          <input type="text" id="primary-search" placeholder="Search primary subject..." 
-                                 class="w-full border rounded px-3 py-2"
-                                 oninput="window.searchPrimarySubjects(this.value)">
-                          <div id="primary-results" class="border rounded mt-1 max-h-32 overflow-y-auto hidden"></div>
-                          <div id="selected-primary" class="mt-2 hidden">
-                              <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
-                                  🎯 <span id="primary-name"></span>
-                                  <button type="button" onclick="window.clearPrimarySubject()" class="ml-1">×</button>
-                              </span>
-                          </div>
+                          <select id="primary-subject" required class="w-full border rounded px-3 py-2">
+                              <option value="">Select...</option>
+                              ${allSubjects.map(s => `<option value="${s.id}">${safeHtml(s.subject_name)}</option>`).join('')}
+                          </select>
                       </div>
-                      
                       <div>
                           <label class="block text-sm font-medium mb-2">Additional Subjects</label>
-                          <input type="text" id="additional-search" placeholder="Search additional subjects..." 
-                                 class="w-full border rounded px-3 py-2"
-                                 oninput="window.searchAdditionalSubjects(this.value)">
-                          <div id="additional-results" class="border rounded mt-1 max-h-32 overflow-y-auto hidden"></div>
-                          <div id="selected-additional" class="mt-2 space-y-1"></div>
+                          <div class="max-h-32 overflow-y-auto border rounded p-2">
+                              ${allSubjects.map(s => `
+                                  <label class="flex items-center gap-2 text-sm">
+                                      <input type="checkbox" name="additional" value="${s.id}">
+                                      ${safeHtml(s.subject_name)}
+                                  </label>
+                              `).join('')}
+                          </div>
                       </div>
-                      
                       <div class="flex gap-2 pt-2 border-t">
-                          <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                              Save
-                          </button>
-                          <button type="button" onclick="window.closeSubjectModal()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
-                              Cancel
-                          </button>
+                          <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save</button>
+                          <button type="button" onclick="closeModal()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">Cancel</button>
                       </div>
                   </form>
               </div>
@@ -173,23 +161,19 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
       </div>
 
       <script>
-        console.log('Teachers module loading...');
-        
-        // Make functions globally available
-        window.ALL_SUBJECTS = ${JSON.stringify(allSubjects)};
-        window.selectedPrimary = null;
-        window.selectedAdditional = [];
-
-        console.log('Functions being defined...');
-
-        window.toggleAddTeacherForm = function() {
-            console.log('toggleAddTeacherForm called');
-            const form = document.getElementById('add-teacher-form');
-            form.classList.toggle('hidden');
+        // Data storage - simple approach
+        window.teachersData = {
+            teachers: ${JSON.stringify(teachers)},
+            allSubjects: ${JSON.stringify(allSubjects)},
+            teacherSubjects: ${JSON.stringify(teacherSubjects)}
         };
 
-        window.addTeacher = async function(e) {
-            console.log('addTeacher called');
+        // Simple functions
+        function toggleAddForm() {
+            document.getElementById('add-form').classList.toggle('hidden');
+        }
+
+        function addTeacher(e) {
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
@@ -203,248 +187,114 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             data.phone = '+880-' + phoneDigits;
             delete data.phone_digits;
             
-            console.log('Sending teacher data:', data);
-            
-            try {
-                const response = await fetch('/school/teachers', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                console.log('Teacher add response:', result);
+            fetch('/school/teachers', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(r => r.json()).then(result => {
                 if (result.success) {
-                    window.location.reload();
+                    location.reload();
                 } else {
                     alert('Error: ' + (result.error || 'Unknown error'));
                 }
-            } catch (error) {
-                console.error('Teacher add error:', error);
+            }).catch(err => {
                 alert('Network error. Please try again.');
-            }
-        };
-
-        window.openSubjectEditor = function(teacherId, teacherName) {
-            console.log('openSubjectEditor called with:', teacherId, teacherName);
-            document.getElementById('teacher-id').value = teacherId;
-            document.getElementById('teacher-name-display').textContent = teacherName;
-            document.getElementById('subject-modal').classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
-            
-            window.loadCurrentSubjects(teacherId);
-        };
-
-        window.closeSubjectModal = function() {
-            console.log('closeSubjectModal called');
-            document.getElementById('subject-modal').classList.add('hidden');
-            document.body.style.overflow = '';
-            document.getElementById('subject-modal').querySelector('form').reset();
-            window.clearPrimarySubject();
-            window.clearAdditionalSubjects();
-        };
-
-        window.searchPrimarySubjects = function(query) {
-            console.log('searchPrimarySubjects called with:', query);
-            const results = document.getElementById('primary-results');
-            const filtered = window.ALL_SUBJECTS.filter(subject => 
-                subject.subject_name.toLowerCase().includes(query.toLowerCase()) &&
-                subject.id !== window.selectedPrimary?.id
-            );
-            
-            if (query && filtered.length > 0) {
-                results.innerHTML = filtered.map(subject => {
-                    const safeName = subject.subject_name.replace(/'/g, "\\'");
-                    return '<div class="px-3 py-2 hover:bg-gray-100 cursor-pointer" onclick="window.selectPrimarySubject(' + subject.id + ', \'' + safeName + '\')">' + subject.subject_name + '</div>';
-                }).join('');
-                results.classList.remove('hidden');
-            } else {
-                results.classList.add('hidden');
-            }
-        };
-
-        window.searchAdditionalSubjects = function(query) {
-            console.log('searchAdditionalSubjects called with:', query);
-            const results = document.getElementById('additional-results');
-            const filtered = window.ALL_SUBJECTS.filter(subject => 
-                subject.subject_name.toLowerCase().includes(query.toLowerCase()) &&
-                subject.id !== window.selectedPrimary?.id &&
-                !window.selectedAdditional.find(s => s.id === subject.id)
-            );
-            
-            if (query && filtered.length > 0) {
-                results.innerHTML = filtered.map(subject => {
-                    const safeName = subject.subject_name.replace(/'/g, "\\'");
-                    return '<div class="px-3 py-2 hover:bg-gray-100 cursor-pointer" onclick="window.selectAdditionalSubject(' + subject.id + ', \'' + safeName + '\')">' + subject.subject_name + '</div>';
-                }).join('');
-                results.classList.remove('hidden');
-            } else {
-                results.classList.add('hidden');
-            }
-        };
-
-        window.selectPrimarySubject = function(id, name) {
-            console.log('selectPrimarySubject called with:', id, name);
-            window.selectedPrimary = { id, name };
-            document.getElementById('primary-subject').value = id;
-            document.getElementById('primary-name').textContent = name;
-            document.getElementById('selected-primary').classList.remove('hidden');
-            document.getElementById('primary-search').value = '';
-            document.getElementById('primary-results').classList.add('hidden');
-        };
-
-        window.selectAdditionalSubject = function(id, name) {
-            console.log('selectAdditionalSubject called with:', id, name);
-            window.selectedAdditional.push({ id, name });
-            window.updateAdditionalDisplay();
-            document.getElementById('additional-search').value = '';
-            document.getElementById('additional-results').classList.add('hidden');
-        };
-
-        window.clearPrimarySubject = function() {
-            console.log('clearPrimarySubject called');
-            window.selectedPrimary = null;
-            document.getElementById('primary-subject').value = '';
-            document.getElementById('selected-primary').classList.add('hidden');
-        };
-
-        window.removeAdditionalSubject = function(id) {
-            console.log('removeAdditionalSubject called with:', id);
-            window.selectedAdditional = window.selectedAdditional.filter(s => s.id !== id);
-            window.updateAdditionalDisplay();
-        };
-
-        window.clearAdditionalSubjects = function() {
-            console.log('clearAdditionalSubjects called');
-            window.selectedAdditional = [];
-            window.updateAdditionalDisplay();
-        };
-
-        window.updateAdditionalDisplay = function() {
-            const display = document.getElementById('selected-additional');
-            if (window.selectedAdditional.length > 0) {
-                display.innerHTML = window.selectedAdditional.map(subject => 
-                    '<span class="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs">' + 
-                    subject.name + 
-                    '<button type="button" onclick="window.removeAdditionalSubject(' + subject.id + ')" class="ml-1">×</button>' + 
-                    '</span>'
-                ).join('');
-            } else {
-                display.innerHTML = '';
-            }
-        };
-
-        window.loadCurrentSubjects = function(teacherId) {
-            console.log('loadCurrentSubjects called with:', teacherId);
-            // Find current subjects from the page
-            const teacherRow = document.querySelector('tr:has(button[onclick*="' + teacherId + '"])');
-            if (!teacherRow) return;
-            
-            const subjectsCell = teacherRow.cells[1];
-            const primaryBadge = subjectsCell.querySelector('.bg-green-100');
-            const additionalBadges = subjectsCell.querySelectorAll('.bg-blue-50');
-            
-            // Load primary subject
-            if (primaryBadge) {
-                const primaryText = primaryBadge.textContent.replace('🎯 ', '').trim();
-                const subject = window.ALL_SUBJECTS.find(s => s.subject_name === primaryText);
-                if (subject) {
-                    window.selectPrimarySubject(subject.id, subject.subject_name);
-                }
-            }
-            
-            // Load additional subjects
-            additionalBadges.forEach(badge => {
-                const subjectText = badge.textContent.trim();
-                const subject = window.ALL_SUBJECTS.find(s => s.subject_name === subjectText);
-                if (subject) {
-                    window.selectedAdditional.push({ id: subject.id, name: subject.subject_name });
-                }
             });
-            window.updateAdditionalDisplay();
-        };
+        }
 
-        window.saveSubjectAssignments = async function(e) {
-            console.log('saveSubjectAssignments called');
+        function editSubjects(teacherId, teacherName) {
+            document.getElementById('modal-teacher-id').value = teacherId;
+            document.getElementById('teacher-name').textContent = teacherName;
+            document.getElementById('subject-modal').classList.remove('hidden');
+            
+            // Load current subjects
+            const currentSubjects = window.teachersData.teacherSubjects.filter(ts => ts.teacher_id == teacherId);
+            const primary = currentSubjects.find(ts => ts.is_primary === 1);
+            const additional = currentSubjects.filter(ts => ts.is_primary === 0);
+            
+            document.getElementById('primary-subject').value = primary ? primary.subject_id : '';
+            
+            document.querySelectorAll('input[name="additional"]').forEach(cb => {
+                cb.checked = additional.some(ts => ts.subject_id == cb.value);
+            });
+        }
+
+        function closeModal() {
+            document.getElementById('subject-modal').classList.add('hidden');
+        }
+
+        function saveSubjects(e) {
             e.preventDefault();
             
-            if (!window.selectedPrimary) {
+            const primary = document.getElementById('primary-subject').value;
+            if (!primary) {
                 alert('Please select a primary subject');
                 return;
             }
             
+            const additional = Array.from(document.querySelectorAll('input[name="additional"]:checked'))
+                .map(cb => parseInt(cb.value));
+            
             const data = {
-                teacher_id: document.getElementById('teacher-id').value,
-                primary_subject: window.selectedPrimary.id,
-                additional_subjects: window.selectedAdditional.map(s => s.id),
+                teacher_id: document.getElementById('modal-teacher-id').value,
+                primary_subject: parseInt(primary),
+                additional_subjects: additional,
                 action: 'assign_subjects'
             };
             
-            console.log('Saving subject assignments:', data);
-            
-            try {
-                const response = await fetch('/school/teachers', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                console.log('Subject assignment response:', result);
+            fetch('/school/teachers', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(r => r.json()).then(result => {
                 if (result.success) {
-                    window.closeSubjectModal();
-                    window.location.reload();
+                    closeModal();
+                    location.reload();
                 } else {
                     alert('Error: ' + (result.error || 'Unknown error'));
                 }
-            } catch (error) {
-                console.error('Subject assignment error:', error);
+            }).catch(err => {
                 alert('Network error. Please try again.');
-            }
-        };
+            });
+        }
 
-        window.removeTeacher = async function(teacherId) {
-            console.log('removeTeacher called with:', teacherId);
+        function removeTeacher(teacherId) {
             if (!confirm('Remove this teacher?')) return;
             
-            try {
-                const response = await fetch('/school/teachers', {
-                    method: 'DELETE',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({id: teacherId})
-                });
-                
-                const result = await response.json();
-                console.log('Remove teacher response:', result);
+            fetch('/school/teachers', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({id: teacherId})
+            }).then(r => r.json()).then(result => {
                 if (result.success) {
-                    window.location.reload();
+                    location.reload();
                 } else {
                     alert('Error: ' + (result.error || 'Unknown error'));
                 }
-            } catch (error) {
-                console.error('Remove teacher error:', error);
+            }).catch(err => {
                 alert('Network error. Please try again.');
-            }
-        };
+            });
+        }
 
-        // Close dropdowns when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('#primary-search') && !e.target.closest('#primary-results')) {
-                document.getElementById('primary-results').classList.add('hidden');
-            }
-            if (!e.target.closest('#additional-search') && !e.target.closest('#additional-results')) {
-                document.getElementById('additional-results').classList.add('hidden');
-            }
-        });
-
-        // Close modal on escape
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                window.closeSubjectModal();
-            }
-        });
-
-        console.log('Teachers module loaded successfully');
+        function safeHtml(text) {
+            if (!text) return '';
+            return text.toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
       </script>
     `;
+}
+
+function safeHtml(text) {
+    if (!text) return '';
+    return text.toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
