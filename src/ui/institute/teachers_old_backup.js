@@ -1,38 +1,38 @@
-// src/ui/institute/teachers.js - COMPLETE REWRITE: Modern Teacher Management System
+// src/ui/institute/teachers.js - CLEAN TABLE LAYOUT with Subject Editability
 
 export function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjects = []) {
     
-    // Group subjects by teacher for efficient lookup
+    // Group subjects by teacher
     const subjectsByTeacher = {};
     teacherSubjects.forEach(ts => {
         if (!subjectsByTeacher[ts.teacher_id]) subjectsByTeacher[ts.teacher_id] = [];
         subjectsByTeacher[ts.teacher_id].push(ts);
     });
 
-    // Build clean table rows
+    // Build table rows
     const teacherRows = teachers.map(t => {
         const teacherSubjectsList = subjectsByTeacher[t.id] || [];
         const primarySubject = teacherSubjectsList.find(ts => ts.is_primary === 1);
         const additionalSubjects = teacherSubjectsList.filter(ts => ts.is_primary === 0);
         
         return `
-            <tr class="border-b hover:bg-gray-50 transition-colors">
-                <td class="p-4">
-                    <div class="font-medium text-gray-900">${t.full_name}</div>
+            <tr class="border-b hover:bg-gray-50">
+                <td class="p-3">
+                    <div class="font-medium">${t.full_name}</div>
                     <div class="text-sm text-gray-500">${t.email}</div>
                     <div class="text-sm text-gray-600">${t.phone}</div>
                 </td>
-                <td class="p-4">
-                    <div class="space-y-2">
+                <td class="p-3">
+                    <div class="space-y-1">
                         ${primarySubject ? `
-                            <div class="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
+                            <div class="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
                                 🎯 ${primarySubject.subject_name}
                             </div>
                         ` : '<span class="text-gray-400 text-xs">No primary subject</span>'}
                         ${additionalSubjects.length > 0 ? `
                             <div class="flex flex-wrap gap-1">
                                 ${additionalSubjects.map(s => `
-                                    <span class="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
+                                    <span class="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-xs">
                                         ${s.subject_name}
                                     </span>
                                 `).join('')}
@@ -40,14 +40,14 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                         ` : ''}
                     </div>
                 </td>
-                <td class="p-4">
+                <td class="p-3">
                     <div class="flex gap-2">
                         <button onclick="openSubjectEditor(' + t.id + ', \'' + t.full_name.replace(/'/g, "\\'") + '\')" 
-                                class="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors">
+                                class="text-blue-600 hover:text-blue-800 text-sm">
                             Edit Subjects
                         </button>
                         <button onclick="removeTeacher(' + t.id + ')" 
-                                class="text-red-600 hover:text-red-800 text-sm font-medium transition-colors">
+                                class="text-red-600 hover:text-red-800 text-sm">
                             Remove
                         </button>
                     </div>
@@ -58,218 +58,154 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
 
     return `
       <style>
-        .teachers-table {
+        .simple-table {
           border-collapse: collapse;
           width: 100%;
-          background: white;
         }
         
-        .teachers-table th {
-          background: #f8fafc;
-          padding: 16px;
+        .simple-table th {
+          background: #f8f9fa;
+          padding: 12px;
           text-align: left;
           font-weight: 600;
           color: #374151;
           border-bottom: 2px solid #e5e7eb;
         }
         
-        .teachers-table td {
-          padding: 16px;
+        .simple-table td {
+          padding: 12px;
           vertical-align: top;
         }
         
         .modal-overlay {
           background: rgba(0, 0, 0, 0.5);
-          backdrop-filter: blur(4px);
+          backdrop-filter: blur(2px);
         }
         
-        .search-dropdown {
-          max-height: 200px;
-          overflow-y: auto;
+        .subject-checkbox {
+          transition: background-color 0.2s;
         }
         
-        .search-item {
-          transition: background-color 0.15s ease;
-        }
-        
-        .search-item:hover {
-          background-color: #f3f4f6;
-        }
-        
-        .subject-badge {
-          transition: all 0.15s ease;
-        }
-        
-        .subject-badge:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .form-input {
-          transition: border-color 0.15s ease, box-shadow 0.15s ease;
-        }
-        
-        .form-input:focus {
-          outline: none;
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        .subject-checkbox:hover {
+          background-color: #f0f9ff;
         }
       </style>
       
-      <div class="min-h-screen bg-gray-50">
-          <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-              <!-- Header -->
-              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-                  <div>
-                    <h1 class="text-3xl font-bold text-gray-900">Teachers Management</h1>
-                    <p class="text-gray-600 mt-1">Manage teachers and assign their teaching subjects</p>
+      <div>
+          <div class="flex justify-between items-center mb-4">
+              <div>
+                <h1 class="text-2xl font-semibold text-gray-900">Teachers</h1>
+                <p class="text-sm text-gray-500">Manage teachers and their subject assignments</p>
+              </div>
+              <button onclick="toggleAddTeacherForm()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                  + Add Teacher
+              </button>
+          </div>
+
+          <!-- Add Teacher Form -->
+          <div id="add-teacher-form" class="hidden mb-4 bg-white border rounded p-4">
+              <h3 class="font-semibold mb-3">Add New Teacher</h3>
+              <form onsubmit="addTeacher(event)" class="space-y-3">
+                  <div class="grid grid-cols-2 gap-3">
+                      <input type="text" name="full_name" placeholder="Full Name" required 
+                             class="border rounded px-3 py-2">
+                      <input type="email" name="email" placeholder="Email" required 
+                             class="border rounded px-3 py-2">
                   </div>
-                  <button onclick="toggleAddTeacherForm()" 
-                          class="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm">
-                      + Add Teacher
-                  </button>
-              </div>
+                  <div class="flex gap-2">
+                      <span class="bg-gray-100 px-3 py-2 rounded text-sm">+880</span>
+                      <input type="text" name="phone_digits" placeholder="1XXXXXXXXX" required maxlength="10" 
+                             class="flex-1 border rounded px-3 py-2">
+                  </div>
+                  <div class="flex gap-2">
+                      <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                          Add
+                      </button>
+                      <button type="button" onclick="toggleAddTeacherForm()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
+                          Cancel
+                      </button>
+                  </div>
+              </form>
+          </div>
 
-              <!-- Add Teacher Form -->
-              <div id="add-teacher-form" class="hidden mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <h3 class="text-lg font-semibold text-gray-900 mb-4">Add New Teacher</h3>
-                  <form onsubmit="addTeacher(event)" class="space-y-4">
-                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                              <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                              <input type="text" name="full_name" placeholder="Enter full name" required 
-                                     class="form-input w-full border border-gray-300 rounded-lg px-3 py-2">
-                          </div>
-                          <div>
-                              <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                              <input type="email" name="email" placeholder="Enter email address" required 
-                                     class="form-input w-full border border-gray-300 rounded-lg px-3 py-2">
-                          </div>
-                      </div>
-                      <div>
-                          <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                          <div class="flex items-center border border-gray-300 rounded-lg overflow-hidden">
-                              <span class="bg-gray-100 text-gray-600 px-3 py-2 text-sm font-medium border-r border-gray-300">+880</span>
-                              <input type="text" name="phone_digits" placeholder="1XXXXXXXXX" required maxlength="10" 
-                                     pattern="[0-9]{10}"
-                                     class="form-input flex-1 px-3 py-2">
-                          </div>
-                      </div>
-                      <div class="flex gap-3">
-                          <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                              Add Teacher
-                          </button>
-                          <button type="button" onclick="toggleAddTeacherForm()" 
-                                  class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors font-medium">
-                              Cancel
-                          </button>
-                      </div>
-                  </form>
-              </div>
-
-              <!-- Teachers Table -->
-              <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                  <table class="teachers-table">
-                      <thead>
+          <!-- Teachers Table -->
+          <div class="bg-white border rounded overflow-hidden">
+              <table class="simple-table">
+                  <thead>
+                      <tr>
+                          <th class="w-2/5">Teacher</th>
+                          <th class="w-2/5">Subjects</th>
+                          <th class="w-1/5">Actions</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      ${teacherRows.length > 0 ? teacherRows : `
                           <tr>
-                              <th class="w-2/5">Teacher Information</th>
-                              <th class="w-2/5">Assigned Subjects</th>
-                              <th class="w-1/5">Actions</th>
+                              <td colspan="3" class="p-8 text-center text-gray-500">
+                                  No teachers added yet. Click "Add Teacher" to get started.
+                              </td>
                           </tr>
-                      </thead>
-                      <tbody>
-                          ${teacherRows.length > 0 ? teacherRows : `
-                              <tr>
-                                  <td colspan="3" class="p-12 text-center">
-                                      <div class="flex flex-col items-center">
-                                          <svg class="w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 016-12h13a6 6 0 016 12v1m-18 0V7a4 4 0 114 0h4a2 2 0 012 2v1a2 2 0 002 2h4a2 2 0 002-2V9a2 2 0 00-2-2h-4a2 2 0 00-2 2v-1z"></path>
-                                          </svg>
-                                          <p class="text-lg font-medium text-gray-900 mb-2">No teachers added yet</p>
-                                          <p class="text-sm text-gray-500">Click "Add Teacher" to get started with teacher management</p>
-                                      </div>
-                                  </td>
-                              </tr>
-                          `}
-                      </tbody>
-                  </table>
-              </div>
+                      `}
+                  </tbody>
+              </table>
           </div>
       </div>
 
-      <!-- Subject Assignment Modal -->
+      <!-- Subject Editor Modal -->
       <div id="subject-editor-modal" class="fixed inset-0 modal-overlay z-[9999] hidden flex items-center justify-center p-4">
-          <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
-              <div class="p-6 border-b border-gray-200">
-                  <h3 class="text-lg font-semibold text-gray-900">Assign Subjects</h3>
-                  <p class="text-sm text-gray-600 mt-1">For <span id="teacher-name-display" class="font-medium"></span></p>
+          <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+              <div class="p-4 border-b">
+                  <h3 class="font-semibold">Assign Subjects</h3>
+                  <p class="text-sm text-gray-600">For <span id="teacher-name-display"></span></p>
               </div>
               
-              <div class="p-6">
-                  <form id="subject-editor-form" onsubmit="saveSubjectAssignments(event)" class="space-y-5">
+              <div class="p-4">
+                  <form id="subject-editor-form" onsubmit="saveSubjectAssignments(event)" class="space-y-4">
                       <input type="hidden" name="teacher_id" id="edit-teacher-id">
                       <input type="hidden" name="primary_subject" id="selected-primary-subject">
                       
                       <!-- Primary Subject Selection -->
                       <div>
-                          <label class="block text-sm font-medium text-gray-700 mb-2">Primary Subject *</label>
+                          <label class="block text-sm font-medium mb-2">Primary Subject</label>
                           <div class="relative">
-                              <input type="text" id="primary-search" 
-                                     placeholder="Search and select primary subject..." 
-                                     class="form-input w-full border border-gray-300 rounded-lg px-3 py-2 pr-10"
+                              <input type="text" id="primary-search" placeholder="Search and select primary subject..." 
+                                     class="w-full border rounded px-3 py-2 pr-8"
                                      oninput="searchSubjects('primary', this.value)"
                                      onfocus="showSubjectDropdown('primary')">
-                              <div class="absolute inset-y-0 right-0 flex items-center pr-3">
-                                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                                  </svg>
-                              </div>
-                              <div id="primary-dropdown" class="hidden absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg mt-1 search-dropdown z-10 shadow-lg">
-                                  <!-- Search results -->
+                              <div id="primary-dropdown" class="hidden absolute top-full left-0 right-0 bg-white border rounded mt-1 max-h-32 overflow-y-auto z-10 shadow-lg">
+                                  <!-- Search results will appear here -->
                               </div>
                           </div>
-                          <div id="selected-primary-display" class="mt-3 hidden">
-                              <span class="subject-badge inline-flex items-center gap-2 bg-green-100 text-green-700 px-3 py-1.5 rounded-full text-sm font-medium">
+                          <div id="selected-primary-display" class="mt-2 hidden">
+                              <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
                                   🎯 <span id="primary-name"></span>
-                                  <button type="button" onclick="clearPrimarySubject()" 
-                                          class="ml-1 text-green-600 hover:text-green-800 transition-colors">
-                                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                      </svg>
-                                  </button>
+                                  <button type="button" onclick="clearPrimarySubject()" class="ml-1 text-green-600 hover:text-green-800">×</button>
                               </span>
                           </div>
                       </div>
                       
                       <!-- Additional Subjects -->
                       <div>
-                          <label class="block text-sm font-medium text-gray-700 mb-2">Additional Subjects</label>
+                          <label class="block text-sm font-medium mb-2">Additional Subjects</label>
                           <div class="relative">
-                              <input type="text" id="additional-search" 
-                                     placeholder="Search and add additional subjects..." 
-                                     class="form-input w-full border border-gray-300 rounded-lg px-3 py-2 pr-10"
+                              <input type="text" id="additional-search" placeholder="Search and add additional subjects..." 
+                                     class="w-full border rounded px-3 py-2 pr-8"
                                      oninput="searchSubjects('additional', this.value)"
                                      onfocus="showSubjectDropdown('additional')">
-                              <div class="absolute inset-y-0 right-0 flex items-center pr-3">
-                                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                  </svg>
-                              </div>
-                              <div id="additional-dropdown" class="hidden absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg mt-1 search-dropdown z-10 shadow-lg">
-                                  <!-- Search results -->
+                              <div id="additional-dropdown" class="hidden absolute top-full left-0 right-0 bg-white border rounded mt-1 max-h-32 overflow-y-auto z-10 shadow-lg">
+                                  <!-- Search results will appear here -->
                               </div>
                           </div>
-                          <div id="selected-additional-display" class="mt-3 space-y-2">
-                              <!-- Selected additional subjects -->
+                          <div id="selected-additional-display" class="mt-2 space-y-1">
+                              <!-- Selected additional subjects will appear here -->
                           </div>
                       </div>
                       
-                      <div class="flex gap-3 pt-4 border-t border-gray-200">
-                          <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                              Save Assignments
+                      <div class="flex gap-2 pt-2 border-t">
+                          <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                              Save
                           </button>
-                          <button type="button" onclick="closeSubjectEditor()" 
-                                  class="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors font-medium">
+                          <button type="button" onclick="closeSubjectEditor()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
                               Cancel
                           </button>
                       </div>
@@ -279,18 +215,16 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
       </div>
 
       <script>
-        // Global state
         const SCHOOL_ID = ${school.id};
         const ALL_SUBJECTS = ${JSON.stringify(allSubjects)};
         let selectedPrimarySubject = null;
         let selectedAdditionalSubjects = [];
 
-        // Form management
         function toggleAddTeacherForm() {
             const form = document.getElementById('add-teacher-form');
             form.classList.toggle('hidden');
             if (!form.classList.contains('hidden')) {
-                setTimeout(() => form.querySelector('input[name="full_name"]').focus(), 100);
+                form.querySelector('input[name="full_name"]').focus();
             }
         }
 
@@ -301,7 +235,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             
             const phoneDigits = data.phone_digits.replace(/\D/g, '');
             if (phoneDigits.length !== 10) {
-                alert('Please enter a valid 10-digit Bangladesh phone number');
+                alert('Please enter a valid 10-digit phone number');
                 return;
             }
             
@@ -326,18 +260,17 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             }
         }
 
-        // Subject editor functions
         function openSubjectEditor(teacherId, teacherName) {
             document.getElementById('edit-teacher-id').value = teacherId;
             document.getElementById('teacher-name-display').textContent = teacherName;
             document.getElementById('subject-editor-modal').classList.remove('hidden');
             document.body.style.overflow = 'hidden';
             
-            // Reset state
+            // Reset selections
             selectedPrimarySubject = null;
             selectedAdditionalSubjects = [];
             
-            // Load current assignments
+            // Load current subjects for this teacher
             loadCurrentSubjects(teacherId);
         }
 
@@ -355,7 +288,6 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             document.getElementById('additional-dropdown').classList.add('hidden');
         }
 
-        // Search functionality
         function searchSubjects(type, query) {
             const dropdown = document.getElementById(type + '-dropdown');
             const filteredSubjects = ALL_SUBJECTS.filter(subject => {
@@ -371,8 +303,8 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             
             if (query && filteredSubjects.length > 0) {
                 dropdown.innerHTML = filteredSubjects.map(subject => 
-                    '<div class="search-item px-4 py-3 cursor-pointer text-sm hover:bg-gray-50" onclick="selectSubject(\'' + type + '\', ' + subject.id + ', \'' + subject.subject_name.replace(/'/g, "\\'") + '\')">' + 
-                    '<div class="font-medium">' + subject.subject_name + '</div>' + 
+                    '<div class="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm" onclick="selectSubject(\'' + type + '\', ' + subject.id + ', \'' + subject.subject_name + '\')">' + 
+                    subject.subject_name + 
                     '</div>'
                 ).join('');
                 dropdown.classList.remove('hidden');
@@ -425,21 +357,18 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             const display = document.getElementById('selected-additional-display');
             if (selectedAdditionalSubjects.length > 0) {
                 display.innerHTML = selectedAdditionalSubjects.map(subject => 
-                    '<span class="subject-badge inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-sm font-medium">' + 
+                    '<span class="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs">' + 
                     subject.name + 
-                    '<button type="button" onclick="removeAdditionalSubject(' + subject.id + ')" class="ml-1 text-blue-600 hover:text-blue-800 transition-colors">' + 
-                    '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' + 
-                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>' + 
-                    '</svg>' + 
-                    '</button>' + 
+                    '<button type="button" onclick="removeAdditionalSubject(' + subject.id + ')" class="ml-1 text-blue-600 hover:text-blue-800">×</button>' + 
                     '</span>'
                 ).join('');
             } else {
-                display.innerHTML = '<p class="text-sm text-gray-500">No additional subjects selected</p>';
+                display.innerHTML = '';
             }
         }
 
         function loadCurrentSubjects(teacherId) {
+            // Get current subjects from the displayed table
             const teacherRow = document.querySelector('tr:has(button[onclick*="' + teacherId + '"])');
             if (!teacherRow) return;
             
@@ -447,7 +376,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             const primaryBadge = subjectsCell.querySelector('.bg-green-100');
             const additionalBadges = subjectsCell.querySelectorAll('.bg-blue-50');
             
-            // Load primary subject
+            // Set primary subject
             if (primaryBadge) {
                 const primaryText = primaryBadge.textContent.replace('🎯 ', '').trim();
                 const primarySubject = ALL_SUBJECTS.find(s => s.subject_name === primaryText);
@@ -459,7 +388,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 }
             }
             
-            // Load additional subjects
+            // Set additional subjects
             additionalBadges.forEach(badge => {
                 const subjectText = badge.textContent.trim();
                 const subject = ALL_SUBJECTS.find(s => s.subject_name === subjectText);
@@ -505,7 +434,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
         }
 
         async function removeTeacher(teacherId) {
-            if (!confirm('Are you sure you want to remove this teacher? This action cannot be undone.')) return;
+            if (!confirm('Remove this teacher?')) return;
             
             try {
                 const response = await fetch('/school/teachers', {
