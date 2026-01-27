@@ -8,16 +8,56 @@ export function AdminLayout(contentHTML, title = "Dashboard", companyName = "Rou
   <html lang="en">
   <head>
       <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
       <title>${title} - ${companyName}</title>
       <script src="https://cdn.tailwindcss.com"></script>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
       <style>
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { 
+          font-family: 'Inter', sans-serif; 
+          -webkit-tap-highlight-color: transparent;
+          padding-top: env(safe-area-inset-top);
+        }
         .sidebar-transition { transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .page-shell { animation: pageFadeIn 320ms ease-out both; }
         .page-leave .page-shell { opacity: 0; transform: translateY(6px); transition: opacity 180ms ease, transform 180ms ease; }
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+          .mobile-header {
+            padding-top: env(safe-area-inset-top);
+            background: white;
+            position: sticky;
+            top: 0;
+            z-index: 40;
+          }
+          .mobile-content {
+            padding-bottom: env(safe-area-inset-bottom);
+          }
+        }
+        
+        /* Prevent zoom on input focus */
+        input, select, textarea {
+          font-size: 16px !important;
+        }
+        
+        /* Smooth transitions */
+        * {
+          -webkit-touch-callout: none;
+          -webkit-user-select: none;
+          -khtml-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
+          user-select: none;
+        }
+        
+        input, textarea {
+          -webkit-user-select: text;
+          -moz-user-select: text;
+          -ms-user-select: text;
+          user-select: text;
+        }
         .ui-glow::before {
           content: "";
           position: fixed;

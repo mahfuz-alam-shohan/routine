@@ -42,11 +42,11 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                             <span class="text-xs text-gray-500">(${groups.length} groups, ${sections.length} sections)</span>
                         </div>
                         ${cls.has_groups ? `
-                            <button onclick="openAddGroupModal(${cls.id}, '${cls.class_name}')" class="text-xs bg-green-600 text-white px-2 py-1">
+                            <button onclick="openAddGroupModal(${cls.id}, '${cls.class_name}')" class="text-xs bg-green-600 text-white px-2 py-1 hover-lift">
                                 + Add Group
                             </button>
                         ` : `
-                            <button onclick="openAddSectionModal(${cls.id}, '${cls.class_name}', ${cls.has_groups})" class="text-xs bg-blue-600 text-white px-2 py-1">
+                            <button onclick="openAddSectionModal(${cls.id}, '${cls.class_name}', ${cls.has_groups})" class="text-xs bg-blue-600 text-white px-2 py-1 hover-lift">
                                 + Add Section
                             </button>
                         `}
@@ -117,6 +117,78 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
     }).join('');
 
     return `
+      <style>
+        /* Enhanced animations and transitions */
+        .btn-primary {
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          transform: translateY(0);
+        }
+        .btn-primary:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .btn-primary:active {
+          transform: translateY(0);
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .section-badge {
+          transition: all 0.2s ease;
+        }
+        .section-badge:hover {
+          transform: scale(1.05);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Loading skeleton */
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .skeleton {
+          background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.5s infinite;
+        }
+        
+        /* Success animations */
+        @keyframes slideInSuccess {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .success-message {
+          animation: slideInSuccess 0.3s ease-out;
+        }
+        
+        /* Smooth focus states */
+        input:focus, select:focus, textarea:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+          transition: all 0.2s ease;
+        }
+        
+        /* Hover states for interactive elements */
+        .hover-lift {
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .hover-lift:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Prevent zoom on input focus */
+        input, select, textarea {
+          font-size: 16px !important;
+        }
+      </style>
+      
       <div>
          <div class="flex items-center gap-2 text-sm text-gray-500 mb-6">
             <a href="/admin/school/view?id=${school.auth_id}" class="hover:text-blue-600">Back to Menu</a>
@@ -151,8 +223,8 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
       </div>
 
       <!-- Add Group Modal -->
-      <div id="addGroupModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center px-4">
-          <div class="bg-white border border-gray-300 w-full max-w-md p-4">
+      <div id="addGroupModal" class="fixed inset-0 bg-black/60 z-[9999] hidden flex items-center justify-center px-4">
+          <div class="bg-white border border-gray-300 w-full max-w-md p-4 relative">
               <h3 class="font-bold mb-3">Add Group</h3>
               <form onsubmit="addGroup(event)">
                   <input type="hidden" name="class_id" id="group_class_id">
@@ -160,7 +232,7 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                       <input type="text" name="group_name" required class="w-full border border-gray-300 px-2 py-1" placeholder="e.g. Science, Arts">
                   </div>
                   <div class="flex gap-2">
-                      <button type="submit" class="bg-green-600 text-white px-3 py-1 text-sm">Add Group</button>
+                      <button type="submit" class="bg-green-600 text-white px-3 py-1 text-sm" id="addGroupBtn">Add Group</button>
                       <button type="button" onclick="closeModal('addGroupModal')" class="bg-gray-200 text-gray-800 px-3 py-1 text-sm">Cancel</button>
                   </div>
               </form>
@@ -168,8 +240,8 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
       </div>
 
       <!-- Add Section Modal -->
-      <div id="addSectionModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center px-4">
-          <div class="bg-white border border-gray-300 w-full max-w-md p-4">
+      <div id="addSectionModal" class="fixed inset-0 bg-black/60 z-[9999] hidden flex items-center justify-center px-4">
+          <div class="bg-white border border-gray-300 w-full max-w-md p-4 relative">
               <h3 class="font-bold mb-3">Add Section</h3>
               <form onsubmit="addSection(event)">
                   <input type="hidden" name="class_id" id="section_class_id">
@@ -180,7 +252,7 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                   </div>
                   
                   <div class="flex gap-2">
-                      <button type="submit" class="bg-blue-600 text-white px-3 py-1 text-sm">Add Section</button>
+                      <button type="submit" class="bg-blue-600 text-white px-3 py-1 text-sm" id="addSectionBtn">Add Section</button>
                       <button type="button" onclick="closeModal('addSectionModal')" class="bg-gray-200 text-gray-800 px-3 py-1 text-sm">Cancel</button>
                   </div>
               </form>
@@ -193,6 +265,12 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
 
         function createClass(e) {
             e.preventDefault();
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            if (submitBtn.disabled) return; // Prevent multiple submissions
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating...';
+            
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
             data.action = 'create_class';
@@ -208,32 +286,54 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                     window.location.reload();
                 } else {
                     alert('Error creating class: ' + (response.error || 'Unknown error'));
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Create Class';
                 }
             }).catch(error => {
                 console.error('Network error:', error);
                 alert('Network error. Please check your connection and try again.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Create Class';
             });
         }
 
         function openAddGroupModal(classId, className) {
             document.getElementById('group_class_id').value = classId;
-            document.getElementById('addGroupModal').classList.remove('hidden');
+            openModal('addGroupModal');
+            // Focus input for better UX
+            setTimeout(() => {
+                document.querySelector('#addGroupModal input[name="group_name"]').focus();
+            }, 100);
         }
 
         function openAddSectionModalForGroup(classId, className, groupId, groupName) {
             document.getElementById('section_class_id').value = classId;
             document.getElementById('section_group_id').value = groupId;
-            document.getElementById('addSectionModal').classList.remove('hidden');
+            openModal('addSectionModal');
+            // Focus input for better UX
+            setTimeout(() => {
+                document.querySelector('#addSectionModal input[name="section_name"]').focus();
+            }, 100);
         }
 
         function openAddSectionModal(classId, className, hasGroups) {
             document.getElementById('section_class_id').value = classId;
             document.getElementById('section_group_id').value = '';
-            document.getElementById('addSectionModal').classList.remove('hidden');
+            openModal('addSectionModal');
+            // Focus input for better UX
+            setTimeout(() => {
+                document.querySelector('#addSectionModal input[name="section_name"]').focus();
+            }, 100);
         }
 
         function addGroup(e) {
             e.preventDefault();
+            const submitBtn = document.getElementById('addGroupBtn');
+            if (submitBtn.disabled) return; // Prevent multiple submissions
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Adding...';
+            
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
             data.action = 'add_group';
@@ -248,15 +348,25 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                     window.location.reload();
                 } else {
                     alert('Error adding group: ' + (response.error || 'Unknown error'));
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Add Group';
                 }
             }).catch(error => {
                 console.error('Network error:', error);
                 alert('Network error. Please check your connection and try again.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Add Group';
             });
         }
 
         function addSection(e) {
             e.preventDefault();
+            const submitBtn = document.getElementById('addSectionBtn');
+            if (submitBtn.disabled) return; // Prevent multiple submissions
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Adding...';
+            
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
             data.action = 'add_section';
@@ -271,10 +381,14 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                     window.location.reload();
                 } else {
                     alert('Error adding section: ' + (response.error || 'Unknown error'));
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Add Section';
                 }
             }).catch(error => {
                 console.error('Network error:', error);
                 alert('Network error. Please check your connection and try again.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Add Section';
             });
         }
 
@@ -337,6 +451,156 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
 
         function closeModal(modalId) {
             document.getElementById(modalId).classList.add('hidden');
+            // Re-enable body scrolling
+            document.body.style.overflow = '';
+            // Reset button states
+            const modal = document.getElementById(modalId);
+            const submitBtn = modal.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = submitBtn.id === 'addGroupBtn' ? 'Add Group' : 'Add Section';
+            }
+            // Clear form
+            modal.querySelector('form').reset();
+        }
+
+        // Prevent body scrolling when modal is open
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modals = document.querySelectorAll('.fixed.inset-0');
+                modals.forEach(modal => {
+                    if (!modal.classList.contains('hidden')) {
+                        closeModal(modal.id);
+                    }
+                });
+            }
+        });
+
+        // Toast notification system
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `fixed top-4 right-4 px-4 py-2 rounded-lg text-white z-[10000] success-message ${
+                type === 'success' ? 'bg-green-600' : 
+                type === 'error' ? 'bg-red-600' : 
+                type === 'info' ? 'bg-blue-600' : 'bg-gray-600'
+            }`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl/Cmd + N: New class
+            if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+                e.preventDefault();
+                document.querySelector('input[name="class_name"]').focus();
+            }
+            // Ctrl/Cmd + G: Add group (if class has groups)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
+                e.preventDefault();
+                const firstAddGroupBtn = document.querySelector('button[onclick*="openAddGroupModal"]');
+                if (firstAddGroupBtn) firstAddGroupBtn.click();
+            }
+            // Ctrl/Cmd + S: Add section
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                const firstAddSectionBtn = document.querySelector('button[onclick*="openAddSectionModal"]');
+                if (firstAddSectionBtn) firstAddSectionBtn.click();
+            }
+        });
+
+        // Auto-save draft functionality
+        let classDraft = '';
+        let groupDraft = '';
+        let sectionDraft = '';
+
+        document.querySelector('input[name="class_name"]')?.addEventListener('input', function(e) {
+            classDraft = e.target.value;
+            localStorage.setItem('classDraft', classDraft);
+        });
+
+        document.querySelector('#addGroupModal input[name="group_name"]')?.addEventListener('input', function(e) {
+            groupDraft = e.target.value;
+            localStorage.setItem('groupDraft', groupDraft);
+        });
+
+        document.querySelector('#addSectionModal input[name="section_name"]')?.addEventListener('input', function(e) {
+            sectionDraft = e.target.value;
+            localStorage.setItem('sectionDraft', sectionDraft);
+        });
+
+        // Restore drafts on page load
+        window.addEventListener('load', function() {
+            const savedClassDraft = localStorage.getItem('classDraft');
+            if (savedClassDraft) {
+                const classInput = document.querySelector('input[name="class_name"]');
+                if (classInput && !classInput.value) {
+                    classInput.value = savedClassDraft;
+                    classInput.classList.add('bg-yellow-50');
+                    setTimeout(() => classInput.classList.remove('bg-yellow-50'), 2000);
+                }
+            }
+        });
+
+        // Enhanced form validation with real-time feedback
+        function validateInput(input, minLength = 1) {
+            const value = input.value.trim();
+            const isValid = value.length >= minLength;
+            
+            if (!isValid && value.length > 0) {
+                input.classList.add('border-red-500');
+                input.classList.remove('border-gray-300');
+            } else {
+                input.classList.remove('border-red-500');
+                input.classList.add('border-gray-300');
+            }
+            
+            return isValid;
+        }
+
+        // Add real-time validation
+        document.querySelector('input[name="class_name"]')?.addEventListener('input', function(e) {
+            validateInput(e.target, 2);
+        });
+
+        document.querySelector('#addGroupModal input[name="group_name"]')?.addEventListener('input', function(e) {
+            validateInput(e.target, 2);
+        });
+
+        document.querySelector('#addSectionModal input[name="section_name"]')?.addEventListener('input', function(e) {
+            validateInput(e.target, 1);
+        });
+
+        // Loading states with skeleton
+        function showLoadingState(element) {
+            element.classList.add('skeleton');
+            element.style.pointerEvents = 'none';
+        }
+
+        function hideLoadingState(element) {
+            element.classList.remove('skeleton');
+            element.style.pointerEvents = '';
+        }
+
+        // Progress indicators
+        function updateProgress(current, total) {
+            const progressBar = document.getElementById('progressBar');
+            if (progressBar) {
+                const percentage = (current / total) * 100;
+                progressBar.style.width = percentage + '%';
+                progressBar.textContent = Math.round(percentage) + '%';
+            }
         }
       </script>
     `;
