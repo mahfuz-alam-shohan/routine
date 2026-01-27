@@ -256,6 +256,7 @@ export async function handleInstituteRequest(request, env) {
       }
       
       // Get all data for teachers page
+      console.log('Loading teachers page for school:', school.id);
       const teachers = await env.DB.prepare("SELECT * FROM profiles_teacher WHERE school_id = ? ORDER BY id DESC").bind(school.id).all();
       const allSubjects = await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
       const teacherSubjects = await env.DB.prepare(`
@@ -265,6 +266,10 @@ export async function handleInstituteRequest(request, env) {
         WHERE ts.school_id = ?
         ORDER BY ts.is_primary DESC, sub.subject_name ASC
       `).bind(school.id).all();
+      
+      console.log('Teachers data:', teachers.results);
+      console.log('Subjects data:', allSubjects.results);
+      console.log('Teacher subjects data:', teacherSubjects.results);
       
       return htmlResponse(InstituteLayout(
         TeachersPageHTML(

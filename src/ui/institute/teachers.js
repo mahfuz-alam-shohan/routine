@@ -173,17 +173,24 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
       </div>
 
       <script>
+        console.log('Teachers module loading...');
+        console.log('Available subjects:', ${JSON.stringify(allSubjects)});
+        
         // Make functions globally available
         window.ALL_SUBJECTS = ${JSON.stringify(allSubjects)};
         window.selectedPrimary = null;
         window.selectedAdditional = [];
 
+        console.log('Functions being defined...');
+
         window.toggleAddTeacherForm = function() {
+            console.log('toggleAddTeacherForm called');
             const form = document.getElementById('add-teacher-form');
             form.classList.toggle('hidden');
         };
 
         window.addTeacher = async function(e) {
+            console.log('addTeacher called');
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
@@ -197,6 +204,8 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             data.phone = '+880-' + phoneDigits;
             delete data.phone_digits;
             
+            console.log('Sending teacher data:', data);
+            
             try {
                 const response = await fetch('/school/teachers', {
                     method: 'POST',
@@ -205,17 +214,20 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 });
                 
                 const result = await response.json();
+                console.log('Teacher add response:', result);
                 if (result.success) {
                     window.location.reload();
                 } else {
                     alert('Error: ' + (result.error || 'Unknown error'));
                 }
             } catch (error) {
+                console.error('Teacher add error:', error);
                 alert('Network error. Please try again.');
             }
         };
 
         window.openSubjectEditor = function(teacherId, teacherName) {
+            console.log('openSubjectEditor called with:', teacherId, teacherName);
             document.getElementById('teacher-id').value = teacherId;
             document.getElementById('teacher-name-display').textContent = teacherName;
             document.getElementById('subject-modal').classList.remove('hidden');
@@ -225,6 +237,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
         };
 
         window.closeSubjectModal = function() {
+            console.log('closeSubjectModal called');
             document.getElementById('subject-modal').classList.add('hidden');
             document.body.style.overflow = '';
             document.getElementById('subject-modal').querySelector('form').reset();
@@ -233,6 +246,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
         };
 
         window.searchPrimarySubjects = function(query) {
+            console.log('searchPrimarySubjects called with:', query);
             const results = document.getElementById('primary-results');
             const filtered = window.ALL_SUBJECTS.filter(subject => 
                 subject.subject_name.toLowerCase().includes(query.toLowerCase()) &&
@@ -252,6 +266,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
         };
 
         window.searchAdditionalSubjects = function(query) {
+            console.log('searchAdditionalSubjects called with:', query);
             const results = document.getElementById('additional-results');
             const filtered = window.ALL_SUBJECTS.filter(subject => 
                 subject.subject_name.toLowerCase().includes(query.toLowerCase()) &&
@@ -272,6 +287,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
         };
 
         window.selectPrimarySubject = function(id, name) {
+            console.log('selectPrimarySubject called with:', id, name);
             window.selectedPrimary = { id, name };
             document.getElementById('primary-subject').value = id;
             document.getElementById('primary-name').textContent = name;
@@ -281,6 +297,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
         };
 
         window.selectAdditionalSubject = function(id, name) {
+            console.log('selectAdditionalSubject called with:', id, name);
             window.selectedAdditional.push({ id, name });
             window.updateAdditionalDisplay();
             document.getElementById('additional-search').value = '';
@@ -288,17 +305,20 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
         };
 
         window.clearPrimarySubject = function() {
+            console.log('clearPrimarySubject called');
             window.selectedPrimary = null;
             document.getElementById('primary-subject').value = '';
             document.getElementById('selected-primary').classList.add('hidden');
         };
 
         window.removeAdditionalSubject = function(id) {
+            console.log('removeAdditionalSubject called with:', id);
             window.selectedAdditional = window.selectedAdditional.filter(s => s.id !== id);
             window.updateAdditionalDisplay();
         };
 
         window.clearAdditionalSubjects = function() {
+            console.log('clearAdditionalSubjects called');
             window.selectedAdditional = [];
             window.updateAdditionalDisplay();
         };
@@ -318,6 +338,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
         };
 
         window.loadCurrentSubjects = function(teacherId) {
+            console.log('loadCurrentSubjects called with:', teacherId);
             // Find current subjects from the page
             const teacherRow = document.querySelector('tr:has(button[onclick*="' + teacherId + '"])');
             if (!teacherRow) return;
@@ -347,6 +368,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
         };
 
         window.saveSubjectAssignments = async function(e) {
+            console.log('saveSubjectAssignments called');
             e.preventDefault();
             
             if (!window.selectedPrimary) {
@@ -361,6 +383,8 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 action: 'assign_subjects'
             };
             
+            console.log('Saving subject assignments:', data);
+            
             try {
                 const response = await fetch('/school/teachers', {
                     method: 'POST',
@@ -369,6 +393,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 });
                 
                 const result = await response.json();
+                console.log('Subject assignment response:', result);
                 if (result.success) {
                     window.closeSubjectModal();
                     window.location.reload();
@@ -376,11 +401,13 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                     alert('Error: ' + (result.error || 'Unknown error'));
                 }
             } catch (error) {
+                console.error('Subject assignment error:', error);
                 alert('Network error. Please try again.');
             }
         };
 
         window.removeTeacher = async function(teacherId) {
+            console.log('removeTeacher called with:', teacherId);
             if (!confirm('Remove this teacher?')) return;
             
             try {
@@ -391,12 +418,14 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 });
                 
                 const result = await response.json();
+                console.log('Remove teacher response:', result);
                 if (result.success) {
                     window.location.reload();
                 } else {
                     alert('Error: ' + (result.error || 'Unknown error'));
                 }
             } catch (error) {
+                console.error('Remove teacher error:', error);
                 alert('Network error. Please try again.');
             }
         };
@@ -417,6 +446,8 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 window.closeSubjectModal();
             }
         });
+
+        console.log('Teachers module loaded successfully');
       </script>
     `;
 }
