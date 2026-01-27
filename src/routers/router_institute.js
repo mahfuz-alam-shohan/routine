@@ -43,8 +43,15 @@ export async function handleInstituteRequest(request, env) {
                   
                   // Update school start time
                   if (slots.length > 0) {
-                      await env.DB.prepare("INSERT INTO schedule_config (school_id, start_time) VALUES (?, ?) ON CONFLICT(school_id) DO UPDATE SET start_time=excluded.start_time")
-                          .bind(school.id, slots[0].start_time).run();
+                      await env.DB.prepare("UPDATE schedule_config SET start_time = ? WHERE school_id = ?")
+                          .bind(slots[0].start_time, school.id).run();
+                      
+                      // If no config exists, insert it
+                      const existing = await env.DB.prepare("SELECT id FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+                      if (!existing) {
+                          await env.DB.prepare("INSERT INTO schedule_config (school_id, start_time) VALUES (?, ?)")
+                              .bind(school.id, slots[0].start_time).run();
+                      }
                   }
               }
 
@@ -69,7 +76,20 @@ export async function handleInstituteRequest(request, env) {
       try { 
           config = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first(); 
           slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY start_time ASC").bind(school.id).all()).results;
-      } catch(e) { await syncDatabase(env); }
+          
+          // Handle existing data format - ensure duration is calculated if missing
+          slots = slots.map(slot => {
+              if (!slot.duration && slot.start_time && slot.end_time) {
+                  const [h1, m1] = slot.start_time.split(':').map(Number);
+                  const [h2, m2] = slot.end_time.split(':').map(Number);
+                  slot.duration = Math.round((new Date(2000, 0, 1, h2, m2) - new Date(2000, 0, 1, h1, m1)) / 60000);
+              }
+              return slot;
+          });
+      } catch(e) { 
+          console.error('Database error:', e);
+          await syncDatabase(env); 
+      }
       
       return htmlResponse(InstituteLayout(SchedulesPageHTML(config, slots), "Master Schedule", school.school_name));
   }

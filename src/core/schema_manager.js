@@ -70,17 +70,21 @@ const DEFINED_SCHEMA = {
   schedule_config: {
     id: "INTEGER PRIMARY KEY AUTOINCREMENT",
     school_id: "INTEGER UNIQUE", // One config per school
+    strategy: "TEXT", // Keep for backward compatibility
+    shifts_json: "TEXT", // Keep for backward compatibility  
     start_time: "TEXT DEFAULT '08:00'" // School start time
   },
 
   schedule_slots: {
     id: "INTEGER PRIMARY KEY AUTOINCREMENT",
     school_id: "INTEGER",
+    slot_index: "INTEGER", // Keep for backward compatibility
     start_time: "TEXT", // "08:00"
     end_time: "TEXT",   // "08:45"
     duration: "INTEGER", // Duration in minutes
     type: "TEXT",       // 'class', 'break'
     label: "TEXT",      // "1st Period", "Tiffin"
+    applicable_shifts: "TEXT", // Keep for backward compatibility
     "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)"
   },
 

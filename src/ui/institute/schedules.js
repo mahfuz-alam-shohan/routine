@@ -1,7 +1,7 @@
-export function SchedulesPageHTML(existingSlots = []) {
+export function SchedulesPageHTML(config = null, existingSlots = []) {
     // Sort slots by start time
     existingSlots.sort((a, b) => a.start_time.localeCompare(b.start_time));
-    const initialSchoolStart = existingSlots.length > 0 ? existingSlots[0].start_time : "08:00";
+    const initialSchoolStart = existingSlots.length > 0 ? existingSlots[0].start_time : (config?.start_time || "08:00");
 
     return `
       <div class="max-w-5xl mx-auto pb-24 md:pb-10 select-none" id="schedule-app">
