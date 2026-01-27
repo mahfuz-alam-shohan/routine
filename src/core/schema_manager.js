@@ -77,11 +77,30 @@ const DEFINED_SCHEMA = {
     subject_name: "TEXT" 
   },
 
-  class_subjects_link: {
+  // --- SUBJECT ASSIGNMENT TABLES ---
+  class_subjects: {
     id: "INTEGER PRIMARY KEY AUTOINCREMENT",
     school_id: "INTEGER",
-    class_name: "TEXT", 
+    class_id: "INTEGER",
     subject_id: "INTEGER",
+    classes_per_week: "INTEGER", // Actual number of classes assigned
+    min_classes: "INTEGER", // Minimum required classes per week
+    max_classes: "INTEGER", // Maximum allowed classes per week
+    "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)",
+    "FOREIGN KEY(class_id)": "REFERENCES academic_classes(id)",
+    "FOREIGN KEY(subject_id)": "REFERENCES academic_subjects(id)"
+  },
+
+  group_subjects: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    school_id: "INTEGER",
+    group_id: "INTEGER",
+    subject_id: "INTEGER",
+    classes_per_week: "INTEGER", // Actual number of classes assigned
+    min_classes: "INTEGER", // Minimum required classes per week
+    max_classes: "INTEGER", // Maximum allowed classes per week
+    "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)",
+    "FOREIGN KEY(group_id)": "REFERENCES class_groups(id)",
     "FOREIGN KEY(subject_id)": "REFERENCES academic_subjects(id)"
   },
 
@@ -91,7 +110,9 @@ const DEFINED_SCHEMA = {
     school_id: "INTEGER UNIQUE", // One config per school
     strategy: "TEXT", // Keep for backward compatibility
     shifts_json: "TEXT", // Keep for backward compatibility  
-    start_time: "TEXT DEFAULT '08:00'" // School start time
+    start_time: "TEXT DEFAULT '08:00'", // School start time
+    active_days: "INTEGER DEFAULT 5", // Number of active school days per week
+    periods_per_day: "INTEGER DEFAULT 8" // Number of periods per day
   },
 
   schedule_slots: {

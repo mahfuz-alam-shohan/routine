@@ -133,6 +133,28 @@ export async function handleAdminRequest(request, env) {
                       .bind(body.school_id, body.class_id, body.group_id || null, body.section_name).run();
                   return jsonResponse({success:true});
               }
+              
+              // --- SUBJECT ASSIGNMENT ACTIONS ---
+              if(body.action === 'add_class_subject') {
+                  // Add subject to class (common for all groups)
+                  await env.DB.prepare("INSERT INTO class_subjects (school_id, class_id, subject_id, classes_per_week, min_classes, max_classes) VALUES (?, ?, ?, ?, ?, ?)")
+                      .bind(body.school_id, body.class_id, body.subject_id, body.classes_per_week, body.min_classes, body.max_classes).run();
+                  return jsonResponse({success:true});
+              }
+              
+              if(body.action === 'add_group_subject') {
+                  // Add subject to specific group
+                  await env.DB.prepare("INSERT INTO group_subjects (school_id, group_id, subject_id, classes_per_week, min_classes, max_classes) VALUES (?, ?, ?, ?, ?, ?)")
+                      .bind(body.school_id, body.group_id, body.subject_id, body.classes_per_week, body.min_classes, body.max_classes).run();
+                  return jsonResponse({success:true});
+              }
+              
+              if(body.action === 'update_schedule_config') {
+                  // Update master schedule configuration
+                  await env.DB.prepare("UPDATE schedule_config SET active_days = ?, periods_per_day = ? WHERE school_id = ?")
+                      .bind(body.active_days, body.periods_per_day, body.school_id).run();
+                  return jsonResponse({success:true});
+              }
           } catch(e) {
               console.error('Classes API Error:', e);
               // If tables don't exist, try to sync database
@@ -161,6 +183,17 @@ export async function handleAdminRequest(request, env) {
               await env.DB.prepare("DELETE FROM class_sections WHERE id=?").bind(body.id).run();
               return jsonResponse({success:true});
           }
+          
+          // --- SUBJECT DELETION ACTIONS ---
+          if(body.action === 'delete_class_subject') {
+              await env.DB.prepare("DELETE FROM class_subjects WHERE id=?").bind(body.id).run();
+              return jsonResponse({success:true});
+          }
+          
+          if(body.action === 'delete_group_subject') {
+              await env.DB.prepare("DELETE FROM group_subjects WHERE id=?").bind(body.id).run();
+              return jsonResponse({success:true});
+          }
       }
       
       const authId = url.searchParams.get('id');
@@ -171,7 +204,47 @@ export async function handleAdminRequest(request, env) {
       const groups = await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ? ORDER BY class_id, group_name").bind(school.id).all();
       const sections = await env.DB.prepare("SELECT * FROM class_sections WHERE school_id = ? ORDER BY class_id, section_name").bind(school.id).all();
       
-      return htmlResponse(AdminLayout(SchoolClassesHTML(school, classes.results, groups.results, sections.results), "Classes", companyName, {email}));
+      // Get subjects and assignments
+      const subjects = await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
+      const classSubjects = await env.DB.prepare(`
+        SELECT cs.*, sub.subject_name 
+        FROM class_subjects cs 
+        JOIN academic_subjects sub ON cs.subject_id = sub.id 
+        WHERE cs.school_id = ?
+      `).bind(school.id).all();
+      
+      const groupSubjects = await env.DB.prepare(`
+        SELECT gs.*, sub.subject_name, g.group_name, g.class_id
+        FROM group_subjects gs 
+        JOIN academic_subjects sub ON gs.subject_id = sub.id
+        JOIN class_groups g ON gs.group_id = g.id
+        WHERE gs.school_id = ?
+      `).bind(school.id).all();
+      
+      // Get schedule configuration
+      let scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+      if (!scheduleConfig) {
+        // Create default config if doesn't exist
+        await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day) VALUES (?, ?, ?)")
+          .bind(school.id, 5, 8).run();
+        scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+      }
+      
+      return htmlResponse(AdminLayout(
+        SchoolClassesHTML(
+          school, 
+          classes.results, 
+          groups.results, 
+          sections.results,
+          subjects.results,
+          classSubjects.results,
+          groupSubjects.results,
+          scheduleConfig
+        ), 
+        "Classes", 
+        companyName, 
+        {email}
+      ));
   }
 
   // --- SETUP ---
