@@ -176,7 +176,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
         console.log('Teachers module loading...');
         
         // Make functions globally available
-        window.ALL_SUBJECTS = ${JSON.stringify(allSubjects)};
+        window.ALL_SUBJECTS = JSON.parse('${JSON.stringify(allSubjects).replace(/'/g, "\\'")}');
         window.selectedPrimary = null;
         window.selectedAdditional = [];
 
