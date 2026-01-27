@@ -128,9 +128,9 @@ export async function handleAdminRequest(request, env) {
               }
               
               if(body.action === 'add_section') {
-                  // Add section to class (with optional group)
-                  await env.DB.prepare("INSERT INTO class_sections (school_id, class_id, group_id, section_name, shift) VALUES (?, ?, ?, ?, ?)")
-                      .bind(body.school_id, body.class_id, body.group_id || null, body.section_name, body.shift || 'Morning').run();
+                  // Add section to class (with optional group) - single shift only
+                  await env.DB.prepare("INSERT INTO class_sections (school_id, class_id, group_id, section_name) VALUES (?, ?, ?, ?)")
+                      .bind(body.school_id, body.class_id, body.group_id || null, body.section_name).run();
                   return jsonResponse({success:true});
               }
           } catch(e) {

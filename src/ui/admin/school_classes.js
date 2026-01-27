@@ -15,58 +15,100 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
         classSections[s.class_id].push(s);
     });
 
-    // Build table rows with sections grouped by class
-    const tableRows = classesData.map(cls => {
+    // Build hierarchical display
+    const classHierarchy = classesData.map(cls => {
         const groups = classGroups[cls.id] || [];
         const sections = classSections[cls.id] || [];
-        const groupNames = groups.map(g => g.group_name).join(', ') || 'None';
         
-        // Get section info with group names
-        const sectionInfo = sections.map(s => {
-            const group = groups.find(g => g.id === s.group_id);
-            return {
-                name: s.section_name,
-                shift: s.shift,
-                group: group ? group.group_name : null
+        // Group sections by their group
+        const sectionsByGroup = {};
+        groups.forEach(g => {
+            sectionsByGroup[g.id] = {
+                group: g,
+                sections: sections.filter(s => s.group_id === g.id)
             };
         });
         
-        const sectionDisplay = sectionInfo.map(si => 
-            si.group ? `${si.name} (${si.group})` : si.name
-        ).join(', ') || 'No sections';
-        
+        // Sections without groups
+        const sectionsWithoutGroup = sections.filter(s => !s.group_id);
+
         return `
-            <tr class="hover:bg-gray-50 border-b border-gray-100">
-                <td class="px-4 py-3">
-                    <div class="font-medium text-gray-900">${cls.class_name}</div>
-                </td>
-                <td class="px-4 py-3">
-                    <span class="px-2 py-1 text-xs rounded-full ${cls.has_groups ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}">
-                        ${cls.has_groups ? 'Has Groups' : 'No Groups'}
-                    </span>
-                </td>
-                <td class="px-4 py-3">
-                    <div class="text-sm text-gray-600">${groupNames}</div>
-                </td>
-                <td class="px-4 py-3">
-                    <div class="text-sm text-gray-900 max-w-xs truncate" title="${sectionDisplay}">${sectionDisplay}</div>
-                </td>
-                <td class="px-4 py-3">
-                    <div class="flex items-center gap-2">
-                        ${cls.has_groups ? `
-                            <button onclick="openAddGroupModal(${cls.id}, '${cls.class_name}')" class="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">
-                                + Add Group
+            <div class="mb-6 bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <!-- Class Header -->
+                <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-bold text-gray-900">${cls.class_name}</h3>
+                            <span class="text-xs text-gray-500">(${groups.length} groups, ${sections.length} sections)</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            ${cls.has_groups ? `
+                                <button onclick="openAddGroupModal(${cls.id}, '${cls.class_name}')" class="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700">
+                                    + Add Group
+                                </button>
+                            ` : ''}
+                            <button onclick="openAddSectionModal(${cls.id}, '${cls.class_name}', ${cls.has_groups})" class="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">
+                                + Add Section
                             </button>
-                        ` : ''}
-                        <button onclick="openAddSectionModal(${cls.id}, '${cls.class_name}', ${cls.has_groups})" class="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">
-                            + Add Section
-                        </button>
-                        <button onclick="deleteClass(${cls.id})" class="text-xs text-red-600 hover:text-red-800">
-                            Delete
-                        </button>
+                        </div>
                     </div>
-                </td>
-            </tr>
+                </div>
+
+                <!-- Groups and Sections -->
+                <div class="p-4">
+                    ${groups.length > 0 ? `
+                        <div class="space-y-4">
+                            ${groups.map(g => {
+                                const groupSections = sectionsByGroup[g.id]?.sections || [];
+                                return `
+                                    <div class="border-l-4 border-purple-400 pl-4">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <div class="flex items-center gap-2">
+                                                <span class="font-semibold text-purple-700">${g.group_name}</span>
+                                                <span class="text-xs text-gray-500">(${groupSections.length} sections)</span>
+                                            </div>
+                                            <button onclick="deleteGroup(${g.id})" class="text-xs text-red-600 hover:text-red-800">
+                                                Delete Group
+                                            </button>
+                                        </div>
+                                        <div class="flex flex-wrap gap-2">
+                                            ${groupSections.map(s => `
+                                                <div class="flex items-center gap-1 bg-purple-50 px-2 py-1 rounded border border-purple-200">
+                                                    <span class="text-sm font-medium text-gray-900">${s.section_name}</span>
+                                                    <button onclick="deleteSection(${s.id})" class="text-xs text-red-500 hover:text-red-700 ml-1">×</button>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    ` : ''}
+                    
+                    ${sectionsWithoutGroup.length > 0 ? `
+                        <div class="border-l-4 border-blue-400 pl-4">
+                            <div class="mb-2">
+                                <span class="font-semibold text-blue-700">No Group</span>
+                                <span class="text-xs text-gray-500 ml-2">(${sectionsWithoutGroup.length} sections)</span>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                ${sectionsWithoutGroup.map(s => `
+                                    <div class="flex items-center gap-1 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                                        <span class="text-sm font-medium text-gray-900">${s.section_name}</span>
+                                        <button onclick="deleteSection(${s.id})" class="text-xs text-red-500 hover:text-red-700 ml-1">×</button>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${groups.length === 0 && sectionsWithoutGroup.length === 0 ? `
+                        <div class="text-center py-8 text-gray-400">
+                            <p class="text-sm">No groups or sections added yet</p>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
         `;
     }).join('');
 
@@ -96,21 +138,12 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
              </form>
          </div>
 
-         <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-             <table class="w-full">
-                 <thead class="bg-gray-50 border-b border-gray-200">
-                     <tr>
-                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class Name</th>
-                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Groups</th>
-                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Group Names</th>
-                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sections</th>
-                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                     </tr>
-                 </thead>
-                 <tbody>
-                     ${tableRows.length > 0 ? tableRows : '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No classes found.</td></tr>'}
-                 </tbody>
-             </table>
+         <div class="space-y-4">
+             ${classHierarchy.length > 0 ? classHierarchy : `
+                 <div class="bg-white border border-gray-200 rounded-lg p-8 text-center">
+                     <p class="text-gray-400">No classes found</p>
+                 </div>
+             `}
          </div>
       </div>
 
@@ -149,14 +182,6 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                       <label class="block text-sm font-medium text-gray-700 mb-2">Select Group *</label>
                       <select name="group_id" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
                           <option value="">Select a group...</option>
-                      </select>
-                  </div>
-                  
-                  <div class="mb-4">
-                      <label class="block text-sm font-medium text-gray-700 mb-2">Shift</label>
-                      <select name="shift" class="w-full border border-gray-300 rounded-lg px-3 py-2">
-                          <option value="Morning">Morning</option>
-                          <option value="Day">Day</option>
                       </select>
                   </div>
                   
@@ -269,8 +294,46 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
             });
         }
 
+        function deleteGroup(id) {
+            if(!confirm("Delete this group and all its sections?")) return;
+            
+            fetch('/admin/school/classes', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'delete_group', id: id})
+            }).then(res => res.json()).then(response => {
+                if(response.success) {
+                    window.location.reload();
+                } else {
+                    alert('Error deleting group: ' + (response.error || 'Unknown error'));
+                }
+            }).catch(error => {
+                console.error('Network error:', error);
+                alert('Network error. Please check your connection and try again.');
+            });
+        }
+
+        function deleteSection(id) {
+            if(!confirm("Delete this section?")) return;
+            
+            fetch('/admin/school/classes', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'delete_section', id: id})
+            }).then(res => res.json()).then(response => {
+                if(response.success) {
+                    window.location.reload();
+                } else {
+                    alert('Error deleting section: ' + (response.error || 'Unknown error'));
+                }
+            }).catch(error => {
+                console.error('Network error:', error);
+                alert('Network error. Please check your connection and try again.');
+            });
+        }
+
         function deleteClass(id) {
-            if(!confirm("Delete this class and all its data?")) return;
+            if(!confirm("Delete this class and all its groups and sections?")) return;
             
             fetch('/admin/school/classes', {
                 method: 'DELETE',

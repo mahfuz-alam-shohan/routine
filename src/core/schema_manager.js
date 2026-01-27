@@ -66,7 +66,6 @@ const DEFINED_SCHEMA = {
     class_id: "INTEGER",
     group_id: "INTEGER", // null if class has no groups
     section_name: "TEXT",
-    shift: "TEXT DEFAULT 'Morning'",
     "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)",
     "FOREIGN KEY(class_id)": "REFERENCES academic_classes(id)",
     "FOREIGN KEY(group_id)": "REFERENCES class_groups(id)"
