@@ -485,11 +485,11 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
         // Toast notification system
         function showToast(message, type = 'success') {
             const toast = document.createElement('div');
-            toast.className = `fixed top-4 right-4 px-4 py-2 rounded-lg text-white z-[10000] success-message ${
-                type === 'success' ? 'bg-green-600' : 
-                type === 'error' ? 'bg-red-600' : 
-                type === 'info' ? 'bg-blue-600' : 'bg-gray-600'
-            }`;
+            const bgColor = type === 'success' ? 'bg-green-600' : 
+                          type === 'error' ? 'bg-red-600' : 
+                          type === 'info' ? 'bg-blue-600' : 'bg-gray-600';
+            
+            toast.className = `fixed top-4 right-4 px-4 py-2 rounded-lg text-white z-[10000] success-message ${bgColor}`;
             toast.textContent = message;
             document.body.appendChild(toast);
             
