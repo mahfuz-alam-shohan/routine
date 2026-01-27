@@ -4,30 +4,30 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
     const initialSchoolStart = existingSlots.length > 0 ? existingSlots[0].start_time : (config?.start_time || "08:00");
 
     return `
-      <div class="max-w-7xl mx-auto pb-24 md:pb-10 select-none" id="schedule-app">
+      <div class="max-w-6xl mx-auto pb-24 md:pb-10 select-none" id="schedule-app">
           
           <div class="bg-white sticky top-0 z-30 border-b border-gray-200 shadow-sm">
-              <div class="flex justify-between items-center px-4 py-4 md:px-6 md:py-5">
+              <div class="flex justify-between items-center px-4 py-3 md:px-5 md:py-4">
                   <div>
-                    <h2 class="text-lg md:text-2xl font-bold text-gray-900">Master Schedule</h2>
-                    <p class="text-sm md:text-base text-gray-500 mt-1">Configure your school's daily routine</p>
+                    <h2 class="text-base md:text-xl font-bold text-gray-900">Master Schedule</h2>
+                    <p class="text-xs md:text-sm text-gray-500 mt-1">Configure your school's daily routine</p>
                   </div>
                   <div class="flex gap-2 md:gap-3">
-                       <button onclick="app.save()" class="bg-black text-white px-4 py-2 md:px-6 md:py-3 rounded-lg md:rounded-xl text-sm md:text-base font-bold active:scale-95 transition-transform">Save</button>
-                       <button onclick="app.reset()" class="text-red-600 bg-red-50 px-3 py-2 md:px-5 md:py-3 rounded-lg md:rounded-xl text-sm md:text-base font-bold">Reset</button>
+                       <button onclick="app.save()" class="bg-black text-white px-3 py-2 md:px-5 md:py-2.5 rounded-lg text-sm md:text-base font-bold active:scale-95 transition-transform">Save</button>
+                       <button onclick="app.reset()" class="text-red-600 bg-red-50 px-3 py-2 md:px-4 md:py-2.5 rounded-lg text-sm md:text-base font-bold">Reset</button>
                   </div>
               </div>
           </div>
 
-          <div class="mx-3 md:mx-6 mt-3 md:mt-4 p-3 md:p-4 bg-blue-50 border border-blue-100 rounded-lg md:rounded-xl flex items-center justify-between">
+          <div class="mx-3 md:mx-5 mt-3 md:mt-3 p-3 md:p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-between">
               <span class="text-xs md:text-sm font-bold text-blue-800 uppercase tracking-wide">Day Starts At:</span>
               <input type="time" id="school_start_time" value="${initialSchoolStart}" onchange="app.updateStartTime(this.value)" 
-                     class="bg-white border border-blue-200 text-blue-900 text-xs md:text-base font-bold rounded-lg md:rounded-xl px-3 py-2 md:px-4 md:py-3 outline-none w-20 md:w-24 text-center focus:ring-2 focus:ring-blue-500">
+                     class="bg-white border border-blue-200 text-blue-900 text-xs md:text-sm font-bold rounded-lg px-3 py-2 md:px-3 md:py-2 outline-none w-20 md:w-22 text-center focus:ring-2 focus:ring-blue-500">
           </div>
 
-          <div class="mt-3 md:mt-4 bg-white border-t border-b border-gray-200 md:border md:rounded-xl md:mx-6 md:shadow-lg overflow-hidden">
+          <div class="mt-3 md:mt-3 bg-white border-t border-b border-gray-200 md:border md:rounded-lg md:mx-5 md:shadow-md overflow-hidden">
               
-              <div class="hidden md:grid grid-cols-12 gap-3 md:gap-4 p-4 md:p-6 bg-gray-100 text-sm md:text-base uppercase font-bold text-gray-500 border-b border-gray-200">
+              <div class="hidden md:grid grid-cols-12 gap-2 md:gap-3 p-3 md:p-4 bg-gray-100 text-xs md:text-sm uppercase font-bold text-gray-500 border-b border-gray-200">
                   <div class="col-span-1 text-center">#</div>
                   <div class="col-span-2">Start</div>
                   <div class="col-span-2">End</div>
@@ -39,7 +39,7 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
 
               <div id="slot-container" class="divide-y divide-gray-100"></div>
 
-              <button id="add-btn" onclick="app.addPeriod()" class="w-full py-3 md:py-4 text-center text-blue-600 font-bold text-sm md:text-base hover:bg-gray-50 active:bg-blue-50 transition-colors">
+              <button id="add-btn" onclick="app.addPeriod()" class="w-full py-3 md:py-3 text-center text-blue-600 font-bold text-sm md:text-base hover:bg-gray-50 active:bg-blue-50 transition-colors">
                   + Add Next Period
               </button>
           </div>
@@ -180,29 +180,29 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
                 
                 return \`
                 <div class="group bg-white relative">
-                    <div class="hidden md:grid grid-cols-12 gap-3 md:gap-4 p-4 md:p-5 items-center hover:bg-gray-50">
-                        <div class="col-span-1 text-center text-lg md:text-xl text-gray-400 font-bold">\${i+1}</div>
+                    <div class="hidden md:grid grid-cols-12 gap-2 md:gap-3 p-3 md:p-4 items-center hover:bg-gray-50">
+                        <div class="col-span-1 text-center text-sm md:text-base text-gray-400 font-bold">\${i+1}</div>
                         <div class="col-span-2">
                              <input type="time" value="\${slot.start_time}" onchange="app.handleInput(\${i}, 'start_time', this.value)" 
-                             class="w-full text-base md:text-lg font-mono font-bold border border-gray-300 rounded-lg px-3 py-2 md:px-4 md:py-3 \${!isFirst ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-900'} focus:border-blue-500 focus:ring-2">
+                             class="w-full text-sm md:text-base font-mono font-bold border border-gray-300 rounded-lg px-2 py-2 md:px-3 md:py-2 \${!isFirst ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-900'} focus:border-blue-500 focus:ring-2">
                         </div>
                         <div class="col-span-2">
-                             <input type="time" value="\${slot.end_time}" onchange="app.handleInput(\${i}, 'end_time', this.value)" class="w-full text-base md:text-lg font-mono font-bold border border-gray-300 rounded-lg px-3 py-2 md:px-4 md:py-3 bg-white text-gray-900 focus:border-blue-500 focus:ring-2">
+                             <input type="time" value="\${slot.end_time}" onchange="app.handleInput(\${i}, 'end_time', this.value)" class="w-full text-sm md:text-base font-mono font-bold border border-gray-300 rounded-lg px-2 py-2 md:px-3 md:py-2 bg-white text-gray-900 focus:border-blue-500 focus:ring-2">
                         </div>
                         <div class="col-span-1">
-                             <input type="number" value="\${slot.duration}" onchange="app.handleInput(\${i}, 'duration', this.value)" class="w-full text-base md:text-lg text-center font-bold bg-blue-50 text-blue-700 rounded-lg px-2 py-2 md:px-3 md:py-3 border-none focus:ring-2 focus:ring-blue-500">
+                             <input type="number" value="\${slot.duration}" onchange="app.handleInput(\${i}, 'duration', this.value)" class="w-full text-sm md:text-base text-center font-bold bg-blue-50 text-blue-700 rounded-lg px-2 py-2 md:px-2 md:py-2 border-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div class="col-span-4">
-                             <input type="text" value="\${slot.label}" onchange="app.handleInput(\${i}, 'label', this.value)" class="w-full text-base md:text-lg border-b-2 border-transparent hover:border-gray-300 focus:border-blue-500 bg-transparent py-2 md:py-3 outline-none font-medium placeholder-gray-400" placeholder="Period Name...">
+                             <input type="text" value="\${slot.label}" onchange="app.handleInput(\${i}, 'label', this.value)" class="w-full text-sm md:text-base border-b-2 border-transparent hover:border-gray-300 focus:border-blue-500 bg-transparent py-2 md:py-2 outline-none font-medium placeholder-gray-400" placeholder="Period Name...">
                         </div>
                         <div class="col-span-1">
-                             <select onchange="app.handleInput(\${i}, 'type', this.value)" class="text-sm md:text-base font-bold uppercase bg-transparent outline-none \${slot.type==='break'?'text-orange-500':'text-blue-600'}">
+                             <select onchange="app.handleInput(\${i}, 'type', this.value)" class="text-xs md:text-sm font-bold uppercase bg-transparent outline-none \${slot.type==='break'?'text-orange-500':'text-blue-600'}">
                                 <option value="class" \${slot.type==='class'?'selected':''}>Class</option>
                                 <option value="break" \${slot.type==='break'?'selected':''}>Break</option>
                              </select>
                         </div>
                         <div class="col-span-1 text-right">
-                             <button onclick="app.removePeriod(\${i})" class="text-gray-300 hover:text-red-500 font-bold text-lg md:text-xl transition-colors p-2 rounded-lg hover:bg-red-50">&times;</button>
+                             <button onclick="app.removePeriod(\${i})" class="text-gray-300 hover:text-red-500 font-bold text-base md:text-lg transition-colors p-2 rounded-lg hover:bg-red-50">&times;</button>
                         </div>
                     </div>
 
