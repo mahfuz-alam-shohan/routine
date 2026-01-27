@@ -202,19 +202,18 @@ export async function handleInstituteRequest(request, env) {
       ));
   }
 
-  // --- TEACHERS (NEW SYSTEM: Table Interface + Subject Assignment) ---
+  // --- TEACHERS (CLEAN SYSTEM: Card Interface + Subject Assignment) ---
   if (url.pathname === '/school/teachers') {
       if (request.method === 'POST') {
           const body = await request.json();
           
-          // Add new teacher (without subjects)
-          if (body.full_name && body.email && body.phone_digits) {
+          // Add new teacher
+          if (body.full_name && body.email && body.phone) {
               const current = await env.DB.prepare("SELECT count(*) as count FROM profiles_teacher WHERE school_id = ?").bind(school.id).first();
-              if (current.count >= (school.max_teachers || 10)) return jsonResponse({ error: "Limit Reached" }, 403);
+              if (current.count >= (school.max_teachers || 10)) return jsonResponse({ error: "Teacher limit reached" }, 403);
               
-              const cleanPhone = body.phone_digits.replace(/\D/g, ''); 
-              await env.DB.prepare("INSERT INTO profiles_teacher (school_id, full_name, subject, email, phone) VALUES (?, ?, ?, ?, ?)")
-                  .bind(school.id, body.full_name, '', body.email, `880-${cleanPhone}`).run();
+              await env.DB.prepare("INSERT INTO profiles_teacher (school_id, full_name, email, phone) VALUES (?, ?, ?, ?)")
+                  .bind(school.id, body.full_name, body.email, body.phone).run();
               return jsonResponse({ success: true });
           }
           
@@ -223,24 +222,24 @@ export async function handleInstituteRequest(request, env) {
               // Clear existing assignments for this teacher
               await env.DB.prepare("DELETE FROM teacher_subjects WHERE teacher_id = ?").bind(body.teacher_id).run();
               
-              // Add main subject
-              if (body.main_subject) {
+              // Add primary subject
+              if (body.primary_subject) {
                   await env.DB.prepare("INSERT INTO teacher_subjects (school_id, teacher_id, subject_id, is_primary) VALUES (?, ?, ?, 1)")
-                      .bind(school.id, body.teacher_id, body.main_subject, 1).run();
+                      .bind(school.id, body.teacher_id, body.primary_subject).run();
               }
               
               // Add additional subjects
               if (body.additional_subjects && Array.isArray(body.additional_subjects)) {
                   for (const subjectId of body.additional_subjects) {
                       await env.DB.prepare("INSERT INTO teacher_subjects (school_id, teacher_id, subject_id, is_primary) VALUES (?, ?, ?, 0)")
-                          .bind(school.id, body.teacher_id, subjectId, 0).run();
+                          .bind(school.id, body.teacher_id, subjectId).run();
                   }
               }
               
               return jsonResponse({ success: true });
           }
           
-          return jsonResponse({ error: "Invalid action" }, 400);
+          return jsonResponse({ error: "Invalid request" }, 400);
       }
       
       if (request.method === 'DELETE') {
