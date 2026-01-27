@@ -1,4 +1,4 @@
-// src/ui/institute/teachers.js - SIMPLIFIED: Working Teacher Management
+// src/ui/institute/teachers.js - FIXED: Working Teacher Management
 
 export function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjects = []) {
     
@@ -42,11 +42,11 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 </td>
                 <td class="p-4">
                     <div class="flex gap-2">
-                        <button onclick="openSubjectEditor(' + t.id + ', \'' + t.full_name.replace(/'/g, "\\'") + '\')" 
+                        <button onclick="window.openSubjectEditor(${t.id}, '${t.full_name.replace(/'/g, "\\'")}')" 
                                 class="text-blue-600 hover:text-blue-800 text-sm font-medium">
                             Edit Subjects
                         </button>
-                        <button onclick="removeTeacher(' + t.id + ')" 
+                        <button onclick="window.removeTeacher(${t.id})" 
                                 class="text-red-600 hover:text-red-800 text-sm font-medium">
                             Remove
                         </button>
@@ -63,7 +63,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 <h1 class="text-2xl font-bold text-gray-900">Teachers Management</h1>
                 <p class="text-gray-600">Manage teachers and assign subjects</p>
               </div>
-              <button onclick="toggleAddTeacherForm()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+              <button onclick="window.toggleAddTeacherForm()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
                   + Add Teacher
               </button>
           </div>
@@ -71,7 +71,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
           <!-- Add Teacher Form -->
           <div id="add-teacher-form" class="hidden mb-6 bg-white rounded-lg border p-6">
               <h3 class="text-lg font-semibold mb-4">Add New Teacher</h3>
-              <form onsubmit="addTeacher(event)" class="space-y-4">
+              <form onsubmit="window.addTeacher(event)" class="space-y-4">
                   <div class="grid grid-cols-2 gap-4">
                       <input type="text" name="full_name" placeholder="Full Name" required 
                              class="border rounded px-3 py-2">
@@ -87,7 +87,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                       <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
                           Add Teacher
                       </button>
-                      <button type="button" onclick="toggleAddTeacherForm()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
+                      <button type="button" onclick="window.toggleAddTeacherForm()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
                           Cancel
                       </button>
                   </div>
@@ -132,7 +132,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
               </div>
               
               <div class="p-4">
-                  <form onsubmit="saveSubjectAssignments(event)" class="space-y-4">
+                  <form onsubmit="window.saveSubjectAssignments(event)" class="space-y-4">
                       <input type="hidden" name="teacher_id" id="teacher-id">
                       <input type="hidden" name="primary_subject" id="primary-subject">
                       
@@ -140,12 +140,12 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                           <label class="block text-sm font-medium mb-2">Primary Subject *</label>
                           <input type="text" id="primary-search" placeholder="Search primary subject..." 
                                  class="w-full border rounded px-3 py-2"
-                                 oninput="searchPrimarySubjects(this.value)">
+                                 oninput="window.searchPrimarySubjects(this.value)">
                           <div id="primary-results" class="border rounded mt-1 max-h-32 overflow-y-auto hidden"></div>
                           <div id="selected-primary" class="mt-2 hidden">
                               <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
                                   🎯 <span id="primary-name"></span>
-                                  <button type="button" onclick="clearPrimarySubject()" class="ml-1">×</button>
+                                  <button type="button" onclick="window.clearPrimarySubject()" class="ml-1">×</button>
                               </span>
                           </div>
                       </div>
@@ -154,7 +154,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                           <label class="block text-sm font-medium mb-2">Additional Subjects</label>
                           <input type="text" id="additional-search" placeholder="Search additional subjects..." 
                                  class="w-full border rounded px-3 py-2"
-                                 oninput="searchAdditionalSubjects(this.value)">
+                                 oninput="window.searchAdditionalSubjects(this.value)">
                           <div id="additional-results" class="border rounded mt-1 max-h-32 overflow-y-auto hidden"></div>
                           <div id="selected-additional" class="mt-2 space-y-1"></div>
                       </div>
@@ -163,7 +163,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                           <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
                               Save
                           </button>
-                          <button type="button" onclick="closeSubjectModal()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
+                          <button type="button" onclick="window.closeSubjectModal()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
                               Cancel
                           </button>
                       </div>
@@ -173,21 +173,22 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
       </div>
 
       <script>
-        const ALL_SUBJECTS = ${JSON.stringify(allSubjects)};
-        let selectedPrimary = null;
-        let selectedAdditional = [];
+        // Make functions globally available
+        window.ALL_SUBJECTS = ${JSON.stringify(allSubjects)};
+        window.selectedPrimary = null;
+        window.selectedAdditional = [];
 
-        function toggleAddTeacherForm() {
+        window.toggleAddTeacherForm = function() {
             const form = document.getElementById('add-teacher-form');
             form.classList.toggle('hidden');
-        }
+        };
 
-        async function addTeacher(e) {
+        window.addTeacher = async function(e) {
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
             
-            const phoneDigits = data.phone_digits.replace(/\D/g, '');
+            const phoneDigits = data.phone_digits.replace(/\\D/g, '');
             if (phoneDigits.length !== 10) {
                 alert('Please enter a valid 10-digit phone number');
                 return;
@@ -212,35 +213,35 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             } catch (error) {
                 alert('Network error. Please try again.');
             }
-        }
+        };
 
-        function openSubjectEditor(teacherId, teacherName) {
+        window.openSubjectEditor = function(teacherId, teacherName) {
             document.getElementById('teacher-id').value = teacherId;
             document.getElementById('teacher-name-display').textContent = teacherName;
             document.getElementById('subject-modal').classList.remove('hidden');
             document.body.style.overflow = 'hidden';
             
-            loadCurrentSubjects(teacherId);
-        }
+            window.loadCurrentSubjects(teacherId);
+        };
 
-        function closeSubjectModal() {
+        window.closeSubjectModal = function() {
             document.getElementById('subject-modal').classList.add('hidden');
             document.body.style.overflow = '';
             document.getElementById('subject-modal').querySelector('form').reset();
-            clearPrimarySubject();
-            clearAdditionalSubjects();
-        }
+            window.clearPrimarySubject();
+            window.clearAdditionalSubjects();
+        };
 
-        function searchPrimarySubjects(query) {
+        window.searchPrimarySubjects = function(query) {
             const results = document.getElementById('primary-results');
-            const filtered = ALL_SUBJECTS.filter(subject => 
+            const filtered = window.ALL_SUBJECTS.filter(subject => 
                 subject.subject_name.toLowerCase().includes(query.toLowerCase()) &&
-                subject.id !== selectedPrimary?.id
+                subject.id !== window.selectedPrimary?.id
             );
             
             if (query && filtered.length > 0) {
                 results.innerHTML = filtered.map(subject => 
-                    '<div class="px-3 py-2 hover:bg-gray-100 cursor-pointer" onclick="selectPrimarySubject(' + subject.id + ', \'' + subject.subject_name.replace(/'/g, "\\'") + '\')">' + 
+                    '<div class="px-3 py-2 hover:bg-gray-100 cursor-pointer" onclick="window.selectPrimarySubject(' + subject.id + ', \'' + subject.subject_name.replace(/'/g, "\\'") + '\')">' + 
                     subject.subject_name + 
                     '</div>'
                 ).join('');
@@ -248,19 +249,19 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             } else {
                 results.classList.add('hidden');
             }
-        }
+        };
 
-        function searchAdditionalSubjects(query) {
+        window.searchAdditionalSubjects = function(query) {
             const results = document.getElementById('additional-results');
-            const filtered = ALL_SUBJECTS.filter(subject => 
+            const filtered = window.ALL_SUBJECTS.filter(subject => 
                 subject.subject_name.toLowerCase().includes(query.toLowerCase()) &&
-                subject.id !== selectedPrimary?.id &&
-                !selectedAdditional.find(s => s.id === subject.id)
+                subject.id !== window.selectedPrimary?.id &&
+                !window.selectedAdditional.find(s => s.id === subject.id)
             );
             
             if (query && filtered.length > 0) {
                 results.innerHTML = filtered.map(subject => 
-                    '<div class="px-3 py-2 hover:bg-gray-100 cursor-pointer" onclick="selectAdditionalSubject(' + subject.id + ', \'' + subject.subject_name.replace(/'/g, "\\'") + '\')">' + 
+                    '<div class="px-3 py-2 hover:bg-gray-100 cursor-pointer" onclick="window.selectAdditionalSubject(' + subject.id + ', \'' + subject.subject_name.replace(/'/g, "\\'") + '\')">' + 
                     subject.subject_name + 
                     '</div>'
                 ).join('');
@@ -268,55 +269,55 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             } else {
                 results.classList.add('hidden');
             }
-        }
+        };
 
-        function selectPrimarySubject(id, name) {
-            selectedPrimary = { id, name };
+        window.selectPrimarySubject = function(id, name) {
+            window.selectedPrimary = { id, name };
             document.getElementById('primary-subject').value = id;
             document.getElementById('primary-name').textContent = name;
             document.getElementById('selected-primary').classList.remove('hidden');
             document.getElementById('primary-search').value = '';
             document.getElementById('primary-results').classList.add('hidden');
-        }
+        };
 
-        function selectAdditionalSubject(id, name) {
-            selectedAdditional.push({ id, name });
-            updateAdditionalDisplay();
+        window.selectAdditionalSubject = function(id, name) {
+            window.selectedAdditional.push({ id, name });
+            window.updateAdditionalDisplay();
             document.getElementById('additional-search').value = '';
             document.getElementById('additional-results').classList.add('hidden');
-        }
+        };
 
-        function clearPrimarySubject() {
-            selectedPrimary = null;
+        window.clearPrimarySubject = function() {
+            window.selectedPrimary = null;
             document.getElementById('primary-subject').value = '';
             document.getElementById('selected-primary').classList.add('hidden');
-        }
+        };
 
-        function removeAdditionalSubject(id) {
-            selectedAdditional = selectedAdditional.filter(s => s.id !== id);
-            updateAdditionalDisplay();
-        }
+        window.removeAdditionalSubject = function(id) {
+            window.selectedAdditional = window.selectedAdditional.filter(s => s.id !== id);
+            window.updateAdditionalDisplay();
+        };
 
-        function clearAdditionalSubjects() {
-            selectedAdditional = [];
-            updateAdditionalDisplay();
-        }
+        window.clearAdditionalSubjects = function() {
+            window.selectedAdditional = [];
+            window.updateAdditionalDisplay();
+        };
 
-        function updateAdditionalDisplay() {
+        window.updateAdditionalDisplay = function() {
             const display = document.getElementById('selected-additional');
-            if (selectedAdditional.length > 0) {
-                display.innerHTML = selectedAdditional.map(subject => 
+            if (window.selectedAdditional.length > 0) {
+                display.innerHTML = window.selectedAdditional.map(subject => 
                     '<span class="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs">' + 
                     subject.name + 
-                    '<button type="button" onclick="removeAdditionalSubject(' + subject.id + ')" class="ml-1">×</button>' + 
+                    '<button type="button" onclick="window.removeAdditionalSubject(' + subject.id + ')" class="ml-1">×</button>' + 
                     '</span>'
                 ).join('');
             } else {
                 display.innerHTML = '';
             }
-        }
+        };
 
-        function loadCurrentSubjects(teacherId) {
+        window.loadCurrentSubjects = function(teacherId) {
             // Find current subjects from the page
             const teacherRow = document.querySelector('tr:has(button[onclick*="' + teacherId + '"])');
             if (!teacherRow) return;
@@ -328,35 +329,35 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             // Load primary subject
             if (primaryBadge) {
                 const primaryText = primaryBadge.textContent.replace('🎯 ', '').trim();
-                const subject = ALL_SUBJECTS.find(s => s.subject_name === primaryText);
+                const subject = window.ALL_SUBJECTS.find(s => s.subject_name === primaryText);
                 if (subject) {
-                    selectPrimarySubject(subject.id, subject.subject_name);
+                    window.selectPrimarySubject(subject.id, subject.subject_name);
                 }
             }
             
             // Load additional subjects
             additionalBadges.forEach(badge => {
                 const subjectText = badge.textContent.trim();
-                const subject = ALL_SUBJECTS.find(s => s.subject_name === subjectText);
+                const subject = window.ALL_SUBJECTS.find(s => s.subject_name === subjectText);
                 if (subject) {
-                    selectedAdditional.push({ id: subject.id, name: subject.subject_name });
+                    window.selectedAdditional.push({ id: subject.id, name: subject.subject_name });
                 }
             });
-            updateAdditionalDisplay();
-        }
+            window.updateAdditionalDisplay();
+        };
 
-        async function saveSubjectAssignments(e) {
+        window.saveSubjectAssignments = async function(e) {
             e.preventDefault();
             
-            if (!selectedPrimary) {
+            if (!window.selectedPrimary) {
                 alert('Please select a primary subject');
                 return;
             }
             
             const data = {
                 teacher_id: document.getElementById('teacher-id').value,
-                primary_subject: selectedPrimary.id,
-                additional_subjects: selectedAdditional.map(s => s.id),
+                primary_subject: window.selectedPrimary.id,
+                additional_subjects: window.selectedAdditional.map(s => s.id),
                 action: 'assign_subjects'
             };
             
@@ -369,7 +370,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 
                 const result = await response.json();
                 if (result.success) {
-                    closeSubjectModal();
+                    window.closeSubjectModal();
                     window.location.reload();
                 } else {
                     alert('Error: ' + (result.error || 'Unknown error'));
@@ -377,9 +378,9 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             } catch (error) {
                 alert('Network error. Please try again.');
             }
-        }
+        };
 
-        async function removeTeacher(teacherId) {
+        window.removeTeacher = async function(teacherId) {
             if (!confirm('Remove this teacher?')) return;
             
             try {
@@ -398,7 +399,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             } catch (error) {
                 alert('Network error. Please try again.');
             }
-        }
+        };
 
         // Close dropdowns when clicking outside
         document.addEventListener('click', function(e) {
@@ -413,7 +414,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
         // Close modal on escape
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
-                closeSubjectModal();
+                window.closeSubjectModal();
             }
         });
       </script>
