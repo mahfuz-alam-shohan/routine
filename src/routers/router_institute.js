@@ -32,19 +32,22 @@ export async function handleInstituteRequest(request, env) {
                   // Clear existing slots
                   await env.DB.prepare("DELETE FROM schedule_slots WHERE school_id = ?").bind(school.id).run();
                   
-                  // Insert new slots
-                  for(const slot of body.slots) {
-                      await env.DB.prepare("INSERT INTO schedule_slots (school_id, start_time, end_time, label, duration, type) VALUES (?, ?, ?, ?, ?, ?)")
-                          .bind(school.id, slot.start_time, slot.end_time, slot.label, slot.duration, slot.type).run();
+                  // Insert new slots with proper slot_index
+                  for(let i = 0; i < body.slots.length; i++) {
+                      const slot = body.slots[i];
+                      await env.DB.prepare("INSERT INTO schedule_slots (school_id, slot_index, start_time, end_time, label, duration, type, applicable_shifts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+                          .bind(school.id, i, slot.start_time, slot.end_time, slot.label, slot.duration, slot.type, JSON.stringify(["all"])).run();
                   }
                   
                   // Update working days in schedule config
                   const workingDays = JSON.stringify(body.working_days || ["monday","tuesday","wednesday","thursday","friday"]);
                   const allDays = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
                   const offDays = JSON.stringify(allDays.filter(day => !body.working_days?.includes(day)));
+                  const workingDaysCount = body.working_days?.length || 5;
                   
+                  // Update both fields for consistency
                   await env.DB.prepare("UPDATE schedule_config SET working_days = ?, off_days = ?, active_days = ? WHERE school_id = ?")
-                      .bind(workingDays, offDays, body.working_days?.length || 5, school.id).run();
+                      .bind(workingDays, offDays, workingDaysCount, school.id).run();
               }
               return jsonResponse({ success: true });
           } catch(e) { 
@@ -65,7 +68,7 @@ export async function handleInstituteRequest(request, env) {
       let slots = [];
       try { 
           config = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first(); 
-          slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY start_time ASC").bind(school.id).all()).results;
+          slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
           
           // Handle existing data format - ensure duration is calculated if missing
           slots = slots.map(slot => {
@@ -173,7 +176,7 @@ export async function handleInstituteRequest(request, env) {
       
       // Parse working days and calculate capacity
       const workingDaysArray = scheduleConfig.working_days ? JSON.parse(scheduleConfig.working_days) : ["monday","tuesday","wednesday","thursday","friday"];
-      const workingDaysCount = workingDaysArray.length;
+      const workingDaysCount = workingDaysArray.length; // Dynamic from user input
       const scheduleSlots = await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? AND type = 'class'").bind(school.id).all();
       const actualClassPeriodsPerDay = scheduleSlots.results.length || 8;
       const maxClassesPerSection = workingDaysCount * actualClassPeriodsPerDay;
@@ -250,7 +253,7 @@ export async function handleInstituteRequest(request, env) {
       
       // Parse working days and calculate capacity
       const workingDaysArray = scheduleConfig.working_days ? JSON.parse(scheduleConfig.working_days) : ["monday","tuesday","wednesday","thursday","friday"];
-      const workingDaysCount = workingDaysArray.length;
+      const workingDaysCount = workingDaysArray.length; // Dynamic from user input
       const scheduleSlots = await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? AND type = 'class'").bind(school.id).all();
       const actualClassPeriodsPerDay = scheduleSlots.results.length || 8;
       const maxClassesPerSection = workingDaysCount * actualClassPeriodsPerDay;
