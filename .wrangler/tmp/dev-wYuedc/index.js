@@ -2439,7 +2439,7 @@ function InstituteDashboardHTML(stats) {
 }
 __name(InstituteDashboardHTML, "InstituteDashboardHTML");
 
-// src/ui/institute/teachers.js
+// src/ui/institute/teachers_fixed.js
 init_checked_fetch();
 init_modules_watch_stub();
 function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjects = []) {
@@ -2453,24 +2453,24 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
     const primarySubject = teacherSubjectsList.find((ts) => ts.is_primary === 1);
     const additionalSubjects = teacherSubjectsList.filter((ts) => ts.is_primary === 0);
     return `
-            <tr class="border-b hover:bg-gray-50">
+            <tr class="border-b hover:bg-gray-50" data-teacher-id="${t.id}">
                 <td class="p-4">
-                    <div class="font-medium text-gray-900">${t.full_name}</div>
-                    <div class="text-sm text-gray-500">${t.email}</div>
-                    <div class="text-sm text-gray-600">${t.phone}</div>
+                    <div class="font-medium text-gray-900">${escapeHtml(t.full_name)}</div>
+                    <div class="text-sm text-gray-500">${escapeHtml(t.email)}</div>
+                    <div class="text-sm text-gray-600">${escapeHtml(t.phone)}</div>
                 </td>
                 <td class="p-4">
                     <div class="space-y-2">
                         ${primarySubject ? `
                             <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
-                                \u{1F3AF} ${primarySubject.subject_name}
+                                \u{1F3AF} ${escapeHtml(primarySubject.subject_name)}
                             </span>
                         ` : '<span class="text-gray-400 text-xs">No primary subject</span>'}
                         ${additionalSubjects.length > 0 ? `
                             <div class="flex flex-wrap gap-1">
                                 ${additionalSubjects.map((s) => `
                                     <span class="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
-                                        ${s.subject_name}
+                                        ${escapeHtml(s.subject_name)}
                                     </span>
                                 `).join("")}
                             </div>
@@ -2479,12 +2479,12 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
                 </td>
                 <td class="p-4">
                     <div class="flex gap-2">
-                        <button onclick="window.openSubjectEditor(${t.id}, '${t.full_name.replace(/'/g, "\\'")}')" 
-                                class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                        <button type="button" data-action="edit-subjects" data-teacher-id="${t.id}" data-teacher-name="${escapeHtml(t.full_name)}"
+                                class="edit-subjects-btn text-blue-600 hover:text-blue-800 text-sm font-medium">
                             Edit Subjects
                         </button>
-                        <button onclick="window.removeTeacher(${t.id})" 
-                                class="text-red-600 hover:text-red-800 text-sm font-medium">
+                        <button type="button" data-action="remove-teacher" data-teacher-id="${t.id}"
+                                class="remove-teacher-btn text-red-600 hover:text-red-800 text-sm font-medium">
                             Remove
                         </button>
                     </div>
@@ -2499,7 +2499,7 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
                 <h1 class="text-2xl font-bold text-gray-900">Teachers Management</h1>
                 <p class="text-gray-600">Manage teachers and assign subjects</p>
               </div>
-              <button onclick="window.toggleAddTeacherForm()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+              <button type="button" id="add-teacher-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
                   + Add Teacher
               </button>
           </div>
@@ -2507,7 +2507,7 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
           <!-- Add Teacher Form -->
           <div id="add-teacher-form" class="hidden mb-6 bg-white rounded-lg border p-6">
               <h3 class="text-lg font-semibold mb-4">Add New Teacher</h3>
-              <form onsubmit="window.addTeacher(event)" class="space-y-4">
+              <form id="add-teacher-form-element" class="space-y-4">
                   <div class="grid grid-cols-2 gap-4">
                       <input type="text" name="full_name" placeholder="Full Name" required 
                              class="border rounded px-3 py-2">
@@ -2523,7 +2523,7 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
                       <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
                           Add Teacher
                       </button>
-                      <button type="button" onclick="window.toggleAddTeacherForm()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
+                      <button type="button" id="cancel-add-teacher" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
                           Cancel
                       </button>
                   </div>
@@ -2568,38 +2568,37 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
               </div>
               
               <div class="p-4">
-                  <form onsubmit="window.saveSubjectAssignments(event)" class="space-y-4">
+                  <form id="subject-assignment-form" class="space-y-4">
                       <input type="hidden" name="teacher_id" id="teacher-id">
                       <input type="hidden" name="primary_subject" id="primary-subject">
                       
                       <div>
                           <label class="block text-sm font-medium mb-2">Primary Subject *</label>
-                          <input type="text" id="primary-search" placeholder="Search primary subject..." 
-                                 class="w-full border rounded px-3 py-2"
-                                 oninput="window.searchPrimarySubjects(this.value)">
-                          <div id="primary-results" class="border rounded mt-1 max-h-32 overflow-y-auto hidden"></div>
-                          <div id="selected-primary" class="mt-2 hidden">
-                              <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
-                                  \u{1F3AF} <span id="primary-name"></span>
-                                  <button type="button" onclick="window.clearPrimarySubject()" class="ml-1">\xD7</button>
-                              </span>
-                          </div>
+                          <select id="primary-subject-select" required class="w-full border rounded px-3 py-2">
+                              <option value="">Select primary subject...</option>
+                              ${allSubjects.map(
+    (subject) => `<option value="${subject.id}">${escapeHtml(subject.subject_name)}</option>`
+  ).join("")}
+                          </select>
                       </div>
                       
                       <div>
                           <label class="block text-sm font-medium mb-2">Additional Subjects</label>
-                          <input type="text" id="additional-search" placeholder="Search additional subjects..." 
-                                 class="w-full border rounded px-3 py-2"
-                                 oninput="window.searchAdditionalSubjects(this.value)">
-                          <div id="additional-results" class="border rounded mt-1 max-h-32 overflow-y-auto hidden"></div>
-                          <div id="selected-additional" class="mt-2 space-y-1"></div>
+                          <div id="additional-subjects-container" class="space-y-2 max-h-32 overflow-y-auto border rounded p-2">
+                              ${allSubjects.map(
+    (subject) => `<label class="flex items-center gap-2 text-sm">
+                                      <input type="checkbox" name="additional_subjects" value="${subject.id}" class="rounded">
+                                      ${escapeHtml(subject.subject_name)}
+                                  </label>`
+  ).join("")}
+                          </div>
                       </div>
                       
                       <div class="flex gap-2 pt-2 border-t">
                           <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
                               Save
                           </button>
-                          <button type="button" onclick="window.closeSubjectModal()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
+                          <button type="button" id="cancel-subject-assignment" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
                               Cancel
                           </button>
                       </div>
@@ -2609,214 +2608,157 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
       </div>
 
       <script>
-        console.log('Teachers module loading...');
+        // Store data safely
+        const teachersData = ${JSON.stringify({ teachers, allSubjects, teacherSubjects })};
         
-        // Make functions globally available
-        window.ALL_SUBJECTS = ${JSON.stringify(allSubjects)};
-        window.selectedPrimary = null;
-        window.selectedAdditional = [];
-
-        console.log('Functions being defined...');
-
-        window.toggleAddTeacherForm = function() {
-            console.log('toggleAddTeacherForm called');
-            const form = document.getElementById('add-teacher-form');
-            form.classList.toggle('hidden');
-        };
-
-        window.addTeacher = async function(e) {
-            console.log('addTeacher called');
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const data = Object.fromEntries(formData.entries());
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Teachers module initializing...');
             
-            const phoneDigits = data.phone_digits.replace(/\\D/g, '');
-            if (phoneDigits.length !== 10) {
-                alert('Please enter a valid 10-digit phone number');
-                return;
-            }
+            // Add teacher form toggle
+            const addTeacherBtn = document.getElementById('add-teacher-btn');
+            const addTeacherForm = document.getElementById('add-teacher-form');
+            const cancelAddTeacher = document.getElementById('cancel-add-teacher');
+            const addTeacherFormElement = document.getElementById('add-teacher-form-element');
             
-            data.phone = '+880-' + phoneDigits;
-            delete data.phone_digits;
-            
-            console.log('Sending teacher data:', data);
-            
-            try {
-                const response = await fetch('/school/teachers', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data)
+            if (addTeacherBtn) {
+                addTeacherBtn.addEventListener('click', function() {
+                    addTeacherForm.classList.toggle('hidden');
                 });
-                
-                const result = await response.json();
-                console.log('Teacher add response:', result);
-                if (result.success) {
-                    window.location.reload();
-                } else {
-                    alert('Error: ' + (result.error || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Teacher add error:', error);
-                alert('Network error. Please try again.');
             }
-        };
-
-        window.openSubjectEditor = function(teacherId, teacherName) {
-            console.log('openSubjectEditor called with:', teacherId, teacherName);
+            
+            if (cancelAddTeacher) {
+                cancelAddTeacher.addEventListener('click', function() {
+                    addTeacherForm.classList.add('hidden');
+                    addTeacherFormElement.reset();
+                });
+            }
+            
+            // Add teacher form submission
+            if (addTeacherFormElement) {
+                addTeacherFormElement.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(e.target);
+                    const data = Object.fromEntries(formData.entries());
+                    
+                    const phoneDigits = data.phone_digits.replace(/\\D/g, '');
+                    if (phoneDigits.length !== 10) {
+                        alert('Please enter a valid 10-digit phone number');
+                        return;
+                    }
+                    
+                    data.phone = '+880-' + phoneDigits;
+                    delete data.phone_digits;
+                    
+                    try {
+                        const response = await fetch('/school/teachers', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(data)
+                        });
+                        
+                        const result = await response.json();
+                        if (result.success) {
+                            window.location.reload();
+                        } else {
+                            alert('Error: ' + (result.error || 'Unknown error'));
+                        }
+                    } catch (error) {
+                        console.error('Teacher add error:', error);
+                        alert('Network error. Please try again.');
+                    }
+                });
+            }
+            
+            // Edit subjects buttons
+            document.querySelectorAll('.edit-subjects-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const teacherId = this.dataset.teacherId;
+                    const teacherName = this.dataset.teacherName;
+                    openSubjectEditor(teacherId, teacherName);
+                });
+            });
+            
+            // Remove teacher buttons
+            document.querySelectorAll('.remove-teacher-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const teacherId = this.dataset.teacherId;
+                    removeTeacher(teacherId);
+                });
+            });
+            
+            // Subject modal controls
+            const subjectModal = document.getElementById('subject-modal');
+            const cancelSubjectAssignment = document.getElementById('cancel-subject-assignment');
+            const subjectAssignmentForm = document.getElementById('subject-assignment-form');
+            
+            if (cancelSubjectAssignment) {
+                cancelSubjectAssignment.addEventListener('click', closeSubjectModal);
+            }
+            
+            if (subjectAssignmentForm) {
+                subjectAssignmentForm.addEventListener('submit', saveSubjectAssignments);
+            }
+            
+            // Close modal on escape
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeSubjectModal();
+                }
+            });
+            
+            console.log('Teachers module initialized successfully');
+        });
+        
+        function openSubjectEditor(teacherId, teacherName) {
             document.getElementById('teacher-id').value = teacherId;
             document.getElementById('teacher-name-display').textContent = teacherName;
             document.getElementById('subject-modal').classList.remove('hidden');
             document.body.style.overflow = 'hidden';
             
-            window.loadCurrentSubjects(teacherId);
-        };
-
-        window.closeSubjectModal = function() {
-            console.log('closeSubjectModal called');
+            loadCurrentSubjects(teacherId);
+        }
+        
+        function closeSubjectModal() {
             document.getElementById('subject-modal').classList.add('hidden');
             document.body.style.overflow = '';
-            document.getElementById('subject-modal').querySelector('form').reset();
-            window.clearPrimarySubject();
-            window.clearAdditionalSubjects();
-        };
-
-        window.searchPrimarySubjects = function(query) {
-            console.log('searchPrimarySubjects called with:', query);
-            const results = document.getElementById('primary-results');
-            const filtered = window.ALL_SUBJECTS.filter(subject => 
-                subject.subject_name.toLowerCase().includes(query.toLowerCase()) &&
-                subject.id !== window.selectedPrimary?.id
-            );
+            document.getElementById('subject-assignment-form').reset();
+        }
+        
+        function loadCurrentSubjects(teacherId) {
+            const teacherSubjects = teachersData.teacherSubjects.filter(ts => ts.teacher_id == teacherId);
+            const primarySubject = teacherSubjects.find(ts => ts.is_primary === 1);
+            const additionalSubjects = teacherSubjects.filter(ts => ts.is_primary === 0);
             
-            if (query && filtered.length > 0) {
-                results.innerHTML = filtered.map(subject => {
-                    const safeName = subject.subject_name.replace(/'/g, "\\'");
-                    return '<div class="px-3 py-2 hover:bg-gray-100 cursor-pointer" onclick="window.selectPrimarySubject(' + subject.id + ', '' + safeName + '')">' + subject.subject_name + '</div>';
-                }).join('');
-                results.classList.remove('hidden');
-            } else {
-                results.classList.add('hidden');
-            }
-        };
-
-        window.searchAdditionalSubjects = function(query) {
-            console.log('searchAdditionalSubjects called with:', query);
-            const results = document.getElementById('additional-results');
-            const filtered = window.ALL_SUBJECTS.filter(subject => 
-                subject.subject_name.toLowerCase().includes(query.toLowerCase()) &&
-                subject.id !== window.selectedPrimary?.id &&
-                !window.selectedAdditional.find(s => s.id === subject.id)
-            );
-            
-            if (query && filtered.length > 0) {
-                results.innerHTML = filtered.map(subject => {
-                    const safeName = subject.subject_name.replace(/'/g, "\\'");
-                    return '<div class="px-3 py-2 hover:bg-gray-100 cursor-pointer" onclick="window.selectAdditionalSubject(' + subject.id + ', '' + safeName + '')">' + subject.subject_name + '</div>';
-                }).join('');
-                results.classList.remove('hidden');
-            } else {
-                results.classList.add('hidden');
-            }
-        };
-
-        window.selectPrimarySubject = function(id, name) {
-            console.log('selectPrimarySubject called with:', id, name);
-            window.selectedPrimary = { id, name };
-            document.getElementById('primary-subject').value = id;
-            document.getElementById('primary-name').textContent = name;
-            document.getElementById('selected-primary').classList.remove('hidden');
-            document.getElementById('primary-search').value = '';
-            document.getElementById('primary-results').classList.add('hidden');
-        };
-
-        window.selectAdditionalSubject = function(id, name) {
-            console.log('selectAdditionalSubject called with:', id, name);
-            window.selectedAdditional.push({ id, name });
-            window.updateAdditionalDisplay();
-            document.getElementById('additional-search').value = '';
-            document.getElementById('additional-results').classList.add('hidden');
-        };
-
-        window.clearPrimarySubject = function() {
-            console.log('clearPrimarySubject called');
-            window.selectedPrimary = null;
-            document.getElementById('primary-subject').value = '';
-            document.getElementById('selected-primary').classList.add('hidden');
-        };
-
-        window.removeAdditionalSubject = function(id) {
-            console.log('removeAdditionalSubject called with:', id);
-            window.selectedAdditional = window.selectedAdditional.filter(s => s.id !== id);
-            window.updateAdditionalDisplay();
-        };
-
-        window.clearAdditionalSubjects = function() {
-            console.log('clearAdditionalSubjects called');
-            window.selectedAdditional = [];
-            window.updateAdditionalDisplay();
-        };
-
-        window.updateAdditionalDisplay = function() {
-            const display = document.getElementById('selected-additional');
-            if (window.selectedAdditional.length > 0) {
-                display.innerHTML = window.selectedAdditional.map(subject => 
-                    '<span class="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs">' + 
-                    subject.name + 
-                    '<button type="button" onclick="window.removeAdditionalSubject(' + subject.id + ')" class="ml-1">\xD7</button>' + 
-                    '</span>'
-                ).join('');
-            } else {
-                display.innerHTML = '';
-            }
-        };
-
-        window.loadCurrentSubjects = function(teacherId) {
-            console.log('loadCurrentSubjects called with:', teacherId);
-            // Find current subjects from the page
-            const teacherRow = document.querySelector('tr:has(button[onclick*="' + teacherId + '"])');
-            if (!teacherRow) return;
-            
-            const subjectsCell = teacherRow.cells[1];
-            const primaryBadge = subjectsCell.querySelector('.bg-green-100');
-            const additionalBadges = subjectsCell.querySelectorAll('.bg-blue-50');
-            
-            // Load primary subject
-            if (primaryBadge) {
-                const primaryText = primaryBadge.textContent.replace('\u{1F3AF} ', '').trim();
-                const subject = window.ALL_SUBJECTS.find(s => s.subject_name === primaryText);
-                if (subject) {
-                    window.selectPrimarySubject(subject.id, subject.subject_name);
-                }
+            // Set primary subject
+            if (primarySubject) {
+                document.getElementById('primary-subject-select').value = primarySubject.subject_id;
             }
             
-            // Load additional subjects
-            additionalBadges.forEach(badge => {
-                const subjectText = badge.textContent.trim();
-                const subject = window.ALL_SUBJECTS.find(s => s.subject_name === subjectText);
-                if (subject) {
-                    window.selectedAdditional.push({ id: subject.id, name: subject.subject_name });
-                }
+            // Set additional subjects
+            document.querySelectorAll('input[name="additional_subjects"]').forEach(checkbox => {
+                checkbox.checked = additionalSubjects.some(ts => ts.subject_id == checkbox.value);
             });
-            window.updateAdditionalDisplay();
-        };
-
-        window.saveSubjectAssignments = async function(e) {
-            console.log('saveSubjectAssignments called');
+        }
+        
+        async function saveSubjectAssignments(e) {
             e.preventDefault();
             
-            if (!window.selectedPrimary) {
+            const primarySubject = document.getElementById('primary-subject-select').value;
+            if (!primarySubject) {
                 alert('Please select a primary subject');
                 return;
             }
             
+            const additionalSubjects = Array.from(document.querySelectorAll('input[name="additional_subjects"]:checked'))
+                .map(cb => parseInt(cb.value));
+            
             const data = {
                 teacher_id: document.getElementById('teacher-id').value,
-                primary_subject: window.selectedPrimary.id,
-                additional_subjects: window.selectedAdditional.map(s => s.id),
+                primary_subject: parseInt(primarySubject),
+                additional_subjects: additionalSubjects,
                 action: 'assign_subjects'
             };
-            
-            console.log('Saving subject assignments:', data);
             
             try {
                 const response = await fetch('/school/teachers', {
@@ -2826,9 +2768,8 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
                 });
                 
                 const result = await response.json();
-                console.log('Subject assignment response:', result);
                 if (result.success) {
-                    window.closeSubjectModal();
+                    closeSubjectModal();
                     window.location.reload();
                 } else {
                     alert('Error: ' + (result.error || 'Unknown error'));
@@ -2837,10 +2778,9 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
                 console.error('Subject assignment error:', error);
                 alert('Network error. Please try again.');
             }
-        };
-
-        window.removeTeacher = async function(teacherId) {
-            console.log('removeTeacher called with:', teacherId);
+        }
+        
+        async function removeTeacher(teacherId) {
             if (!confirm('Remove this teacher?')) return;
             
             try {
@@ -2851,7 +2791,6 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
                 });
                 
                 const result = await response.json();
-                console.log('Remove teacher response:', result);
                 if (result.success) {
                     window.location.reload();
                 } else {
@@ -2861,30 +2800,23 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
                 console.error('Remove teacher error:', error);
                 alert('Network error. Please try again.');
             }
-        };
-
-        // Close dropdowns when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('#primary-search') && !e.target.closest('#primary-results')) {
-                document.getElementById('primary-results').classList.add('hidden');
-            }
-            if (!e.target.closest('#additional-search') && !e.target.closest('#additional-results')) {
-                document.getElementById('additional-results').classList.add('hidden');
-            }
-        });
-
-        // Close modal on escape
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                window.closeSubjectModal();
-            }
-        });
-
-        console.log('Teachers module loaded successfully');
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
       <\/script>
     `;
 }
 __name(TeachersPageHTML, "TeachersPageHTML");
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+__name(escapeHtml, "escapeHtml");
 
 // src/ui/institute/classes.js
 init_checked_fetch();
