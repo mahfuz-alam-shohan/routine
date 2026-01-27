@@ -35,7 +35,7 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
             si.group ? `${si.name} (${si.group})` : si.name
         ).join(', ') || 'No sections';
         
-        return \`
+        return `
             <tr class="hover:bg-gray-50 border-b border-gray-100">
                 <td class="px-4 py-3">
                     <div class="font-medium text-gray-900">\${cls.class_name}</div>
@@ -67,10 +67,10 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                     </div>
                 </td>
             </tr>
-        \`;
+        `;
     }).join('');
 
-    return \`
+    return `
       <div>
          <div class="flex items-center gap-2 text-sm text-gray-500 mb-6">
             <a href="/admin/school/view?id=\${school.auth_id}" class="hover:text-blue-600">Back to Menu</a>
@@ -256,5 +256,5 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
             document.getElementById(modalId).classList.add('hidden');
         }
       </script>
-    \`;
+    `;
 }
