@@ -2562,36 +2562,59 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
       <!-- Subject Modal -->
       <div id="subject-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
           <div class="bg-white rounded-lg max-w-md w-full">
-              <div class="p-4 border-b">
-                  <h3 class="font-semibold">Assign Subjects</h3>
-                  <p class="text-sm text-gray-600">For <span id="teacher-name"></span></p>
-              </div>
-              <div class="p-4">
-                  <form onsubmit="saveSubjects(event)" class="space-y-4">
-                      <input type="hidden" id="modal-teacher-id">
-                      <div>
-                          <label class="block text-sm font-medium mb-2">Primary Subject *</label>
-                          <select id="primary-subject" required class="w-full border rounded px-3 py-2">
-                              <option value="">Select...</option>
-                              ${allSubjects.map((s) => `<option value="${s.id}">${safeHtml(s.subject_name)}</option>`).join("")}
-                          </select>
-                      </div>
-                      <div>
-                          <label class="block text-sm font-medium mb-2">Additional Subjects</label>
-                          <div class="max-h-32 overflow-y-auto border rounded p-2">
-                              ${allSubjects.map((s) => `
-                                  <label class="flex items-center gap-2 text-sm">
-                                      <input type="checkbox" name="additional" value="${s.id}">
-                                      ${safeHtml(s.subject_name)}
-                                  </label>
-                              `).join("")}
+              <!-- Step 1: Primary Subject Selection -->
+              <div id="primary-step" class="p-4">
+                  <div class="p-4 border-b">
+                      <h3 class="font-semibold">Assign Primary Subject</h3>
+                      <p class="text-sm text-gray-600">For <span id="teacher-name"></span></p>
+                  </div>
+                  <div class="p-4">
+                      <form onsubmit="goToOptionalSubjects(event)" class="space-y-4">
+                          <input type="hidden" id="modal-teacher-id">
+                          <div>
+                              <label class="block text-sm font-medium mb-2">Primary Subject *</label>
+                              <select id="primary-subject" required class="w-full border rounded px-3 py-2">
+                                  <option value="">Select primary subject...</option>
+                                  ${allSubjects.map((s) => `<option value="${s.id}">${safeHtml(s.subject_name)}</option>`).join("")}
+                              </select>
                           </div>
-                      </div>
-                      <div class="flex gap-2 pt-2 border-t">
-                          <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save</button>
-                          <button type="button" onclick="closeModal()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">Cancel</button>
-                      </div>
-                  </form>
+                          <div class="flex gap-2 pt-2 border-t">
+                              <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Continue</button>
+                              <button type="button" onclick="closeModal()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">Cancel</button>
+                          </div>
+                      </form>
+                  </div>
+              </div>
+
+              <!-- Step 2: Optional Subjects Selection -->
+              <div id="optional-step" class="p-4 hidden">
+                  <div class="p-4 border-b">
+                      <h3 class="font-semibold">Assign Optional Subjects</h3>
+                      <p class="text-sm text-gray-600">For <span id="teacher-name-optional"></span></p>
+                      <p class="text-xs text-blue-600 mt-1">Primary: <span id="selected-primary-name"></span></p>
+                  </div>
+                  <div class="p-4">
+                      <form onsubmit="saveSubjects(event)" class="space-y-4">
+                          <input type="hidden" id="modal-teacher-id-optional">
+                          <input type="hidden" id="selected-primary-id">
+                          <div>
+                              <label class="block text-sm font-medium mb-2">Optional Subjects</label>
+                              <div class="max-h-40 overflow-y-auto border rounded p-2">
+                                  ${allSubjects.map((s) => `
+                                      <label class="flex items-center gap-2 text-sm optional-subject-item" data-subject-id="${s.id}">
+                                          <input type="checkbox" name="optional" value="${s.id}" class="optional-checkbox">
+                                          ${safeHtml(s.subject_name)}
+                                      </label>
+                                  `).join("")}
+                              </div>
+                              <p class="text-xs text-gray-500 mt-1">Select additional subjects (optional)</p>
+                          </div>
+                          <div class="flex gap-2 pt-2 border-t">
+                              <button type="button" onclick="goBackToPrimary()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">Back</button>
+                              <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Confirm</button>
+                          </div>
+                      </form>
+                  </div>
               </div>
           </div>
       </div>
@@ -2643,36 +2666,107 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
             document.getElementById('teacher-name').textContent = teacherName;
             document.getElementById('subject-modal').classList.remove('hidden');
             
-            // Load current subjects
+            // Reset to primary step
+            showPrimaryStep();
+            
+            // Load current subjects for editing
             const currentSubjects = window.teachersData.teacherSubjects.filter(ts => ts.teacher_id == teacherId);
             const primary = currentSubjects.find(ts => ts.is_primary === 1);
             const additional = currentSubjects.filter(ts => ts.is_primary === 0);
             
-            document.getElementById('primary-subject').value = primary ? primary.subject_id : '';
+            if (primary) {
+                document.getElementById('primary-subject').value = primary.subject_id;
+            }
             
-            document.querySelectorAll('input[name="additional"]').forEach(cb => {
-                cb.checked = additional.some(ts => ts.subject_id == cb.value);
+            // Store additional subjects for later
+            window.currentAdditionalSubjects = additional.map(ts => ts.subject_id);
+        }
+
+        function showPrimaryStep() {
+            document.getElementById('primary-step').classList.remove('hidden');
+            document.getElementById('optional-step').classList.add('hidden');
+        }
+
+        function showOptionalStep() {
+            document.getElementById('primary-step').classList.add('hidden');
+            document.getElementById('optional-step').classList.remove('hidden');
+        }
+
+        function goToOptionalSubjects(e) {
+            e.preventDefault();
+            
+            const primarySelect = document.getElementById('primary-subject');
+            const primaryId = primarySelect.value;
+            const primaryName = primarySelect.options[primarySelect.selectedIndex].text;
+            
+            if (!primaryId) {
+                alert('Please select a primary subject');
+                return;
+            }
+            
+            // Set data for optional step
+            document.getElementById('modal-teacher-id-optional').value = document.getElementById('modal-teacher-id').value;
+            document.getElementById('teacher-name-optional').textContent = document.getElementById('teacher-name').textContent;
+            document.getElementById('selected-primary-name').textContent = primaryName;
+            document.getElementById('selected-primary-id').value = primaryId;
+            
+            // Update optional subjects list - hide the selected primary subject
+            updateOptionalSubjectsList(primaryId);
+            
+            // Show optional step
+            showOptionalStep();
+        }
+
+        function updateOptionalSubjectsList(primaryId) {
+            const optionalItems = document.querySelectorAll('.optional-subject-item');
+            const optionalCheckboxes = document.querySelectorAll('.optional-checkbox');
+            
+            optionalItems.forEach((item, index) => {
+                const subjectId = item.dataset.subjectId;
+                const checkbox = optionalCheckboxes[index];
+                
+                if (subjectId == primaryId) {
+                    // Hide the primary subject from optional list
+                    item.style.display = 'none';
+                    checkbox.checked = false;
+                    checkbox.disabled = true;
+                } else {
+                    // Show other subjects
+                    item.style.display = 'flex';
+                    checkbox.disabled = false;
+                    
+                    // Pre-select if it was previously selected
+                    if (window.currentAdditionalSubjects && window.currentAdditionalSubjects.includes(parseInt(subjectId))) {
+                        checkbox.checked = true;
+                    }
+                }
             });
+        }
+
+        function goBackToPrimary() {
+            showPrimaryStep();
         }
 
         function closeModal() {
             document.getElementById('subject-modal').classList.add('hidden');
+            showPrimaryStep(); // Reset to primary step for next time
+            window.currentAdditionalSubjects = []; // Clear stored additional subjects
         }
 
         function saveSubjects(e) {
             e.preventDefault();
             
-            const primary = document.getElementById('primary-subject').value;
+            const primary = document.getElementById('selected-primary-id').value;
             if (!primary) {
                 alert('Please select a primary subject');
                 return;
             }
             
-            const additional = Array.from(document.querySelectorAll('input[name="additional"]:checked'))
+            const additional = Array.from(document.querySelectorAll('input[name="optional"]:checked'))
                 .map(cb => parseInt(cb.value));
             
             const data = {
-                teacher_id: document.getElementById('modal-teacher-id').value,
+                teacher_id: document.getElementById('modal-teacher-id-optional').value,
                 primary_subject: parseInt(primary),
                 additional_subjects: additional,
                 action: 'assign_subjects'
