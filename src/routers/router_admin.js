@@ -110,27 +110,37 @@ export async function handleAdminRequest(request, env) {
   // --- SCHOOL CLASSES (New Logic) ---
   if (url.pathname === '/admin/school/classes') {
       if(request.method === 'POST') {
-          const body = await request.json();
-          
-          if(body.action === 'create_class') {
-              // Create new class
-              await env.DB.prepare("INSERT INTO academic_classes (school_id, class_name, has_groups) VALUES (?, ?, ?)")
-                  .bind(body.school_id, body.class_name, body.has_groups ? 1 : 0).run();
-              return jsonResponse({success:true});
-          }
-          
-          if(body.action === 'add_group') {
-              // Add group to existing class
-              await env.DB.prepare("INSERT INTO class_groups (school_id, class_id, group_name) VALUES (?, ?, ?)")
-                  .bind(body.school_id, body.class_id, body.group_name).run();
-              return jsonResponse({success:true});
-          }
-          
-          if(body.action === 'add_section') {
-              // Add section to class (with optional group)
-              await env.DB.prepare("INSERT INTO class_sections (school_id, class_id, group_id, section_name, shift) VALUES (?, ?, ?, ?, ?)")
-                  .bind(body.school_id, body.class_id, body.group_id || null, body.section_name, body.shift || 'Morning').run();
-              return jsonResponse({success:true});
+          try {
+              const body = await request.json();
+              
+              if(body.action === 'create_class') {
+                  // Create new class
+                  await env.DB.prepare("INSERT INTO academic_classes (school_id, class_name, has_groups) VALUES (?, ?, ?)")
+                      .bind(body.school_id, body.class_name, body.has_groups ? 1 : 0).run();
+                  return jsonResponse({success:true});
+              }
+              
+              if(body.action === 'add_group') {
+                  // Add group to existing class
+                  await env.DB.prepare("INSERT INTO class_groups (school_id, class_id, group_name) VALUES (?, ?, ?)")
+                      .bind(body.school_id, body.class_id, body.group_name).run();
+                  return jsonResponse({success:true});
+              }
+              
+              if(body.action === 'add_section') {
+                  // Add section to class (with optional group)
+                  await env.DB.prepare("INSERT INTO class_sections (school_id, class_id, group_id, section_name, shift) VALUES (?, ?, ?, ?, ?)")
+                      .bind(body.school_id, body.class_id, body.group_id || null, body.section_name, body.shift || 'Morning').run();
+                  return jsonResponse({success:true});
+              }
+          } catch(e) {
+              console.error('Classes API Error:', e);
+              // If tables don't exist, try to sync database
+              if(e.message.includes("no such table")) {
+                  await syncDatabase(env);
+                  return jsonResponse({error: "Database tables are being created. Please try again in a moment."}, 500);
+              }
+              return jsonResponse({error: e.message}, 500);
           }
       }
       

@@ -184,7 +184,16 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
-            }).then(res => res.ok ? window.location.reload() : alert('Error creating class'));
+            }).then(res => res.json()).then(response => {
+                if(response.success) {
+                    window.location.reload();
+                } else {
+                    alert('Error creating class: ' + (response.error || 'Unknown error'));
+                }
+            }).catch(error => {
+                console.error('Network error:', error);
+                alert('Network error. Please check your connection and try again.');
+            });
         }
 
         function openAddGroupModal(classId, className) {
@@ -225,7 +234,16 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
-            }).then(res => res.ok ? window.location.reload() : alert('Error adding group'));
+            }).then(res => res.json()).then(response => {
+                if(response.success) {
+                    window.location.reload();
+                } else {
+                    alert('Error adding group: ' + (response.error || 'Unknown error'));
+                }
+            }).catch(error => {
+                console.error('Network error:', error);
+                alert('Network error. Please check your connection and try again.');
+            });
         }
 
         function addSection(e) {
@@ -239,7 +257,16 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
-            }).then(res => res.ok ? window.location.reload() : alert('Error adding section'));
+            }).then(res => res.json()).then(response => {
+                if(response.success) {
+                    window.location.reload();
+                } else {
+                    alert('Error adding section: ' + (response.error || 'Unknown error'));
+                }
+            }).catch(error => {
+                console.error('Network error:', error);
+                alert('Network error. Please check your connection and try again.');
+            });
         }
 
         function deleteClass(id) {
@@ -249,7 +276,16 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                 method: 'DELETE',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({action: 'delete_class', id: id})
-            }).then(res => res.ok ? window.location.reload() : alert('Error deleting class'));
+            }).then(res => res.json()).then(response => {
+                if(response.success) {
+                    window.location.reload();
+                } else {
+                    alert('Error deleting class: ' + (response.error || 'Unknown error'));
+                }
+            }).catch(error => {
+                console.error('Network error:', error);
+                alert('Network error. Please check your connection and try again.');
+            });
         }
 
         function closeModal(modalId) {
