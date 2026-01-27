@@ -209,7 +209,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
               </div>
               
               <div class="p-4 md:p-6">
-                  <form id="assign-subjects-form" class="space-y-4">
+                  <form id="assign-subjects-form" class="space-y-4" onsubmit="assignSubjects(event)">
                       <input type="hidden" name="teacher_id" id="teacher_id">
                       <input type="hidden" name="teacher_name" id="teacher_name">
                       
