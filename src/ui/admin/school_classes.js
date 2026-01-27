@@ -15,11 +15,25 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
         classSections[s.class_id].push(s);
     });
 
-    // Build table rows
+    // Build table rows with sections grouped by class
     const tableRows = classesData.map(cls => {
         const groups = classGroups[cls.id] || [];
         const sections = classSections[cls.id] || [];
         const groupNames = groups.map(g => g.group_name).join(', ') || 'None';
+        
+        // Get section info with group names
+        const sectionInfo = sections.map(s => {
+            const group = groups.find(g => g.id === s.group_id);
+            return {
+                name: s.section_name,
+                shift: s.shift,
+                group: group ? group.group_name : null
+            };
+        });
+        
+        const sectionDisplay = sectionInfo.map(si => 
+            si.group ? `${si.name} (${si.group})` : si.name
+        ).join(', ') || 'No sections';
         
         return \`
             <tr class="hover:bg-gray-50 border-b border-gray-100">
@@ -33,6 +47,9 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                 </td>
                 <td class="px-4 py-3">
                     <div class="text-sm text-gray-600">\${groupNames}</div>
+                </td>
+                <td class="px-4 py-3">
+                    <div class="text-sm text-gray-900 max-w-xs truncate" title="\${sectionDisplay}">\${sectionDisplay}</div>
                 </td>
                 <td class="px-4 py-3">
                     <div class="flex items-center gap-2">
@@ -86,11 +103,12 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class Name</th>
                          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Groups</th>
                          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Group Names</th>
+                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sections</th>
                          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                      </tr>
                  </thead>
                  <tbody>
-                     \${tableRows.length > 0 ? tableRows : '<tr><td colspan="4" class="px-4 py-8 text-center text-gray-400">No classes found.</td></tr>'}
+                     \${tableRows.length > 0 ? tableRows : '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No classes found.</td></tr>'}
                  </tbody>
              </table>
          </div>

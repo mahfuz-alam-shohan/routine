@@ -144,7 +144,9 @@ export async function handleInstituteRequest(request, env) {
   // --- CLASSES ---
   if (url.pathname === '/school/classes') {
       const classes = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ?").bind(school.id).all();
-      return htmlResponse(InstituteLayout(ClassesPageHTML(classes.results), "Classes", school.school_name));
+      const groups = await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ?").bind(school.id).all();
+      const sections = await env.DB.prepare("SELECT cs.*, cg.group_name FROM class_sections cs LEFT JOIN class_groups cg ON cs.group_id = cg.id WHERE cs.school_id = ?").bind(school.id).all();
+      return htmlResponse(InstituteLayout(ClassesPageHTML(classes.results, groups.results, sections.results), "Classes", school.school_name));
   }
 
   return new Response("Not Found", {status:404});
