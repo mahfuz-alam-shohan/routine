@@ -1,7 +1,7 @@
 import { htmlResponse, jsonResponse, getCookie } from '../core/utils.js';
 import { InstituteLayout } from '../ui/institute/layout.js';
 import { InstituteDashboardHTML } from '../ui/institute/dashboard.js';
-import { TeachersPageHTML } from '../ui/institute/teachers_fixed.js'; 
+import { TeachersPageHTML } from '../ui/institute/teachers_workers.js'; 
 import { ClassesPageHTML } from '../ui/institute/classes.js'; 
 import { SubjectsPageHTML } from '../ui/institute/subjects.js'; 
 import { SchedulesPageHTML } from '../ui/institute/schedules.js'; 

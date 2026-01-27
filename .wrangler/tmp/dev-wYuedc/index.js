@@ -2439,7 +2439,7 @@ function InstituteDashboardHTML(stats) {
 }
 __name(InstituteDashboardHTML, "InstituteDashboardHTML");
 
-// src/ui/institute/teachers_fixed.js
+// src/ui/institute/teachers_workers.js
 init_checked_fetch();
 init_modules_watch_stub();
 function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjects = []) {
@@ -2453,24 +2453,24 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
     const primarySubject = teacherSubjectsList.find((ts) => ts.is_primary === 1);
     const additionalSubjects = teacherSubjectsList.filter((ts) => ts.is_primary === 0);
     return `
-            <tr class="border-b hover:bg-gray-50" data-teacher-id="${t.id}">
+            <tr class="border-b hover:bg-gray-50">
                 <td class="p-4">
-                    <div class="font-medium text-gray-900">${escapeHtml(t.full_name)}</div>
-                    <div class="text-sm text-gray-500">${escapeHtml(t.email)}</div>
-                    <div class="text-sm text-gray-600">${escapeHtml(t.phone)}</div>
+                    <div class="font-medium text-gray-900">${safeHtml(t.full_name)}</div>
+                    <div class="text-sm text-gray-500">${safeHtml(t.email)}</div>
+                    <div class="text-sm text-gray-600">${safeHtml(t.phone)}</div>
                 </td>
                 <td class="p-4">
                     <div class="space-y-2">
                         ${primarySubject ? `
                             <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
-                                \u{1F3AF} ${escapeHtml(primarySubject.subject_name)}
+                                \u{1F3AF} ${safeHtml(primarySubject.subject_name)}
                             </span>
                         ` : '<span class="text-gray-400 text-xs">No primary subject</span>'}
                         ${additionalSubjects.length > 0 ? `
                             <div class="flex flex-wrap gap-1">
                                 ${additionalSubjects.map((s) => `
                                     <span class="bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs">
-                                        ${escapeHtml(s.subject_name)}
+                                        ${safeHtml(s.subject_name)}
                                     </span>
                                 `).join("")}
                             </div>
@@ -2479,12 +2479,12 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
                 </td>
                 <td class="p-4">
                     <div class="flex gap-2">
-                        <button type="button" data-action="edit-subjects" data-teacher-id="${t.id}" data-teacher-name="${escapeHtml(t.full_name)}"
-                                class="edit-subjects-btn text-blue-600 hover:text-blue-800 text-sm font-medium">
+                        <button type="button" onclick="editSubjects(${t.id}, '${safeHtml(t.full_name)}')" 
+                                class="text-blue-600 hover:text-blue-800 text-sm font-medium">
                             Edit Subjects
                         </button>
-                        <button type="button" data-action="remove-teacher" data-teacher-id="${t.id}"
-                                class="remove-teacher-btn text-red-600 hover:text-red-800 text-sm font-medium">
+                        <button type="button" onclick="removeTeacher(${t.id})" 
+                                class="text-red-600 hover:text-red-800 text-sm font-medium">
                             Remove
                         </button>
                     </div>
@@ -2499,15 +2499,15 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
                 <h1 class="text-2xl font-bold text-gray-900">Teachers Management</h1>
                 <p class="text-gray-600">Manage teachers and assign subjects</p>
               </div>
-              <button type="button" id="add-teacher-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+              <button type="button" onclick="toggleAddForm()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
                   + Add Teacher
               </button>
           </div>
 
           <!-- Add Teacher Form -->
-          <div id="add-teacher-form" class="hidden mb-6 bg-white rounded-lg border p-6">
+          <div id="add-form" class="hidden mb-6 bg-white rounded-lg border p-6">
               <h3 class="text-lg font-semibold mb-4">Add New Teacher</h3>
-              <form id="add-teacher-form-element" class="space-y-4">
+              <form onsubmit="addTeacher(event)" class="space-y-4">
                   <div class="grid grid-cols-2 gap-4">
                       <input type="text" name="full_name" placeholder="Full Name" required 
                              class="border rounded px-3 py-2">
@@ -2523,7 +2523,7 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
                       <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
                           Add Teacher
                       </button>
-                      <button type="button" id="cancel-add-teacher" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
+                      <button type="button" onclick="toggleAddForm()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
                           Cancel
                       </button>
                   </div>
@@ -2559,48 +2559,37 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
           </div>
       </div>
 
-      <!-- Subject Assignment Modal -->
+      <!-- Subject Modal -->
       <div id="subject-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
           <div class="bg-white rounded-lg max-w-md w-full">
               <div class="p-4 border-b">
                   <h3 class="font-semibold">Assign Subjects</h3>
-                  <p class="text-sm text-gray-600">For <span id="teacher-name-display"></span></p>
+                  <p class="text-sm text-gray-600">For <span id="teacher-name"></span></p>
               </div>
-              
               <div class="p-4">
-                  <form id="subject-assignment-form" class="space-y-4">
-                      <input type="hidden" name="teacher_id" id="teacher-id">
-                      <input type="hidden" name="primary_subject" id="primary-subject">
-                      
+                  <form onsubmit="saveSubjects(event)" class="space-y-4">
+                      <input type="hidden" id="modal-teacher-id">
                       <div>
                           <label class="block text-sm font-medium mb-2">Primary Subject *</label>
-                          <select id="primary-subject-select" required class="w-full border rounded px-3 py-2">
-                              <option value="">Select primary subject...</option>
-                              ${allSubjects.map(
-    (subject) => `<option value="${subject.id}">${escapeHtml(subject.subject_name)}</option>`
-  ).join("")}
+                          <select id="primary-subject" required class="w-full border rounded px-3 py-2">
+                              <option value="">Select...</option>
+                              ${allSubjects.map((s) => `<option value="${s.id}">${safeHtml(s.subject_name)}</option>`).join("")}
                           </select>
                       </div>
-                      
                       <div>
                           <label class="block text-sm font-medium mb-2">Additional Subjects</label>
-                          <div id="additional-subjects-container" class="space-y-2 max-h-32 overflow-y-auto border rounded p-2">
-                              ${allSubjects.map(
-    (subject) => `<label class="flex items-center gap-2 text-sm">
-                                      <input type="checkbox" name="additional_subjects" value="${subject.id}" class="rounded">
-                                      ${escapeHtml(subject.subject_name)}
-                                  </label>`
-  ).join("")}
+                          <div class="max-h-32 overflow-y-auto border rounded p-2">
+                              ${allSubjects.map((s) => `
+                                  <label class="flex items-center gap-2 text-sm">
+                                      <input type="checkbox" name="additional" value="${s.id}">
+                                      ${safeHtml(s.subject_name)}
+                                  </label>
+                              `).join("")}
                           </div>
                       </div>
-                      
                       <div class="flex gap-2 pt-2 border-t">
-                          <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                              Save
-                          </button>
-                          <button type="button" id="cancel-subject-assignment" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
-                              Cancel
-                          </button>
+                          <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save</button>
+                          <button type="button" onclick="closeModal()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">Cancel</button>
                       </div>
                   </form>
               </div>
@@ -2608,215 +2597,139 @@ function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjec
       </div>
 
       <script>
-        // Store data safely
-        const teachersData = ${JSON.stringify({ teachers, allSubjects, teacherSubjects })};
-        
-        // Initialize when DOM is ready
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Teachers module initializing...');
+        // Data storage - simple approach
+        window.teachersData = {
+            teachers: ${JSON.stringify(teachers)},
+            allSubjects: ${JSON.stringify(allSubjects)},
+            teacherSubjects: ${JSON.stringify(teacherSubjects)}
+        };
+
+        // Simple functions
+        function toggleAddForm() {
+            document.getElementById('add-form').classList.toggle('hidden');
+        }
+
+        function addTeacher(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
             
-            // Add teacher form toggle
-            const addTeacherBtn = document.getElementById('add-teacher-btn');
-            const addTeacherForm = document.getElementById('add-teacher-form');
-            const cancelAddTeacher = document.getElementById('cancel-add-teacher');
-            const addTeacherFormElement = document.getElementById('add-teacher-form-element');
-            
-            if (addTeacherBtn) {
-                addTeacherBtn.addEventListener('click', function() {
-                    addTeacherForm.classList.toggle('hidden');
-                });
+            const phoneDigits = data.phone_digits.replace(/\\D/g, '');
+            if (phoneDigits.length !== 10) {
+                alert('Please enter a valid 10-digit phone number');
+                return;
             }
             
-            if (cancelAddTeacher) {
-                cancelAddTeacher.addEventListener('click', function() {
-                    addTeacherForm.classList.add('hidden');
-                    addTeacherFormElement.reset();
-                });
-            }
+            data.phone = '+880-' + phoneDigits;
+            delete data.phone_digits;
             
-            // Add teacher form submission
-            if (addTeacherFormElement) {
-                addTeacherFormElement.addEventListener('submit', async function(e) {
-                    e.preventDefault();
-                    const formData = new FormData(e.target);
-                    const data = Object.fromEntries(formData.entries());
-                    
-                    const phoneDigits = data.phone_digits.replace(/\\D/g, '');
-                    if (phoneDigits.length !== 10) {
-                        alert('Please enter a valid 10-digit phone number');
-                        return;
-                    }
-                    
-                    data.phone = '+880-' + phoneDigits;
-                    delete data.phone_digits;
-                    
-                    try {
-                        const response = await fetch('/school/teachers', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify(data)
-                        });
-                        
-                        const result = await response.json();
-                        if (result.success) {
-                            window.location.reload();
-                        } else {
-                            alert('Error: ' + (result.error || 'Unknown error'));
-                        }
-                    } catch (error) {
-                        console.error('Teacher add error:', error);
-                        alert('Network error. Please try again.');
-                    }
-                });
-            }
-            
-            // Edit subjects buttons
-            document.querySelectorAll('.edit-subjects-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const teacherId = this.dataset.teacherId;
-                    const teacherName = this.dataset.teacherName;
-                    openSubjectEditor(teacherId, teacherName);
-                });
-            });
-            
-            // Remove teacher buttons
-            document.querySelectorAll('.remove-teacher-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const teacherId = this.dataset.teacherId;
-                    removeTeacher(teacherId);
-                });
-            });
-            
-            // Subject modal controls
-            const subjectModal = document.getElementById('subject-modal');
-            const cancelSubjectAssignment = document.getElementById('cancel-subject-assignment');
-            const subjectAssignmentForm = document.getElementById('subject-assignment-form');
-            
-            if (cancelSubjectAssignment) {
-                cancelSubjectAssignment.addEventListener('click', closeSubjectModal);
-            }
-            
-            if (subjectAssignmentForm) {
-                subjectAssignmentForm.addEventListener('submit', saveSubjectAssignments);
-            }
-            
-            // Close modal on escape
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') {
-                    closeSubjectModal();
+            fetch('/school/teachers', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(r => r.json()).then(result => {
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown error'));
                 }
+            }).catch(err => {
+                alert('Network error. Please try again.');
             });
-            
-            console.log('Teachers module initialized successfully');
-        });
-        
-        function openSubjectEditor(teacherId, teacherName) {
-            document.getElementById('teacher-id').value = teacherId;
-            document.getElementById('teacher-name-display').textContent = teacherName;
+        }
+
+        function editSubjects(teacherId, teacherName) {
+            document.getElementById('modal-teacher-id').value = teacherId;
+            document.getElementById('teacher-name').textContent = teacherName;
             document.getElementById('subject-modal').classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
             
-            loadCurrentSubjects(teacherId);
-        }
-        
-        function closeSubjectModal() {
-            document.getElementById('subject-modal').classList.add('hidden');
-            document.body.style.overflow = '';
-            document.getElementById('subject-assignment-form').reset();
-        }
-        
-        function loadCurrentSubjects(teacherId) {
-            const teacherSubjects = teachersData.teacherSubjects.filter(ts => ts.teacher_id == teacherId);
-            const primarySubject = teacherSubjects.find(ts => ts.is_primary === 1);
-            const additionalSubjects = teacherSubjects.filter(ts => ts.is_primary === 0);
+            // Load current subjects
+            const currentSubjects = window.teachersData.teacherSubjects.filter(ts => ts.teacher_id == teacherId);
+            const primary = currentSubjects.find(ts => ts.is_primary === 1);
+            const additional = currentSubjects.filter(ts => ts.is_primary === 0);
             
-            // Set primary subject
-            if (primarySubject) {
-                document.getElementById('primary-subject-select').value = primarySubject.subject_id;
-            }
+            document.getElementById('primary-subject').value = primary ? primary.subject_id : '';
             
-            // Set additional subjects
-            document.querySelectorAll('input[name="additional_subjects"]').forEach(checkbox => {
-                checkbox.checked = additionalSubjects.some(ts => ts.subject_id == checkbox.value);
+            document.querySelectorAll('input[name="additional"]').forEach(cb => {
+                cb.checked = additional.some(ts => ts.subject_id == cb.value);
             });
         }
-        
-        async function saveSubjectAssignments(e) {
+
+        function closeModal() {
+            document.getElementById('subject-modal').classList.add('hidden');
+        }
+
+        function saveSubjects(e) {
             e.preventDefault();
             
-            const primarySubject = document.getElementById('primary-subject-select').value;
-            if (!primarySubject) {
+            const primary = document.getElementById('primary-subject').value;
+            if (!primary) {
                 alert('Please select a primary subject');
                 return;
             }
             
-            const additionalSubjects = Array.from(document.querySelectorAll('input[name="additional_subjects"]:checked'))
+            const additional = Array.from(document.querySelectorAll('input[name="additional"]:checked'))
                 .map(cb => parseInt(cb.value));
             
             const data = {
-                teacher_id: document.getElementById('teacher-id').value,
-                primary_subject: parseInt(primarySubject),
-                additional_subjects: additionalSubjects,
+                teacher_id: document.getElementById('modal-teacher-id').value,
+                primary_subject: parseInt(primary),
+                additional_subjects: additional,
                 action: 'assign_subjects'
             };
             
-            try {
-                const response = await fetch('/school/teachers', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
+            fetch('/school/teachers', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(r => r.json()).then(result => {
                 if (result.success) {
-                    closeSubjectModal();
-                    window.location.reload();
+                    closeModal();
+                    location.reload();
                 } else {
                     alert('Error: ' + (result.error || 'Unknown error'));
                 }
-            } catch (error) {
-                console.error('Subject assignment error:', error);
+            }).catch(err => {
                 alert('Network error. Please try again.');
-            }
+            });
         }
-        
-        async function removeTeacher(teacherId) {
+
+        function removeTeacher(teacherId) {
             if (!confirm('Remove this teacher?')) return;
             
-            try {
-                const response = await fetch('/school/teachers', {
-                    method: 'DELETE',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({id: teacherId})
-                });
-                
-                const result = await response.json();
+            fetch('/school/teachers', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({id: teacherId})
+            }).then(r => r.json()).then(result => {
                 if (result.success) {
-                    window.location.reload();
+                    location.reload();
                 } else {
                     alert('Error: ' + (result.error || 'Unknown error'));
                 }
-            } catch (error) {
-                console.error('Remove teacher error:', error);
+            }).catch(err => {
                 alert('Network error. Please try again.');
-            }
+            });
         }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+
+        function safeHtml(text) {
+            if (!text) return '';
+            return text.toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
       <\/script>
     `;
 }
 __name(TeachersPageHTML, "TeachersPageHTML");
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
+function safeHtml(text) {
+  if (!text) return "";
+  return text.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
-__name(escapeHtml, "escapeHtml");
+__name(safeHtml, "safeHtml");
 
 // src/ui/institute/classes.js
 init_checked_fetch();
