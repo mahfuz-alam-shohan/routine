@@ -483,6 +483,11 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
       <script>
         const SCHOOL_ID = ${school.id};
         const MAX_CLASSES_PER_SECTION = ${maxClassesPerSection};
+        
+        // Store subjects data for validation
+        const CLASS_SUBJECTS = ${JSON.stringify(classSubjects)};
+        const GROUP_SUBJECTS = ${JSON.stringify(groupSubjects)};
+        const GROUPS = ${JSON.stringify(groups)};
 
         // Tab switching
         function switchTab(tabName) {
@@ -867,11 +872,36 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             const submitBtn = document.getElementById('addClassSubjectBtn');
             if (submitBtn.disabled) return;
             
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            const classId = parseInt(data.class_id);
+            const subjectId = parseInt(data.subject_id);
+            
+            // Check for duplicate using stored data
+            const existingClassSubject = CLASS_SUBJECTS.find(cs => 
+                cs.class_id === classId && cs.subject_id === subjectId
+            );
+            
+            if (existingClassSubject) {
+                alert('This subject is already added to this class!');
+                return;
+            }
+            
+            // Check if subject already exists in any group of this class
+            const classGroups = GROUPS.filter(g => g.class_id === classId);
+            const groupIds = classGroups.map(g => g.id);
+            const existingGroupSubject = GROUP_SUBJECTS.find(gs => 
+                groupIds.includes(gs.group_id) && gs.subject_id === subjectId
+            );
+            
+            if (existingGroupSubject) {
+                alert('This subject is already added to one or more groups in this class. Remove it from groups first, or keep it only in groups.');
+                return;
+            }
+            
             submitBtn.disabled = true;
             submitBtn.textContent = 'Adding...';
             
-            const formData = new FormData(e.target);
-            const data = Object.fromEntries(formData.entries());
             data.action = 'add_class_subject';
             data.school_id = SCHOOL_ID;
             
@@ -910,11 +940,41 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             const submitBtn = document.getElementById('addGroupSubjectBtn');
             if (submitBtn.disabled) return;
             
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            const groupId = parseInt(data.group_id);
+            const subjectId = parseInt(data.subject_id);
+            
+            // Check for duplicate using stored data
+            const existingGroupSubject = GROUP_SUBJECTS.find(gs => 
+                gs.group_id === groupId && gs.subject_id === subjectId
+            );
+            
+            if (existingGroupSubject) {
+                alert('This subject is already added to this group!');
+                return;
+            }
+            
+            // Get the class_id for this group
+            const groupInfo = GROUPS.find(g => g.id === groupId);
+            if (!groupInfo) {
+                alert('Group not found!');
+                return;
+            }
+            
+            // Check if subject already exists as class subject for this class
+            const existingClassSubject = CLASS_SUBJECTS.find(cs => 
+                cs.class_id === groupInfo.class_id && cs.subject_id === subjectId
+            );
+            
+            if (existingClassSubject) {
+                alert('This subject is already added to the entire class. Remove it from class first, or keep it only as class subject.');
+                return;
+            }
+            
             submitBtn.disabled = true;
             submitBtn.textContent = 'Adding...';
             
-            const formData = new FormData(e.target);
-            const data = Object.fromEntries(formData.entries());
             data.action = 'add_group_subject';
             data.school_id = SCHOOL_ID;
             

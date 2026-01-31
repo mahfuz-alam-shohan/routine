@@ -28,13 +28,13 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
         return `
             <tr class="border-b">
                 <td class="p-3">${escapeHtml(t.full_name)}</td>
-                <td class="p-3">${escapeHtml(t.email)}</td>
+                <td class="p-3 break-words">${escapeHtml(t.email)}</td>
                 <td class="p-3">${escapeHtml(t.phone || '')}</td>
-                <td class="p-3">
+                <td class="p-3 break-words">
                     ${primarySubject ? escapeHtml(primarySubject.subject_name) : 'Not assigned'}
                     ${additionalSubjects.length > 0 ? ', ' + additionalSubjects.map(s => escapeHtml(s.subject_name)).join(', ') : ''}
                 </td>
-                <td class="p-3">
+                <td class="p-3 whitespace-nowrap">
                     <button type="button" onclick="editSubjects(${t.id}, '${escapeHtml(t.full_name)}')" 
                             class="text-blue-600 hover:text-blue-800 text-sm">
                         Edit
@@ -49,31 +49,31 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
     }).join('');
 
     return `
-      <div class="p-6">
-          <div class="flex justify-between items-center mb-6">
+      <div class="p-4 sm:p-6">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
               <h1 class="text-xl font-bold">Teachers Management</h1>
-              <button type="button" onclick="toggleAddForm()" class="bg-blue-600 text-white px-4 py-2">
+              <button type="button" onclick="toggleAddForm()" class="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded">
                   + Add Teacher
               </button>
           </div>
 
           <!-- Add Teacher Form -->
-          <div id="add-form" class="hidden mb-6 border p-4">
+          <div id="add-form" class="hidden mb-6 border p-4 rounded-lg bg-white">
               <h3 class="font-semibold mb-4">Add New Teacher</h3>
               <form onsubmit="addTeacher(event)" class="space-y-4">
-                  <div class="grid grid-cols-3 gap-4">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <input type="text" name="full_name" placeholder="Full Name" required 
-                             class="border px-3 py-2">
+                             class="w-full border px-3 py-2">
                       <input type="email" name="email" placeholder="Email" required 
-                             class="border px-3 py-2">
+                             class="w-full border px-3 py-2">
                       <input type="text" name="phone" placeholder="Phone" 
-                             class="border px-3 py-2">
+                             class="w-full border px-3 py-2">
                   </div>
-                  <div class="flex gap-2">
-                      <button type="submit" class="bg-blue-600 text-white px-4 py-2">
+                  <div class="flex flex-col sm:flex-row gap-2">
+                      <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded">
                           Add Teacher
                       </button>
-                      <button type="button" onclick="toggleAddForm()" class="bg-gray-200 text-gray-800 px-4 py-2">
+                      <button type="button" onclick="toggleAddForm()" class="w-full sm:w-auto bg-gray-200 text-gray-800 px-4 py-2 rounded">
                           Cancel
                       </button>
                   </div>
@@ -81,8 +81,8 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
           </div>
 
           <!-- Teachers Table -->
-          <div class="border">
-              <table class="w-full border-collapse">
+          <div class="border rounded-lg overflow-x-auto bg-white">
+              <table class="w-full min-w-[720px] border-collapse text-sm">
                   <thead class="bg-gray-100">
                       <tr>
                           <th class="border p-3 text-left">Name</th>

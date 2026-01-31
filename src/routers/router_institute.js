@@ -260,6 +260,19 @@ export async function handleInstituteRequest(request, env) {
               
               // Class Curriculum actions
               if(body.action === 'add_class_subject') {
+                  // Check for duplicate subject in this class
+                  const existingSubject = await env.DB.prepare("SELECT id FROM class_subjects WHERE school_id = ? AND class_id = ? AND subject_id = ?")
+                      .bind(body.school_id, body.class_id, body.subject_id).first();
+                  if(existingSubject) return jsonResponse({error: "This subject is already added to this class"}, 400);
+                  
+                  // Check if subject already exists in any group of this class
+                  const existingGroupSubject = await env.DB.prepare(`
+                      SELECT gs.id FROM group_subjects gs 
+                      JOIN class_groups cg ON gs.group_id = cg.id 
+                      WHERE gs.school_id = ? AND cg.class_id = ? AND gs.subject_id = ?
+                  `).bind(body.school_id, body.class_id, body.subject_id).first();
+                  if(existingGroupSubject) return jsonResponse({error: "This subject is already added to one or more groups in this class. Remove it from groups first, or keep it only in groups."}, 400);
+                  
                   const isFixed = body.is_fixed === true || body.is_fixed === 'true';
                   if(isFixed) {
                       // Fixed schedule - only classes_per_week matters
@@ -280,6 +293,20 @@ export async function handleInstituteRequest(request, env) {
                   return jsonResponse({success:true});
               }
               if(body.action === 'add_group_subject') {
+                  // Check for duplicate subject in this group
+                  const existingSubject = await env.DB.prepare("SELECT id FROM group_subjects WHERE school_id = ? AND group_id = ? AND subject_id = ?")
+                      .bind(body.school_id, body.group_id, body.subject_id).first();
+                  if(existingSubject) return jsonResponse({error: "This subject is already added to this group"}, 400);
+                  
+                  // Get class_id for this group to check class-level subjects
+                  const classInfo = await env.DB.prepare("SELECT class_id FROM class_groups WHERE id = ?").bind(body.group_id).first();
+                  if(!classInfo) return jsonResponse({error: "Group not found"}, 400);
+                  
+                  // Check if subject already exists as class subject for this class
+                  const existingClassSubject = await env.DB.prepare("SELECT id FROM class_subjects WHERE school_id = ? AND class_id = ? AND subject_id = ?")
+                      .bind(body.school_id, classInfo.class_id, body.subject_id).first();
+                  if(existingClassSubject) return jsonResponse({error: "This subject is already added to the entire class. Remove it from class first, or keep it only as class subject."}, 400);
+                  
                   const isFixed = body.is_fixed === true || body.is_fixed === 'true';
                   if(isFixed) {
                       // Fixed schedule - only classes_per_week matters
@@ -292,7 +319,6 @@ export async function handleInstituteRequest(request, env) {
                   }
                   
                   // Auto-create auto-assignment for this group subject
-                  const classInfo = await env.DB.prepare("SELECT class_id FROM class_groups WHERE id = ?").bind(body.group_id).first();
                   await env.DB.prepare(`
                       INSERT INTO teacher_assignments (school_id, class_id, group_id, section_id, subject_id, teacher_id, is_auto) 
                       VALUES (?, ?, ?, ?, ?, ?, 1)

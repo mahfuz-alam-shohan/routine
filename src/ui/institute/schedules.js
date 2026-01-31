@@ -7,14 +7,14 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
       <div class="max-w-7xl xl:max-w-8xl mx-auto pb-24 md:pb-10 select-none" id="schedule-app">
           
           <div class="bg-white sticky top-0 z-30 border-b border-gray-200 shadow-sm">
-              <div class="flex justify-between items-center px-4 py-3 md:px-6 md:py-4">
+              <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 px-4 py-3 md:px-6 md:py-4">
                   <div>
                     <h2 class="text-lg md:text-2xl font-bold text-gray-900">Master Schedule</h2>
                     <p class="text-sm md:text-base text-gray-500 mt-1">Configure your school's daily routine</p>
                   </div>
-                  <div class="flex gap-3 md:gap-4">
-                       <button onclick="app.save()" class="bg-black text-white px-4 py-2.5 md:px-6 md:py-3 rounded-lg text-sm md:text-base font-bold active:scale-95 transition-transform">Save</button>
-                       <button onclick="app.reset()" class="text-red-600 bg-red-50 px-4 py-2.5 md:px-5 md:py-3 rounded-lg text-sm md:text-base font-bold">Reset</button>
+                  <div class="flex flex-col sm:flex-row gap-2 md:gap-4">
+                       <button onclick="app.save()" class="w-full sm:w-auto bg-black text-white px-4 py-2.5 md:px-6 md:py-3 rounded-lg text-sm md:text-base font-bold active:scale-95 transition-transform">Save</button>
+                       <button onclick="app.reset()" class="w-full sm:w-auto text-red-600 bg-red-50 px-4 py-2.5 md:px-5 md:py-3 rounded-lg text-sm md:text-base font-bold">Reset</button>
                   </div>
               </div>
           </div>
@@ -28,7 +28,7 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
                   </div>
                   <div class="flex-1">
                       <div class="text-sm md:text-base font-bold text-blue-800 uppercase tracking-wide mb-3">Working Days:</div>
-                      <div class="grid grid-cols-7 gap-2" id="weekday-selector">
+                      <div class="grid grid-cols-4 sm:grid-cols-7 gap-2 sm:gap-3" id="weekday-selector">
                           <div class="text-center">
                               <label class="flex flex-col items-center gap-1 cursor-pointer">
                                   <input type="checkbox" name="weekday" value="monday" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
