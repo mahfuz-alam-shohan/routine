@@ -2,7 +2,14 @@
   "name": "school-routine-modular",
   "version": "1.0.0",
   "type": "module",
+  "scripts": {
+    "build-css": "tailwindcss -i ./src/styles/main.css -o ./src/styles/output.css --watch",
+    "build-css-prod": "tailwindcss -i ./src/styles/main.css -o ./src/styles/output.css --minify"
+  },
   "devDependencies": {
-    "wrangler": "^3.0.0"
+    "autoprefixer": "^10.4.24",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.18",
+    "wrangler": "^4.61.1"
   }
 }

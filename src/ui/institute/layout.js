@@ -6,49 +6,14 @@ export function InstituteLayout(content, title, schoolName) {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <title>${title} - ${schoolName}</title>
+        <script>
+            // Suppress production warning - must be set before Tailwind loads
+            window.TAILWIND_DISABLE_PRODUCTION_WARNING = true;
+        </script>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
         <style>
-            body { font-family: 'Inter', sans-serif; font-size: 0.875rem; } 
-            
-            /* Hide Scrollbar for Chrome/Safari/Opera */
-            .no-scrollbar::-webkit-scrollbar { display: none; }
-            /* Hide Scrollbar for IE, Edge and Firefox */
-            .no-scrollbar { -ms-overflow-style: none;  scrollbar-width: none; }
-
-            /* Professional custom scrollbar for main content */
-            ::-webkit-scrollbar { width: 6px; height: 6px; }
-            ::-webkit-scrollbar-track { background: transparent; }
-            ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-            ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
-            /* Prevent iOS Zoom on inputs */
-            @media screen and (max-width: 768px) {
-                input, select, textarea { font-size: 16px !important; }
-            }
-
-            .page-shell { animation: pageFadeIn 320ms ease-out both; }
-            .page-leave .page-shell { opacity: 0; transform: translateY(6px); transition: opacity 180ms ease, transform 180ms ease; }
-            .ui-glow::before {
-                content: "";
-                position: fixed;
-                inset: -10% -10% auto -10%;
-                height: 40vh;
-                background:
-                  radial-gradient(circle at top left, rgba(59, 130, 246, 0.14), transparent 55%),
-                  radial-gradient(circle at top right, rgba(168, 85, 247, 0.14), transparent 55%),
-                  radial-gradient(circle at 40% 10%, rgba(16, 185, 129, 0.1), transparent 50%);
-                pointer-events: none;
-                z-index: 0;
-            }
-            @keyframes pageFadeIn {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            @media (prefers-reduced-motion: reduce) {
-                .page-shell { animation: none; }
-                .page-leave .page-shell { transition: none; }
-            }
+            /* Additional custom styles if needed */
         </style>
     </head>
     <body class="ui-glow bg-gray-50 text-gray-800 antialiased h-screen flex flex-col md:flex-row overflow-hidden relative">

@@ -36,12 +36,26 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
         
         // Add class-level subjects
         const classSubjects = subjectsByClass[classId] || [];
-        totalClasses += classSubjects.reduce((sum, s) => sum + (s.classes_per_week || 0), 0);
+        totalClasses += classSubjects.reduce((sum, s) => {
+            if(s.is_fixed) {
+                return sum + (s.classes_per_week || 0);
+            } else {
+                // For flexible, use the maximum for capacity calculation
+                return sum + (s.max_classes || 0);
+            }
+        }, 0);
         
         // Add group-level subjects
         if (groupId) {
             const groupSubjects = subjectsByGroup[groupId] || [];
-            totalClasses += groupSubjects.reduce((sum, s) => sum + (s.classes_per_week || 0), 0);
+            totalClasses += groupSubjects.reduce((sum, s) => {
+                if(s.is_fixed) {
+                    return sum + (s.classes_per_week || 0);
+                } else {
+                    // For flexible, use the maximum for capacity calculation
+                    return sum + (s.max_classes || 0);
+                }
+            }, 0);
         }
         
         return {
@@ -121,8 +135,10 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                                         <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                                             <span class="font-medium text-sm">${cs.subject_name}</span>
                                             <div class="flex flex-wrap gap-2 text-xs">
-                                                <span class="text-gray-600">${cs.classes_per_week} classes/week</span>
-                                                <span class="text-gray-500">min: ${cs.min_classes}, max: ${cs.max_classes}</span>
+                                                ${cs.is_fixed ? 
+                                                    `<span class="text-gray-600">${cs.classes_per_week} classes/week (fixed)</span>` :
+                                                    `<span class="text-gray-600">${cs.min_classes}-${cs.max_classes} classes/week (flexible)</span>`
+                                                }
                                             </div>
                                         </div>
                                         <button onclick="deleteClassSubject(${cs.id})" class="text-xs text-red-600 self-end sm:self-auto">Remove</button>
@@ -158,8 +174,10 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                                                 <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                                                     <span class="font-medium text-sm">${gs.subject_name}</span>
                                                     <div class="flex flex-wrap gap-2 text-xs">
-                                                        <span class="text-gray-600">${gs.classes_per_week} classes/week</span>
-                                                        <span class="text-gray-500">min: ${gs.min_classes}, max: ${gs.max_classes}</span>
+                                                        ${gs.is_fixed ? 
+                                                            `<span class="text-gray-600">${gs.classes_per_week} classes/week (fixed)</span>` :
+                                                            `<span class="text-gray-600">${gs.min_classes}-${gs.max_classes} classes/week (flexible)</span>`
+                                                        }
                                                     </div>
                                                 </div>
                                                 <button onclick="deleteGroupSubject(${gs.id})" class="text-xs text-red-600 self-end sm:self-auto">Remove</button>
@@ -304,23 +322,39 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                   <div class="mb-3">
                       <select name="subject_id" required class="w-full border border-gray-300 px-2 py-2 text-sm">
                           <option value="">Select Subject</option>
-                          ${subjects.map(s => `<option value="${s.id}">${s.subject_name}</option>`).join('')}
+                          ${subjects.map(s => '<option value="' + s.id + '">' + s.subject_name + '</option>').join('')}
                       </select>
                   </div>
-                  <div class="grid grid-cols-2 gap-2 mb-3 form-grid">
-                      <div>
-                          <label class="text-xs text-gray-600 block mb-1">Classes/Week</label>
-                          <input type="number" name="classes_per_week" required min="1" max="20" class="w-full border border-gray-300 px-2 py-2 text-sm">
-                      </div>
-                      <div>
-                          <label class="text-xs text-gray-600 block mb-1">Min Classes</label>
-                          <input type="number" name="min_classes" required min="1" max="20" class="w-full border border-gray-300 px-2 py-2 text-sm">
+                  
+                  <!-- Fixed/Flexible Toggle -->
+                  <div class="mb-4">
+                      <label class="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" name="is_fixed" id="class_is_fixed" checked class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                          <span class="text-sm font-medium text-gray-700">Fixed number of classes per week</span>
+                      </label>
+                      <p class="text-xs text-gray-500 mt-1">When checked, you set exact classes. When unchecked, you set minimum and maximum range.</p>
+                  </div>
+                  
+                  <!-- Fixed Classes Input -->
+                  <div id="fixed-classes-input" class="mb-3">
+                      <label class="text-xs text-gray-600 block mb-1">Total Classes Per Week</label>
+                      <input type="number" name="classes_per_week" required min="1" max="20" class="w-full border border-gray-300 px-2 py-2 text-sm">
+                  </div>
+                  
+                  <!-- Flexible Range Inputs -->
+                  <div id="flexible-classes-input" class="hidden mb-3">
+                      <div class="grid grid-cols-2 gap-2">
+                          <div>
+                              <label class="text-xs text-gray-600 block mb-1">Minimum Classes</label>
+                              <input type="number" name="min_classes" min="1" max="20" class="w-full border border-gray-300 px-2 py-2 text-sm">
+                          </div>
+                          <div>
+                              <label class="text-xs text-gray-600 block mb-1">Maximum Classes</label>
+                              <input type="number" name="max_classes" min="1" max="20" class="w-full border border-gray-300 px-2 py-2 text-sm">
+                          </div>
                       </div>
                   </div>
-                  <div class="mb-3">
-                      <label class="text-xs text-gray-600 block mb-1">Max Classes</label>
-                      <input type="number" name="max_classes" required min="1" max="20" class="w-full border border-gray-300 px-2 py-2 text-sm">
-                  </div>
+                  
                   <div class="flex flex-col sm:flex-row gap-2">
                       <button type="submit" class="bg-blue-600 text-white px-3 py-2 text-sm" id="addClassSubjectBtn">Add Subject</button>
                       <button type="button" onclick="closeModal('addClassSubjectModal')" class="bg-gray-200 text-gray-800 px-3 py-2 text-sm">Cancel</button>
@@ -339,28 +373,110 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                   <div class="mb-3">
                       <select name="subject_id" required class="w-full border border-gray-300 px-2 py-2 text-sm">
                           <option value="">Select Subject</option>
-                          ${subjects.map(s => `<option value="${s.id}">${s.subject_name}</option>`).join('')}
+                          ${subjects.map(s => '<option value="' + s.id + '">' + s.subject_name + '</option>').join('')}
                       </select>
                   </div>
-                  <div class="grid grid-cols-2 gap-2 mb-3 form-grid">
-                      <div>
-                          <label class="text-xs text-gray-600 block mb-1">Classes/Week</label>
-                          <input type="number" name="classes_per_week" required min="1" max="20" class="w-full border border-gray-300 px-2 py-2 text-sm">
-                      </div>
-                      <div>
-                          <label class="text-xs text-gray-600 block mb-1">Min Classes</label>
-                          <input type="number" name="min_classes" required min="1" max="20" class="w-full border border-gray-300 px-2 py-2 text-sm">
+                  
+                  <!-- Fixed/Flexible Toggle -->
+                  <div class="mb-4">
+                      <label class="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" name="is_fixed" id="group_is_fixed" checked class="w-4 h-4 text-purple-600 rounded focus:ring-purple-500">
+                          <span class="text-sm font-medium text-gray-700">Fixed number of classes per week</span>
+                      </label>
+                      <p class="text-xs text-gray-500 mt-1">When checked, you set exact classes. When unchecked, you set minimum and maximum range.</p>
+                  </div>
+                  
+                  <!-- Fixed Classes Input -->
+                  <div id="group-fixed-classes-input" class="mb-3">
+                      <label class="text-xs text-gray-600 block mb-1">Total Classes Per Week</label>
+                      <input type="number" name="classes_per_week" required min="1" max="20" class="w-full border border-gray-300 px-2 py-2 text-sm">
+                  </div>
+                  
+                  <!-- Flexible Range Inputs -->
+                  <div id="group-flexible-classes-input" class="hidden mb-3">
+                      <div class="grid grid-cols-2 gap-2">
+                          <div>
+                              <label class="text-xs text-gray-600 block mb-1">Minimum Classes</label>
+                              <input type="number" name="min_classes" min="1" max="20" class="w-full border border-gray-300 px-2 py-2 text-sm">
+                          </div>
+                          <div>
+                              <label class="text-xs text-gray-600 block mb-1">Maximum Classes</label>
+                              <input type="number" name="max_classes" min="1" max="20" class="w-full border border-gray-300 px-2 py-2 text-sm">
+                          </div>
                       </div>
                   </div>
-                  <div class="mb-3">
-                      <label class="text-xs text-gray-600 block mb-1">Max Classes</label>
-                      <input type="number" name="max_classes" required min="1" max="20" class="w-full border border-gray-300 px-2 py-2 text-sm">
-                  </div>
+                  
                   <div class="flex flex-col sm:flex-row gap-2">
                       <button type="submit" class="bg-purple-600 text-white px-3 py-2 text-sm" id="addGroupSubjectBtn">Add Subject</button>
                       <button type="button" onclick="closeModal('addGroupSubjectModal')" class="bg-gray-200 text-gray-800 px-3 py-2 text-sm">Cancel</button>
                   </div>
               </form>
+          </div>
+      </div>
+
+      <!-- Replace Subject Confirmation Modal -->
+      <div id="replace-subject-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+          <div class="bg-white rounded-lg max-w-md w-full">
+              <div class="p-4 border-b">
+                  <h3 class="font-semibold">Subject is Currently in Use</h3>
+                  <p class="text-sm text-gray-600" id="replace-subject-details"></p>
+              </div>
+              <div class="p-4">
+                  <div id="subject-usage-list" class="space-y-2 mb-4">
+                      <!-- Usage details will be populated here -->
+                  </div>
+                  
+                  <div class="space-y-2">
+                      <button type="button" onclick="replaceSubject()" 
+                              class="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                          Replace Subject
+                      </button>
+                      <button type="button" onclick="removeSubjectAndAssignments()" 
+                              class="w-full bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">
+                          Remove from Curriculum & Delete
+                      </button>
+                      <button type="button" onclick="closeReplaceModal()" 
+                              class="w-full bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
+                          Cancel
+                      </button>
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      <!-- Delete Review Modal -->
+      <div id="delete-review-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+          <div class="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+              <div class="p-4 border-b bg-red-50">
+                  <h3 class="font-semibold text-red-800">⚠️ Subject is Currently in Use</h3>
+                  <p class="text-sm text-red-600 mt-1">This subject cannot be deleted because it's being used in the following places:</p>
+              </div>
+              <div class="p-4">
+                  <div id="delete-review-usage-list" class="space-y-3 mb-4">
+                      <!-- Usage details will be populated here -->
+                  </div>
+                  
+                  <div class="space-y-2 border-t pt-4">
+                      <div class="bg-yellow-50 p-3 rounded border border-yellow-200">
+                          <p class="text-sm text-yellow-800"><strong>Options:</strong></p>
+                          <ul class="text-sm text-yellow-700 mt-1 space-y-1">
+                              <li>• <strong>Keep Subject:</strong> Cancel this deletion and keep the subject as is</li>
+                              <li>• <strong>Force Delete:</strong> Remove from all locations and delete permanently (cannot be undone)</li>
+                          </ul>
+                      </div>
+                      
+                      <div class="flex gap-2">
+                          <button type="button" onclick="forceDeleteSubject()" 
+                                  class="flex-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 font-medium">
+                              🗑️ Force Delete (Remove from All)
+                          </button>
+                          <button type="button" onclick="closeDeleteReviewModal()" 
+                                  class="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300 font-medium">
+                              Cancel (Keep Subject)
+                          </button>
+                      </div>
+                  </div>
+              </div>
           </div>
       </div>
 
@@ -429,16 +545,302 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
         }
 
         function deleteSubject(id) {
-            if(!confirm("Delete this subject?")) return;
-            
+            // First check if subject is in use
+            fetch('/school/subjects/usage?id=' + id, {
+                method: 'GET',
+                headers: {'Content-Type': 'application/json'}
+            }).then(res => {
+                if (!res.ok) {
+                    throw new Error('Server returned ' + res.status);
+                }
+                return res.json();
+            }).then(usage => {
+                if (usage.success && usage.data && (usage.data.classes?.length > 0 || usage.data.groups?.length > 0 || usage.data.teachers?.length > 0)) {
+                    // Subject is in use, show review modal
+                    showDeleteReviewModal(id, usage.data);
+                } else {
+                    // Subject not in use, delete directly
+                    if(confirm("Delete this subject?")) {
+                        executeDelete(id);
+                    }
+                }
+            }).catch(error => {
+                console.error('Usage check error:', error);
+                // If usage check fails, ask user and try direct delete
+                if(confirm("Delete this subject? (Usage check failed, proceeding anyway)")) {
+                    executeDelete(id);
+                }
+            });
+        }
+
+        function executeDelete(id) {
             fetch('/school/subjects', {
                 method: 'DELETE',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({type: 'bank', id: id})
-            }).then(res => res.json()).then(response => {
+            }).then(res => {
+                if (!res.ok) {
+                    throw new Error('Server returned ' + res.status);
+                }
+                return res.text().then(text => {
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        console.error('Response not JSON:', text);
+                        throw new Error('Server returned HTML instead of JSON');
+                    }
+                });
+            }).then(response => {
                 if(response.success) {
                     window.location.reload();
+                } else {
+                    alert('Error: ' + (response.error || 'Failed to delete subject'));
                 }
+            }).catch(error => {
+                console.error('Delete error:', error);
+                alert('Error deleting subject: ' + error.message);
+            });
+        }
+
+        // Replace Modal Functions
+        function showReplaceModal(subjectId, errorMessage) {
+            // Fetch current usage data
+            fetch('/school/subjects/usage?id=' + subjectId, {
+                method: 'GET',
+                headers: {'Content-Type': 'application/json'}
+            }).then(res => res.json()).then(usage => {
+                if (usage.success) {
+                    displayReplaceModal(subjectId, usage.data);
+                } else {
+                    alert('Error checking subject usage');
+                }
+            }).catch(error => {
+                    console.error('Usage check error:', error);
+                    // Fallback to simple modal
+                    document.getElementById('replace-subject-details').textContent = errorMessage;
+                    document.getElementById('subject-usage-list').innerHTML = '<p class="text-sm text-gray-600">Unable to check usage details.</p>';
+                    document.getElementById('replace-subject-modal').classList.remove('hidden');
+                });
+        }
+
+        function displayReplaceModal(subjectId, usageData) {
+            document.getElementById('replace-subject-details').textContent = 'Subject ID: ' + subjectId;
+            
+            let usageHTML = '<div class="space-y-2">';
+            
+            if (usageData.classes && usageData.classes.length > 0) {
+                usageHTML += '<div class="bg-blue-50 p-3 rounded"><strong>Classes:</strong><ul class="mt-2 space-y-1">';
+                usageData.classes.forEach(cls => {
+                    usageHTML += '<li class="text-sm">' + cls.class_name + ' - ' + cls.classes_per_week + ' classes/week</li>';
+                });
+                usageHTML += '</ul></div>';
+            }
+            
+            if (usageData.groups && usageData.groups.length > 0) {
+                usageHTML += '<div class="bg-green-50 p-3 rounded"><strong>Groups:</strong><ul class="mt-2 space-y-1">';
+                usageData.groups.forEach(group => {
+                    usageHTML += '<li class="text-sm">' + group.group_name + ' - ' + group.classes_per_week + ' classes/week</li>';
+                });
+                usageHTML += '</ul></div>';
+            }
+            
+            if (usageHTML === '<div class="space-y-2"></div>') {
+                usageHTML = '<p class="text-sm text-gray-600">No current usage found.</p>';
+            }
+            
+            usageHTML += '</div>';
+            document.getElementById('subject-usage-list').innerHTML = usageHTML;
+            
+            // Store subject data for replacement
+            window.replaceSubjectData = {
+                subjectId: subjectId,
+                usageData: usageData
+            };
+            
+            document.getElementById('replace-subject-modal').classList.remove('hidden');
+        }
+
+        function closeReplaceModal() {
+            document.getElementById('replace-subject-modal').classList.add('hidden');
+            window.replaceSubjectData = null;
+        }
+
+        function showDeleteReviewModal(subjectId, usageData) {
+            let usageHTML = '<div class="space-y-3">';
+            
+            if (usageData.classes && usageData.classes.length > 0) {
+                usageHTML += '<div class="bg-blue-50 p-3 rounded border border-blue-200"><strong class="text-blue-800">📚 Used in Classes:</strong><ul class="mt-2 space-y-1">';
+                usageData.classes.forEach(cls => {
+                    usageHTML += '<li class="text-sm ml-4">• ' + cls.class_name + ' - ' + (cls.classes_per_week || cls.min_classes + '-' + cls.max_classes) + ' classes/week</li>';
+                });
+                usageHTML += '</ul></div>';
+            }
+            
+            if (usageData.groups && usageData.groups.length > 0) {
+                usageHTML += '<div class="bg-purple-50 p-3 rounded border border-purple-200"><strong class="text-purple-800">🎯 Used in Groups:</strong><ul class="mt-2 space-y-1">';
+                usageData.groups.forEach(group => {
+                    usageHTML += '<li class="text-sm ml-4">• ' + group.group_name + ' - ' + (group.classes_per_week || group.min_classes + '-' + group.max_classes) + ' classes/week</li>';
+                });
+                usageHTML += '</ul></div>';
+            }
+            
+            if (usageData.teachers && usageData.teachers.length > 0) {
+                usageHTML += '<div class="bg-green-50 p-3 rounded border border-green-200"><strong class="text-green-800">👨‍🏫 Assigned to Teachers:</strong><ul class="mt-2 space-y-1">';
+                usageData.teachers.forEach(teacher => {
+                    usageHTML += '<li class="text-sm ml-4">• ' + teacher.teacher_name + (teacher.subjects ? ' - ' + teacher.subjects : '') + '</li>';
+                });
+                usageHTML += '</ul></div>';
+            }
+            
+            if (usageHTML === '<div class="space-y-3"></div>') {
+                usageHTML = '<p class="text-sm text-gray-600">No current usage found.</p>';
+            }
+            
+            usageHTML += '</div>';
+            document.getElementById('delete-review-usage-list').innerHTML = usageHTML;
+            
+            // Store subject data for deletion
+            window.deleteSubjectData = {
+                subjectId: subjectId,
+                usageData: usageData
+            };
+            
+            document.getElementById('delete-review-modal').classList.remove('hidden');
+        }
+
+        function closeDeleteReviewModal() {
+            document.getElementById('delete-review-modal').classList.add('hidden');
+            window.deleteSubjectData = null;
+        }
+
+        function forceDeleteSubject() {
+            const subjectId = window.deleteSubjectData.subjectId;
+            
+            if (!confirm('⚠️ This will permanently remove the subject from ALL classes, groups, and teacher assignments. This action cannot be undone. Continue?')) {
+                return;
+            }
+            
+            // First remove from all assignments, then delete
+            fetch('/school/subjects/remove-assignments', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    subjectId: subjectId,
+                    action: 'remove_assignments_and_delete'
+                })
+            }).then(res => res.json()).then(response => {
+                if (response.success) {
+                    closeDeleteReviewModal();
+                    window.location.reload();
+                } else {
+                    alert('Error removing assignments: ' + (response.error || 'Unknown error'));
+                }
+            }).catch(error => {
+                console.error('Force delete error:', error);
+                alert('Error deleting subject: ' + error.message);
+            });
+        }
+
+        function replaceSubject() {
+            const subjectId = window.replaceSubjectData.subjectId;
+            
+            // Show subject selection modal
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+            modal.innerHTML = 
+                '<div class="bg-white rounded-lg max-w-md w-full">' +
+                    '<div class="p-4 border-b">' +
+                        '<h3 class="font-semibold">Select Replacement Subject</h3>' +
+                        '<p class="text-sm text-gray-600">Choose a subject to replace the current one:</p>' +
+                    '</div>' +
+                    '<div class="p-4">' +
+                        '<select id="replacement-subject-select" class="w-full border px-3 py-2">' +
+                            '<option value="">Select replacement subject...</option>' +
+                        '</select>' +
+                    '</div>' +
+                    '<div class="p-4 flex gap-2">' +
+                        '<button type="button" onclick="executeReplace()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Replace</button>' +
+                        '<button type="button" onclick="closeReplaceModal()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">Cancel</button>' +
+                    '</div>' +
+                '</div>';
+            
+            document.body.appendChild(modal);
+            
+            // Populate subject options (excluding current subject)
+            fetch('/school/subjects/list', {
+                method: 'GET',
+                headers: {'Content-Type': 'application/json'}
+            }).then(res => res.json()).then(subjects => {
+                const select = document.getElementById('replacement-subject-select');
+                subjects.filter(s => s.id !== parseInt(subjectId)).forEach(subject => {
+                    const option = document.createElement('option');
+                    option.value = subject.id;
+                    option.textContent = subject.subject_name;
+                    select.appendChild(option);
+                });
+            }).catch(error => {
+                    console.error('Error fetching subjects:', error);
+                    alert('Error loading subjects');
+                    document.body.removeChild(modal);
+                });
+        }
+
+        function executeReplace() {
+            const subjectId = window.replaceSubjectData.subjectId;
+            const replacementId = document.getElementById('replacement-subject-select').value;
+            
+            if (!replacementId) {
+                alert('Please select a replacement subject');
+                return;
+            }
+            
+            fetch('/school/subjects/replace', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    oldSubjectId: subjectId,
+                    newSubjectId: parseInt(replacementId),
+                    action: 'replace_subject'
+                })
+            }).then(res => res.json()).then(response => {
+                if (response.success) {
+                    document.body.removeChild(document.querySelector('.fixed.inset-0'));
+                    window.location.reload();
+                } else {
+                    alert('Error replacing subject: ' + (response.error || 'Unknown error'));
+                }
+            }).catch(error => {
+                    console.error('Replace error:', error);
+                    alert('Error replacing subject: ' + error.message);
+                    document.body.removeChild(document.querySelector('.fixed.inset-0'));
+                });
+        }
+
+        function removeSubjectAndAssignments() {
+            const subjectId = window.replaceSubjectData.subjectId;
+            
+            if (!confirm('This will remove the subject from all classes/groups and then delete it permanently. Continue?')) {
+                return; // User cancelled, do nothing
+            }
+            
+            fetch('/school/subjects/remove-assignments', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    subjectId: subjectId,
+                    action: 'remove_assignments_and_delete'
+                })
+            }).then(res => res.json()).then(response => {
+                if (response.success) {
+                    document.body.removeChild(document.querySelector('.fixed.inset-0'));
+                    window.location.reload();
+                } else {
+                    alert('Error removing assignments: ' + (response.error || 'Unknown error'));
+                }
+            }).catch(error => {
+                console.error('Remove assignments error:', error);
+                alert('Error removing assignments: ' + error.message);
+                document.body.removeChild(document.querySelector('.fixed.inset-0'));
             });
         }
 
@@ -472,6 +874,21 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             const data = Object.fromEntries(formData.entries());
             data.action = 'add_class_subject';
             data.school_id = SCHOOL_ID;
+            
+            // Convert checkbox to boolean
+            data.is_fixed = formData.has('is_fixed');
+            
+            // Validation for flexible mode
+            if(!data.is_fixed) {
+                const min = parseInt(data.min_classes);
+                const max = parseInt(data.max_classes);
+                if(min >= max) {
+                    alert('Minimum classes must be less than maximum classes');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Add Subject';
+                    return;
+                }
+            }
 
             fetch('/school/subjects', {
                 method: 'POST',
@@ -500,6 +917,21 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             const data = Object.fromEntries(formData.entries());
             data.action = 'add_group_subject';
             data.school_id = SCHOOL_ID;
+            
+            // Convert checkbox to boolean
+            data.is_fixed = formData.has('is_fixed');
+            
+            // Validation for flexible mode
+            if(!data.is_fixed) {
+                const min = parseInt(data.min_classes);
+                const max = parseInt(data.max_classes);
+                if(min >= max) {
+                    alert('Minimum classes must be less than maximum classes');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Add Subject';
+                    return;
+                }
+            }
 
             fetch('/school/subjects', {
                 method: 'POST',
@@ -551,15 +983,63 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
         }
 
         function closeModal(modalId) {
-            document.getElementById(modalId).classList.add('hidden');
-            document.body.style.overflow = '';
             const modal = document.getElementById(modalId);
+            if (!modal) return;
+            
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+            
             const submitBtn = modal.querySelector('button[type="submit"]');
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Add Subject';
             }
-            modal.querySelector('form').reset();
+            
+            const form = modal.querySelector('form');
+            if (form) {
+                form.reset();
+            }
+            
+            // Reset toggle states
+            if(modalId === 'addClassSubjectModal') {
+                const classToggle = document.getElementById('class_is_fixed');
+                if (classToggle) {
+                    classToggle.checked = true;
+                    toggleFixedFlexible('class', true);
+                }
+            } else if(modalId === 'addGroupSubjectModal') {
+                const groupToggle = document.getElementById('group_is_fixed');
+                if (groupToggle) {
+                    groupToggle.checked = true;
+                    toggleFixedFlexible('group', true);
+                }
+            }
+        }
+
+        // Fixed/Flexible Toggle Function
+        function toggleFixedFlexible(type, isFixed) {
+            const fixedInput = document.getElementById(type + '-fixed-classes-input');
+            const flexibleInput = document.getElementById(type + '-flexible-classes-input');
+            
+            if (!fixedInput || !flexibleInput) return;
+            
+            const classesPerWeekInput = fixedInput.querySelector('input[name="classes_per_week"]');
+            const minClassesInput = flexibleInput.querySelector('input[name="min_classes"]');
+            const maxClassesInput = flexibleInput.querySelector('input[name="max_classes"]');
+            
+            if(isFixed) {
+                fixedInput.classList.remove('hidden');
+                flexibleInput.classList.add('hidden');
+                if (classesPerWeekInput) classesPerWeekInput.required = true;
+                if (minClassesInput) minClassesInput.required = false;
+                if (maxClassesInput) maxClassesInput.required = false;
+            } else {
+                fixedInput.classList.add('hidden');
+                flexibleInput.classList.remove('hidden');
+                if (classesPerWeekInput) classesPerWeekInput.required = false;
+                if (minClassesInput) minClassesInput.required = true;
+                if (maxClassesInput) maxClassesInput.required = true;
+            }
         }
 
         // Close modal on Escape key
@@ -578,6 +1058,25 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
         document.addEventListener('click', function(e) {
             if (e.target.classList.contains('fixed') && e.target.classList.contains('inset-0')) {
                 closeModal(e.target.id);
+            }
+        });
+
+        // Setup toggle event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Class modal toggle
+            const classToggle = document.getElementById('class_is_fixed');
+            if(classToggle) {
+                classToggle.addEventListener('change', function() {
+                    toggleFixedFlexible('class', this.checked);
+                });
+            }
+            
+            // Group modal toggle
+            const groupToggle = document.getElementById('group_is_fixed');
+            if(groupToggle) {
+                groupToggle.addEventListener('change', function() {
+                    toggleFixedFlexible('group', this.checked);
+                });
             }
         });
       </script>

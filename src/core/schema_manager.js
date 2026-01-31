@@ -95,9 +95,10 @@ const DEFINED_SCHEMA = {
     school_id: "INTEGER",
     class_id: "INTEGER",
     subject_id: "INTEGER",
-    classes_per_week: "INTEGER", // Actual number of classes assigned
-    min_classes: "INTEGER", // Minimum required classes per week
-    max_classes: "INTEGER", // Maximum allowed classes per week
+    classes_per_week: "INTEGER", // Total classes per week (when fixed is true)
+    min_classes: "INTEGER", // Minimum classes per week (when fixed is false)
+    max_classes: "INTEGER", // Maximum classes per week (when fixed is false)
+    is_fixed: "BOOLEAN DEFAULT 1", // Whether classes_per_week is fixed or flexible
     "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)",
     "FOREIGN KEY(class_id)": "REFERENCES academic_classes(id)",
     "FOREIGN KEY(subject_id)": "REFERENCES academic_subjects(id)"
@@ -108,9 +109,10 @@ const DEFINED_SCHEMA = {
     school_id: "INTEGER",
     group_id: "INTEGER",
     subject_id: "INTEGER",
-    classes_per_week: "INTEGER", // Actual number of classes assigned
-    min_classes: "INTEGER", // Minimum required classes per week
-    max_classes: "INTEGER", // Maximum allowed classes per week
+    classes_per_week: "INTEGER", // Total classes per week (when fixed is true)
+    min_classes: "INTEGER", // Minimum classes per week (when fixed is false)
+    max_classes: "INTEGER", // Maximum classes per week (when fixed is false)
+    is_fixed: "BOOLEAN DEFAULT 1", // Whether classes_per_week is fixed or flexible
     "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)",
     "FOREIGN KEY(group_id)": "REFERENCES class_groups(id)",
     "FOREIGN KEY(subject_id)": "REFERENCES academic_subjects(id)"
@@ -146,6 +148,24 @@ const DEFINED_SCHEMA = {
   system_settings: {
     key: "TEXT PRIMARY KEY",
     value: "TEXT"
+  },
+
+  teacher_assignments: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    school_id: "INTEGER",
+    class_id: "INTEGER",
+    group_id: "INTEGER",
+    section_id: "INTEGER",
+    subject_id: "INTEGER",
+    teacher_id: "INTEGER",
+    is_auto: "BOOLEAN DEFAULT 0", // 0 = manual assignment, 1 = auto-assign by system
+    created_at: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+    "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)",
+    "FOREIGN KEY(class_id)": "REFERENCES academic_classes(id)",
+    "FOREIGN KEY(group_id)": "REFERENCES class_groups(id)",
+    "FOREIGN KEY(section_id)": "REFERENCES class_sections(id)",
+    "FOREIGN KEY(subject_id)": "REFERENCES academic_subjects(id)",
+    "FOREIGN KEY(teacher_id)": "REFERENCES profiles_teacher(id)"
   }
 };
 
