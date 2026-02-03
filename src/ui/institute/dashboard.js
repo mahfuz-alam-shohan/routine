@@ -18,7 +18,7 @@ export function InstituteDashboardHTML(stats) {
               </div>
               <div>
                   <div class="text-xs md:text-sm uppercase tracking-widest text-gray-400 mb-1 md:mb-2">Routines</div>
-                  <div class="text-3xl md:text-4xl font-light text-gray-900">0</div>
+                  <div class="text-3xl md:text-4xl font-light text-gray-900">${stats.routines || 0}</div>
               </div>
               <div>
                   <div class="text-xs md:text-sm uppercase tracking-widest text-gray-400 mb-1 md:mb-2">System Status</div>

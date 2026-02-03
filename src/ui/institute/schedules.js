@@ -4,109 +4,94 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
     const initialSchoolStart = existingSlots.length > 0 ? existingSlots[0].start_time : (config?.start_time || "08:00");
 
     return `
-      <div class="max-w-7xl xl:max-w-8xl mx-auto pb-24 md:pb-10 select-none" id="schedule-app">
-          
-          <div class="bg-white sticky top-0 z-30 border-b border-gray-200 shadow-sm">
-              <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 px-4 py-3 md:px-6 md:py-4">
+      <div class="max-w-5xl mx-auto pb-16 md:pb-10 select-none" id="schedule-app">
+          <div class="bg-white sticky top-0 z-30 border-b border-gray-200">
+              <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 px-4 py-2 md:px-5 md:py-2">
                   <div>
-                    <h2 class="text-lg md:text-2xl font-bold text-gray-900">Master Schedule</h2>
-                    <p class="text-sm md:text-base text-gray-500 mt-1">Configure your school's daily routine</p>
+                    <h2 class="text-sm md:text-lg font-semibold text-gray-900">Master Schedule</h2>
+                    <p class="text-[11px] md:text-xs text-gray-500 mt-0.5">Configure your school's daily routine</p>
                   </div>
-                  <div class="flex flex-col sm:flex-row gap-2 md:gap-4">
-                       <button onclick="app.save()" class="w-full sm:w-auto bg-black text-white px-4 py-2.5 md:px-6 md:py-3 rounded-lg text-sm md:text-base font-bold active:scale-95 transition-transform">Save</button>
-                       <button onclick="app.reset()" class="w-full sm:w-auto text-red-600 bg-red-50 px-4 py-2.5 md:px-5 md:py-3 rounded-lg text-sm md:text-base font-bold">Reset</button>
+                  <div class="flex flex-col sm:flex-row gap-2 md:gap-3">
+                       <button onclick="app.save()" class="w-full sm:w-auto bg-gray-900 text-white px-3 py-1.5 text-xs font-semibold border border-gray-900 rounded-none">Save</button>
+                       <button onclick="app.reset()" class="w-full sm:w-auto text-gray-600 bg-white px-3 py-1.5 text-xs font-semibold border border-gray-300 rounded-none">Reset</button>
                   </div>
               </div>
           </div>
 
-          <div class="mx-4 md:mx-6 mt-4 md:mt-4 p-4 md:p-4 bg-blue-50 border border-blue-100 rounded-lg">
-              <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div class="mx-4 md:mx-6 mt-3 md:mt-3 p-3 md:p-3 bg-white border border-gray-200">
+              <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   <div class="flex items-center gap-4">
-                      <span class="text-sm md:text-base font-bold text-blue-800 uppercase tracking-wide">Day Starts At:</span>
+                      <span class="text-[11px] md:text-xs font-semibold text-gray-700 uppercase tracking-wide">Day Starts At</span>
                       <input type="time" id="school_start_time" value="${initialSchoolStart}" onchange="app.updateStartTime(this.value)" 
-                             class="bg-white border border-blue-200 text-blue-900 text-sm md:text-base font-bold rounded-lg px-4 py-2.5 md:px-4 md:py-2.5 outline-none w-24 md:w-28 text-center focus:ring-2 focus:ring-blue-500">
+                             class="bg-white border border-gray-300 text-gray-900 text-xs font-semibold rounded-none px-2 py-1.5 outline-none w-24 md:w-24 text-center focus:ring-2 focus:ring-gray-300">
                   </div>
                   <div class="flex-1">
-                      <div class="text-sm md:text-base font-bold text-blue-800 uppercase tracking-wide mb-3">Working Days:</div>
-                      <div class="grid grid-cols-4 sm:grid-cols-7 gap-2 sm:gap-3" id="weekday-selector">
-                          <div class="text-center">
-                              <label class="flex flex-col items-center gap-1 cursor-pointer">
-                                  <input type="checkbox" name="weekday" value="monday" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
-                                  <span class="text-xs font-medium text-gray-700">Mon</span>
-                              </label>
-                          </div>
-                          <div class="text-center">
-                              <label class="flex flex-col items-center gap-1 cursor-pointer">
-                                  <input type="checkbox" name="weekday" value="tuesday" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
-                                  <span class="text-xs font-medium text-gray-700">Tue</span>
-                              </label>
-                          </div>
-                          <div class="text-center">
-                              <label class="flex flex-col items-center gap-1 cursor-pointer">
-                                  <input type="checkbox" name="weekday" value="wednesday" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
-                                  <span class="text-xs font-medium text-gray-700">Wed</span>
-                              </label>
-                          </div>
-                          <div class="text-center">
-                              <label class="flex flex-col items-center gap-1 cursor-pointer">
-                                  <input type="checkbox" name="weekday" value="thursday" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
-                                  <span class="text-xs font-medium text-gray-700">Thu</span>
-                              </label>
-                          </div>
-                          <div class="text-center">
-                              <label class="flex flex-col items-center gap-1 cursor-pointer">
-                                  <input type="checkbox" name="weekday" value="friday" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
-                                  <span class="text-xs font-medium text-gray-700">Fri</span>
-                              </label>
-                          </div>
-                          <div class="text-center">
-                              <label class="flex flex-col items-center gap-1 cursor-pointer">
-                                  <input type="checkbox" name="weekday" value="saturday" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
-                                  <span class="text-xs font-medium text-gray-700">Sat</span>
-                              </label>
-                          </div>
-                          <div class="text-center">
-                              <label class="flex flex-col items-center gap-1 cursor-pointer">
-                                  <input type="checkbox" name="weekday" value="sunday" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
-                                  <span class="text-xs font-medium text-gray-700">Sun</span>
-                              </label>
-                          </div>
+                      <div class="text-[11px] md:text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Working Days</div>
+                      <div class="grid grid-cols-4 sm:grid-cols-7 border border-gray-200 divide-x divide-gray-200" id="weekday-selector">
+                          <label class="flex flex-col items-center justify-center gap-1 cursor-pointer py-1.5">
+                              <input type="checkbox" name="weekday" value="monday" class="w-4 h-4 text-gray-900">
+                              <span class="text-[10px] font-medium text-gray-700">Mon</span>
+                          </label>
+                          <label class="flex flex-col items-center justify-center gap-1 cursor-pointer py-1.5">
+                              <input type="checkbox" name="weekday" value="tuesday" class="w-4 h-4 text-gray-900">
+                              <span class="text-[10px] font-medium text-gray-700">Tue</span>
+                          </label>
+                          <label class="flex flex-col items-center justify-center gap-1 cursor-pointer py-1.5">
+                              <input type="checkbox" name="weekday" value="wednesday" class="w-4 h-4 text-gray-900">
+                              <span class="text-[10px] font-medium text-gray-700">Wed</span>
+                          </label>
+                          <label class="flex flex-col items-center justify-center gap-1 cursor-pointer py-1.5">
+                              <input type="checkbox" name="weekday" value="thursday" class="w-4 h-4 text-gray-900">
+                              <span class="text-[10px] font-medium text-gray-700">Thu</span>
+                          </label>
+                          <label class="flex flex-col items-center justify-center gap-1 cursor-pointer py-1.5">
+                              <input type="checkbox" name="weekday" value="friday" class="w-4 h-4 text-gray-900">
+                              <span class="text-[10px] font-medium text-gray-700">Fri</span>
+                          </label>
+                          <label class="flex flex-col items-center justify-center gap-1 cursor-pointer py-1.5">
+                              <input type="checkbox" name="weekday" value="saturday" class="w-4 h-4 text-gray-900">
+                              <span class="text-[10px] font-medium text-gray-700">Sat</span>
+                          </label>
+                          <label class="flex flex-col items-center justify-center gap-1 cursor-pointer py-1.5">
+                              <input type="checkbox" name="weekday" value="sunday" class="w-4 h-4 text-gray-900">
+                              <span class="text-[10px] font-medium text-gray-700">Sun</span>
+                          </label>
                       </div>
-                      <div class="mt-2 text-xs text-gray-600">
+                      <div class="mt-1.5 text-[10px] text-gray-500">
                         <span id="working-days-count">5</span> working days selected
                       </div>
                   </div>
               </div>
           </div>
 
-          <div class="mt-4 md:mt-4 bg-white border-t border-b border-gray-200 md:border md:rounded-lg md:mx-6 md:shadow-md overflow-hidden">
+          <div class="mt-3 md:mt-3 bg-white border border-gray-200 md:mx-6 overflow-hidden">
               
-              <div class="hidden lg:grid grid-cols-12 gap-3 md:gap-4 p-4 md:p-5 bg-gray-100 text-sm md:text-base uppercase font-bold text-gray-500 border-b border-gray-200">
-                  <div class="col-span-1 text-center">#</div>
-                  <div class="col-span-2">Start</div>
-                  <div class="col-span-2">End</div>
-                  <div class="col-span-1">Mins</div>
-                  <div class="col-span-4">Label</div>
-                  <div class="col-span-1">Type</div>
-                  <div class="col-span-1"></div>
+              <div class="hidden lg:grid grid-cols-12 gap-0 bg-gray-50 text-[10px] uppercase font-semibold text-gray-500 border-b border-gray-200 divide-x divide-gray-200">
+                  <div class="col-span-1 text-center py-2">#</div>
+                  <div class="col-span-2 py-2 pl-2">Start</div>
+                  <div class="col-span-2 py-2 pl-2">End</div>
+                  <div class="col-span-1 py-2 text-center">Mins</div>
+                  <div class="col-span-4 py-2 pl-2">Label</div>
+                  <div class="col-span-1 py-2 pl-2">Type</div>
+                  <div class="col-span-1 py-2"></div>
               </div>
 
-              <div id="slot-container" class="divide-y divide-gray-100"></div>
+              <div id="slot-container" class="divide-y divide-gray-200"></div>
 
-              <button id="add-btn" onclick="app.addPeriod()" class="w-full py-4 md:py-4 text-center text-blue-600 font-bold text-base md:text-lg hover:bg-gray-50 active:bg-blue-50 transition-colors">
+              <button id="add-btn" onclick="app.addPeriod()" class="w-full py-2 text-center text-gray-700 font-semibold text-xs border-t border-gray-200">
                   + Add Next Period
               </button>
           </div>
       </div>
 
-      <div id="tutorial-popup" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center px-4 backdrop-blur-sm">
-          <div class="bg-white rounded-lg shadow-xl w-full max-w-xs p-5 transform transition-all scale-100">
-              <h3 class="text-sm font-bold text-gray-900 mb-2">⚠️ Cannot Change Start Time</h3>
-              <p class="text-xs text-gray-600 mb-4 leading-relaxed">
+      <div id="tutorial-popup" class="fixed inset-0 bg-black/50 z-[9999] hidden flex items-center justify-center px-4 backdrop-blur-sm">
+          <div class="bg-white rounded-none border border-gray-300 w-full max-w-xs p-4 transform transition-all scale-100">
+              <h3 class="text-xs font-bold text-gray-900 mb-2">Warning: Cannot Change Start Time</h3>
+              <p class="text-[11px] text-gray-600 mb-3 leading-relaxed">
                   This period starts automatically when the previous one ends.<br>
                   To change this time, adjust the <b>Duration</b> or <b>End Time</b> of the <u>previous period</u>.
               </p>
-              <button onclick="document.getElementById('tutorial-popup').classList.add('hidden')" class="w-full bg-gray-900 text-white py-2 rounded text-xs font-bold">Okay, Got it</button>
+              <button onclick="document.getElementById('tutorial-popup').classList.add('hidden')" class="w-full bg-gray-900 text-white py-1.5 rounded-none text-xs font-bold">Okay, Got it</button>
           </div>
       </div>
 
@@ -267,65 +252,65 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
                 
                 return \`
                 <div class="group bg-white relative">
-                    <div class="hidden lg:grid grid-cols-12 gap-3 md:gap-4 p-4 md:p-5 items-center hover:bg-gray-50">
-                        <div class="col-span-1 text-center text-base md:text-lg text-gray-400 font-bold">\${i+1}</div>
-                        <div class="col-span-2">
+                    <div class="hidden lg:grid grid-cols-12 gap-0 items-center divide-x divide-gray-200">
+                        <div class="col-span-1 text-center text-[11px] text-gray-500 font-semibold py-2">\${i+1}</div>
+                        <div class="col-span-2 px-2 py-1.5">
                              <input type="time" value="\${slot.start_time}" onchange="app.handleInput(\${i}, 'start_time', this.value)" 
-                             class="w-full text-base md:text-lg font-mono font-bold border border-gray-300 rounded-lg px-3 py-2.5 md:px-4 md:py-3 \${!isFirst ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-900'} focus:border-blue-500 focus:ring-2">
+                             class="w-full text-[11px] font-mono font-semibold border border-gray-300 rounded-none px-2 py-1 \${!isFirst ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-900'} focus:border-gray-500">
                         </div>
-                        <div class="col-span-2">
-                             <input type="time" value="\${slot.end_time}" onchange="app.handleInput(\${i}, 'end_time', this.value)" class="w-full text-base md:text-lg font-mono font-bold border border-gray-300 rounded-lg px-3 py-2.5 md:px-4 md:py-3 bg-white text-gray-900 focus:border-blue-500 focus:ring-2">
+                        <div class="col-span-2 px-2 py-1.5">
+                             <input type="time" value="\${slot.end_time}" onchange="app.handleInput(\${i}, 'end_time', this.value)" class="w-full text-[11px] font-mono font-semibold border border-gray-300 rounded-none px-2 py-1 bg-white text-gray-900 focus:border-gray-500">
                         </div>
-                        <div class="col-span-1">
-                             <input type="number" value="\${slot.duration}" onchange="app.handleInput(\${i}, 'duration', this.value)" class="w-full text-base md:text-lg text-center font-bold bg-blue-50 text-blue-700 rounded-lg px-3 py-2.5 md:px-3 md:py-3 border-none focus:ring-2 focus:ring-blue-500">
+                        <div class="col-span-1 px-2 py-1.5">
+                             <input type="number" value="\${slot.duration}" onchange="app.handleInput(\${i}, 'duration', this.value)" class="w-full text-[11px] text-center font-semibold bg-white text-gray-700 rounded-none px-2 py-1 border border-gray-300">
                         </div>
-                        <div class="col-span-4">
-                             <input type="text" value="\${slot.label}" onchange="app.handleInput(\${i}, 'label', this.value)" class="w-full text-base md:text-lg border-b-2 border-transparent hover:border-gray-300 focus:border-blue-500 bg-transparent py-2.5 md:py-3 outline-none font-medium placeholder-gray-400" placeholder="Period Name...">
+                        <div class="col-span-4 px-2 py-1.5">
+                             <input type="text" value="\${slot.label}" onchange="app.handleInput(\${i}, 'label', this.value)" class="w-full text-[11px] border border-gray-300 rounded-none px-2 py-1 bg-white outline-none font-medium placeholder-gray-400" placeholder="Period Name...">
                         </div>
-                        <div class="col-span-1">
-                             <select onchange="app.handleInput(\${i}, 'type', this.value)" class="text-sm md:text-base font-bold uppercase bg-transparent outline-none \${slot.type==='break'?'text-orange-500':'text-blue-600'}">
+                        <div class="col-span-1 px-2 py-1.5">
+                             <select onchange="app.handleInput(\${i}, 'type', this.value)" class="text-[11px] font-semibold uppercase bg-white border border-gray-300 rounded-none px-2 py-1 outline-none text-gray-700">
                                 <option value="class" \${slot.type==='class'?'selected':''}>Class</option>
                                 <option value="break" \${slot.type==='break'?'selected':''}>Break</option>
                              </select>
                         </div>
-                        <div class="col-span-1 text-right">
-                             <button onclick="app.removePeriod(\${i})" class="text-gray-300 hover:text-red-500 font-bold text-lg md:text-xl transition-colors p-3 rounded-lg hover:bg-red-50">&times;</button>
+                        <div class="col-span-1 text-right px-2 py-1.5">
+                             <button onclick="app.removePeriod(\${i})" class="text-gray-500 hover:text-red-600 font-bold text-base transition-colors px-1 py-0.5">&times;</button>
                         </div>
                     </div>
 
-                    <div class="lg:hidden p-3 border-l-2 \${slot.type==='break'?'border-orange-300':'border-blue-300'} bg-gray-50">
+                    <div class="lg:hidden p-3 border-l border-gray-300 bg-white">
                         <div class="flex items-center gap-2 mb-2">
-                            <span class="text-sm font-bold text-gray-500 w-3">\${i+1}</span>
+                            <span class="text-xs font-semibold text-gray-500 w-3">\${i+1}</span>
                             
                             <div class="flex-1">
                                 <input type="time" value="\${slot.start_time}" onchange="app.handleInput(\${i}, 'start_time', this.value)"
-                                class="w-full text-sm font-mono text-center bg-white border border-gray-200 rounded py-1.5 text-gray-600">
+                                class="w-full text-xs font-mono text-center bg-white border border-gray-300 rounded-none py-1 text-gray-600">
                             </div>
-                            <span class="text-gray-400 text-sm mx-1">→</span>
+                            <span class="text-gray-400 text-xs mx-1">-&gt;</span>
                             
                             <div class="flex-1">
                                 <input type="time" value="\${slot.end_time}" onchange="app.handleInput(\${i}, 'end_time', this.value)"
-                                class="w-full text-sm font-mono font-bold text-center bg-white border border-gray-200 rounded py-1.5 text-gray-900">
+                                class="w-full text-xs font-mono font-semibold text-center bg-white border border-gray-300 rounded-none py-1 text-gray-900">
                             </div>
 
                             <div class="w-12">
                                 <input type="number" value="\${slot.duration}" onchange="app.handleInput(\${i}, 'duration', this.value)"
-                                class="w-full text-sm font-bold text-center bg-blue-50 text-blue-700 rounded py-1.5 border-none">
+                                class="w-full text-xs font-semibold text-center bg-white text-gray-700 rounded-none py-1 border border-gray-300">
                             </div>
                         </div>
 
                         <div class="flex items-center gap-2">
                             <input type="text" value="\${slot.label}" onchange="app.handleInput(\${i}, 'label', this.value)" 
-                            class="flex-1 text-sm font-medium border-b border-gray-200 focus:border-blue-500 py-1 outline-none bg-white placeholder-gray-400" placeholder="Label...">
+                            class="flex-1 text-xs font-medium border border-gray-300 rounded-none px-2 py-1 outline-none bg-white placeholder-gray-400" placeholder="Label...">
                             
                             <select onchange="app.handleInput(\${i}, 'type', this.value)" 
-                            class="text-sm font-bold uppercase bg-white border border-gray-200 rounded px-2 py-1 outline-none \${slot.type==='break'?'text-orange-500':'text-blue-500'}">
+                            class="text-xs font-semibold uppercase bg-white border border-gray-300 rounded-none px-2 py-1 outline-none text-gray-700">
                                 <option value="class" \${slot.type==='class'?'selected':''}>CL</option>
                                 <option value="break" \${slot.type==='break'?'selected':''}>BR</option>
                             </select>
 
-                            <button onclick="app.removePeriod(\${i})" class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-500 bg-white rounded border border-gray-200">
-                                <span class="text-sm leading-none">&times;</span>
+                            <button onclick="app.removePeriod(\${i})" class="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-red-600 bg-white border border-gray-300">
+                                <span class="text-xs leading-none">&times;</span>
                             </button>
                         </div>
                     </div>
@@ -338,3 +323,6 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
       </script>
     `;
 }
+
+
+

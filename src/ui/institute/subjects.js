@@ -68,130 +68,189 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
 
     // Build Subject Bank Tab Content
     const subjectBankContent = `
-        <div class="bg-white rounded-lg border border-gray-200">
-            <div class="p-4 border-b border-gray-100">
-                <h3 class="text-lg font-bold text-gray-800 mb-4">Subject Bank</h3>
-                <div class="flex gap-2">
-                    <input type="text" id="new-subject" placeholder="New Subject Name..." 
-                           class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                    <button onclick="createSubject()" class="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-black">
-                        + Add Subject
-                    </button>
-                </div>
+        <div>
+            <h3 class="text-lg font-bold mb-4">Subject Bank</h3>
+            <div class="mb-4">
+                <input type="text" id="new-subject" placeholder="New Subject Name..." 
+                       class="border px-2 py-1">
+                <button onclick="createSubject()" class="border px-2 py-1 ml-2">
+                    + Add Subject
+                </button>
             </div>
-            <div class="p-4">
-                <div class="space-y-2">
+            <table border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+                <thead>
+                    <tr style="background-color: #f0f0f0;">
+                        <th style="border: 1px solid #ccc; padding: 4px;">#</th>
+                        <th style="border: 1px solid #ccc; padding: 4px;">Subject Name</th>
+                        <th style="border: 1px solid #ccc; padding: 4px;">Edit</th>
+                        <th style="border: 1px solid #ccc; padding: 4px;">Delete</th>
+                    </tr>
+                </thead>
+                <tbody>
                     ${subjects.map((sub, index) => `
-                        <div class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg border border-transparent hover:border-gray-100 transition-all">
-                            <div class="flex items-center gap-3 flex-1">
-                                <span class="text-sm font-mono text-gray-400 w-6">${index + 1}.</span>
-                                <span id="name-${sub.id}" class="text-sm font-medium text-gray-700">${sub.subject_name}</span>
-                                <form id="form-${sub.id}" onsubmit="updateSubject(event, ${sub.id})" class="hidden flex-1 flex gap-2">
-                                    <input type="text" name="name" value="${sub.subject_name}" class="w-full text-sm border rounded px-2 py-1">
-                                    <button type="submit" class="text-green-600 text-xs font-bold">Save</button>
-                                    <button type="button" onclick="toggleEdit(${sub.id})" class="text-gray-400 text-xs">Cancel</button>
+                        <tr>
+                            <td style="border: 1px solid #ccc; padding: 4px; text-align: center;">${index + 1}</td>
+                            <td style="border: 1px solid #ccc; padding: 4px;">
+                                <span id="name-${sub.id}">${sub.subject_name}</span>
+                                <form id="form-${sub.id}" onsubmit="updateSubject(event, ${sub.id})" style="display: none;">
+                                    <input type="text" name="name" value="${sub.subject_name}" style="width: 100%;">
+                                    <button type="submit">Save</button>
+                                    <button type="button" onclick="toggleEdit(${sub.id})">Cancel</button>
                                 </form>
-                            </div>
-                            <div class="flex items-center gap-1">
-                                <button onclick="toggleEdit(${sub.id})" class="p-2 text-gray-400 hover:text-blue-600">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                </button>
-                                <button onclick="deleteSubject(${sub.id})" class="p-2 text-gray-400 hover:text-red-600">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                </button>
-                            </div>
-                        </div>
+                            </td>
+                            <td style="border: 1px solid #ccc; padding: 4px; text-align: center;">
+                                <button onclick="toggleEdit(${sub.id})">Edit</button>
+                            </td>
+                            <td style="border: 1px solid #ccc; padding: 4px; text-align: center;">
+                                <button onclick="deleteSubject(${sub.id})">Delete</button>
+                            </td>
+                        </tr>
                     `).join('')}
-                    ${subjects.length === 0 ? '<div class="p-8 text-center text-gray-400 text-sm italic">No subjects added yet.</div>' : ''}
-                </div>
-            </div>
+                    ${subjects.length === 0 ? '<tr><td colspan="4" style="border: 1px solid #ccc; padding: 4px; text-align: center;">No subjects added yet.</td></tr>' : ''}
+                </tbody>
+            </table>
         </div>
     `;
 
     // Build Class Curriculum Tab Content
-    const classCurriculumContent = classes.map(cls => {
+    const curriculumRows = [];
+    
+    classes.forEach(cls => {
         const groups = classGroups[cls.id] || [];
         const classSubjects = subjectsByClass[cls.id] || [];
         
-        return `
-            <div class="mb-6 border border-gray-300">
-                <div class="bg-gray-100 px-3 py-2 border-b">
-                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                        <span class="font-bold text-sm md:text-base">${cls.class_name}</span>
-                        <button onclick="openAddClassSubjectModal(${cls.id}, '${cls.class_name}')" class="text-xs bg-blue-600 text-white px-2 py-1 hover-lift">
-                            + Add Class Subject
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Class-Level Subjects -->
-                <div class="p-3">
-                    <div class="mb-3">
-                        <h4 class="text-sm font-semibold text-gray-700 mb-2">📚 Common Subjects (All Groups)</h4>
-                        ${classSubjects.length > 0 ? `
-                            <div class="space-y-2">
-                                ${classSubjects.map(cs => `
-                                    <div class="flex flex-col md:flex-row md:items-center md:justify-between bg-blue-50 p-2 rounded subject-item">
-                                        <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                                            <span class="font-medium text-sm">${cs.subject_name}</span>
-                                            <div class="flex flex-wrap gap-2 text-xs">
-                                                ${cs.is_fixed ? 
-                                                    `<span class="text-gray-600">${cs.classes_per_week} classes/week (fixed)</span>` :
-                                                    `<span class="text-gray-600">${cs.min_classes}-${cs.max_classes} classes/week (flexible)</span>`
-                                                }
-                                            </div>
-                                        </div>
-                                        <button onclick="deleteClassSubject(${cs.id})" class="text-xs text-red-600 self-end sm:self-auto">Remove</button>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        ` : '<p class="text-sm text-gray-400">No common subjects added</p>'}
-                    </div>
-                    
-                    <!-- Group-Level Subjects -->
-                    ${groups.map(g => {
-                        const groupSubjects = subjectsByGroup[g.id] || [];
-                        const capacity = calculateSectionCapacity(cls.id, g.id);
-                        
-                        return `
-                            <div class="mb-3 border-l-2 border-purple-300 pl-3">
-                                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
-                                    <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                                        <h4 class="text-sm font-semibold text-gray-700">🎯 ${g.group_name} Group</h4>
-                                        <span class="text-xs text-gray-500">(${classSections[g.class_id]?.filter(s => s.group_id === g.id).length || 0} sections)</span>
-                                        <div class="text-xs px-2 py-1 rounded capacity-indicator ${capacity.percentage >= 90 ? 'bg-red-100 text-red-700' : capacity.percentage >= 70 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}">
-                                            ${capacity.current}/${capacity.max} classes
-                                        </div>
-                                    </div>
-                                    <button onclick="openAddGroupSubjectModal(${g.id}, '${g.group_name}', ${cls.id}, '${cls.class_name}')" class="text-xs bg-purple-600 text-white px-2 py-1">
-                                        + Add Subject
-                                    </button>
-                                </div>
-                                ${groupSubjects.length > 0 ? `
-                                    <div class="space-y-2">
-                                        ${groupSubjects.map(gs => `
-                                            <div class="flex flex-col md:flex-row md:items-center md:justify-between bg-purple-50 p-2 rounded subject-item">
-                                                <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                                                    <span class="font-medium text-sm">${gs.subject_name}</span>
-                                                    <div class="flex flex-wrap gap-2 text-xs">
-                                                        ${gs.is_fixed ? 
-                                                            `<span class="text-gray-600">${gs.classes_per_week} classes/week (fixed)</span>` :
-                                                            `<span class="text-gray-600">${gs.min_classes}-${gs.max_classes} classes/week (flexible)</span>`
-                                                        }
-                                                    </div>
-                                                </div>
-                                                <button onclick="deleteGroupSubject(${gs.id})" class="text-xs text-red-600 self-end sm:self-auto">Remove</button>
-                                            </div>
-                                        `).join('')}
-                                    </div>
-                                ` : '<p class="text-sm text-gray-400">No subjects added to this group</p>'}
-                            </div>
-                        `;
+        // Class header row
+        curriculumRows.push({
+            type: 'class',
+            class: cls,
+            groups: groups,
+            subjects: classSubjects,
+            level: 0
+        });
+        
+        // Class-level subjects
+        classSubjects.forEach(cs => {
+            curriculumRows.push({
+                type: 'class-subject',
+                class: cls,
+                subject: cs,
+                level: 1
+            });
+        });
+        
+        // Groups and their subjects
+        groups.forEach(g => {
+            const groupSubjects = subjectsByGroup[g.id] || [];
+            const capacity = calculateSectionCapacity(cls.id, g.id);
+            
+            // Group header row
+            curriculumRows.push({
+                type: 'group',
+                class: cls,
+                group: g,
+                capacity: capacity,
+                subjects: groupSubjects,
+                level: 1
+            });
+            
+            // Group-level subjects
+            groupSubjects.forEach(gs => {
+                curriculumRows.push({
+                    type: 'group-subject',
+                    class: cls,
+                    group: g,
+                    subject: gs,
+                    level: 2
+                });
+            });
+        });
+    });
+    
+    const classCurriculumContent = `
+        <div>
+            <h3 class="text-lg font-bold mb-4">Class Curriculum</h3>
+            <table border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+                <thead>
+                    <tr style="background-color: #f0f0f0;">
+                        <th style="border: 1px solid #ccc; padding: 4px;">Class/Group</th>
+                        <th style="border: 1px solid #ccc; padding: 4px;">Subject</th>
+                        <th style="border: 1px solid #ccc; padding: 4px;">Classes/Week</th>
+                        <th style="border: 1px solid #ccc; padding: 4px;">Type</th>
+                        <th style="border: 1px solid #ccc; padding: 4px;">Capacity</th>
+                        <th style="border: 1px solid #ccc; padding: 4px;">Add Subject</th>
+                        <th style="border: 1px solid #ccc; padding: 4px;">Remove</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${curriculumRows.map(row => {
+                        if (row.type === 'class') {
+                            return `
+                                <tr style="background-color: #f8f8f8; font-weight: bold;">
+                                    <td style="border: 1px solid #ccc; padding: 4px; text-align: left;">${row.class.class_name} (${row.groups.length} groups)</td>
+                                    <td style="border: 1px solid #ccc; padding: 4px;" colspan="4"></td>
+                                    <td style="border: 1px solid #ccc; padding: 4px; text-align: center;">
+                                        <button onclick="openAddClassSubjectModal(${row.class.id}, '${row.class.class_name}')">+ Add</button>
+                                    </td>
+                                    <td style="border: 1px solid #ccc; padding: 4px;"></td>
+                                </tr>
+                            `;
+                        } else if (row.type === 'class-subject') {
+                            return `
+                                <tr>
+                                    <td style="border: 1px solid #ccc; padding: 4px; padding-left: 20px;">&nbsp;</td>
+                                    <td style="border: 1px solid #ccc; padding: 4px;">${row.subject.subject_name}</td>
+                                    <td style="border: 1px solid #ccc; padding: 4px;">
+                                        ${row.subject.is_fixed ? 
+                                            `${row.subject.classes_per_week} (fixed)` :
+                                            `${row.subject.min_classes}-${row.subject.max_classes} (flexible)`
+                                        }
+                                    </td>
+                                    <td style="border: 1px solid #ccc; padding: 4px;">Common</td>
+                                    <td style="border: 1px solid #ccc; padding: 4px;"></td>
+                                    <td style="border: 1px solid #ccc; padding: 4px;"></td>
+                                    <td style="border: 1px solid #ccc; padding: 4px; text-align: center;">
+                                        <button onclick="deleteClassSubject(${row.subject.id})">Remove</button>
+                                    </td>
+                                </tr>
+                            `;
+                        } else if (row.type === 'group') {
+                            return `
+                                <tr style="background-color: #fafafa; font-weight: bold;">
+                                    <td style="border: 1px solid #ccc; padding: 4px; padding-left: 20px; text-align: right;">${row.group.group_name} (${classSections[row.group.class_id]?.filter(s => s.group_id === row.group.id).length || 0} sections)</td>
+                                    <td style="border: 1px solid #ccc; padding: 4px;" colspan="3"></td>
+                                    <td style="border: 1px solid #ccc; padding: 4px;">${row.capacity.current}/${row.capacity.max}</td>
+                                    <td style="border: 1px solid #ccc; padding: 4px; text-align: center;">
+                                        <button onclick="openAddGroupSubjectModal(${row.group.id}, '${row.group.group_name}', ${row.class.id}, '${row.class.class_name}')">+ Add</button>
+                                    </td>
+                                    <td style="border: 1px solid #ccc; padding: 4px;"></td>
+                                </tr>
+                            `;
+                        } else if (row.type === 'group-subject') {
+                            return `
+                                <tr>
+                                    <td style="border: 1px solid #ccc; padding: 4px; padding-left: 40px;">&nbsp;</td>
+                                    <td style="border: 1px solid #ccc; padding: 4px;">${row.subject.subject_name}</td>
+                                    <td style="border: 1px solid #ccc; padding: 4px;">
+                                        ${row.subject.is_fixed ? 
+                                            `${row.subject.classes_per_week} (fixed)` :
+                                            `${row.subject.min_classes}-${row.subject.max_classes} (flexible)`
+                                        }
+                                    </td>
+                                    <td style="border: 1px solid #ccc; padding: 4px;">Group</td>
+                                    <td style="border: 1px solid #ccc; padding: 4px;"></td>
+                                    <td style="border: 1px solid #ccc; padding: 4px;"></td>
+                                    <td style="border: 1px solid #ccc; padding: 4px; text-align: center;">
+                                        <button onclick="deleteGroupSubject(${row.subject.id})">Remove</button>
+                                    </td>
+                                </tr>
+                            `;
+                        }
                     }).join('')}
-                </div>
-            </div>
-        `;
-    }).join('');
+                    ${curriculumRows.length === 0 ? '<tr><td colspan="7" style="border: 1px solid #ccc; padding: 4px; text-align: center;">No classes found</td></tr>' : ''}
+                </tbody>
+            </table>
+        </div>
+    `;
 
     return `
       <style>
@@ -415,7 +474,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
       </div>
 
       <!-- Replace Subject Confirmation Modal -->
-      <div id="replace-subject-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+      <div id="replace-subject-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[9999] hidden flex items-center justify-center p-4">
           <div class="bg-white rounded-lg max-w-md w-full">
               <div class="p-4 border-b">
                   <h3 class="font-semibold">Subject is Currently in Use</h3>
@@ -445,7 +504,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
       </div>
 
       <!-- Delete Review Modal -->
-      <div id="delete-review-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+      <div id="delete-review-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[9999] hidden flex items-center justify-center p-4">
           <div class="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
               <div class="p-4 border-b bg-red-50">
                   <h3 class="font-semibold text-red-800">⚠️ Subject is Currently in Use</h3>
@@ -751,7 +810,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             
             // Show subject selection modal
             const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4';
             modal.innerHTML = 
                 '<div class="bg-white rounded-lg max-w-md w-full">' +
                     '<div class="p-4 border-b">' +

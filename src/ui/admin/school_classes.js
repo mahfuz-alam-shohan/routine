@@ -42,6 +42,12 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                             <span class="text-xs text-gray-500">(${groups.length} groups, ${sections.length} sections)</span>
                         </div>
                         <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <button onclick="openEditClassModal(${cls.id}, '${cls.class_name}', ${cls.has_groups})" class="text-xs bg-yellow-600 text-white px-2 py-1 hover-lift">
+                                Edit
+                            </button>
+                            <button onclick="deleteClass(${cls.id})" class="text-xs bg-red-600 text-white px-2 py-1 hover-lift">
+                                Delete
+                            </button>
                             ${cls.has_groups ? `
                                 <button onclick="openAddGroupModal(${cls.id}, '${cls.class_name}')" class="text-xs bg-green-600 text-white px-2 py-1 hover-lift">
                                     + Add Group
@@ -70,19 +76,23 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                                                 <span class="text-xs text-gray-500">(${groupSections.length} sections)</span>
                                             </div>
                                             <div class="flex flex-col sm:flex-row sm:items-center gap-1">
+                                                <button onclick="openEditGroupModal(${g.id}, '${g.group_name}')" class="text-xs bg-yellow-600 text-white px-2 py-1">
+                                                    Edit
+                                                </button>
+                                                <button onclick="deleteGroup(${g.id})" class="text-xs bg-red-600 text-white px-2 py-1">
+                                                    Delete
+                                                </button>
                                                 <button onclick="openAddSectionModalForGroup(${cls.id}, '${cls.class_name}', ${g.id}, '${g.group_name}')" class="text-xs bg-blue-600 text-white px-2 py-1">
                                                     + Add Section
-                                                </button>
-                                                <button onclick="deleteGroup(${g.id})" class="text-xs text-red-600">
-                                                    Delete
                                                 </button>
                                             </div>
                                         </div>
                                         <div class="flex flex-wrap gap-1">
                                             ${groupSections.map(s => `
-                                                <span class="border border-gray-300 px-2 py-1 text-sm">
+                                                <span class="border border-gray-300 px-2 py-1 text-sm flex items-center gap-1">
                                                     ${s.section_name}
-                                                    <button onclick="deleteSection(${s.id})" class="text-xs text-red-500 ml-1">×</button>
+                                                    <button onclick="openEditSectionModal(${s.id}, '${s.section_name}')" class="text-xs text-yellow-600 hover:text-yellow-800">✏️</button>
+                                                    <button onclick="deleteSection(${s.id})" class="text-xs text-red-500 hover:text-red-700">×</button>
                                                 </span>
                                             `).join('')}
                                         </div>
@@ -100,9 +110,10 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                             </div>
                             <div class="flex flex-wrap gap-1">
                                 ${sectionsWithoutGroup.map(s => `
-                                    <span class="border border-gray-300 px-2 py-1 text-sm">
+                                    <span class="border border-gray-300 px-2 py-1 text-sm flex items-center gap-1">
                                         ${s.section_name}
-                                        <button onclick="deleteSection(${s.id})" class="text-xs text-red-500 ml-1">×</button>
+                                        <button onclick="openEditSectionModal(${s.id}, '${s.section_name}')" class="text-xs text-yellow-600 hover:text-yellow-800">✏️</button>
+                                        <button onclick="deleteSection(${s.id})" class="text-xs text-red-500 hover:text-red-700">×</button>
                                     </span>
                                 `).join('')}
                             </div>
@@ -287,6 +298,78 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
           </div>
       </div>
 
+      <!-- Edit Class Modal -->
+      <div id="editClassModal" class="fixed inset-0 bg-black/60 z-[9999] hidden flex items-center justify-center px-4">
+          <div class="bg-white border border-gray-300 w-full max-w-md p-4 relative">
+              <h3 class="font-bold mb-3">Edit Class</h3>
+              <form onsubmit="editClass(event)">
+                  <input type="hidden" name="class_id" id="edit_class_id">
+                  <div class="mb-3">
+                      <label class="block text-sm font-medium mb-1">Class Name</label>
+                      <input type="text" name="class_name" required class="w-full border border-gray-300 px-2 py-1" placeholder="e.g. Class 10">
+                  </div>
+                  <div class="flex items-center gap-1 mb-3">
+                      <input type="checkbox" name="has_groups" id="edit_has_groups">
+                      <label for="edit_has_groups" class="text-sm">Has Groups</label>
+                  </div>
+                  <div class="flex gap-2">
+                      <button type="submit" class="bg-yellow-600 text-white px-3 py-1 text-sm" id="editClassBtn">Save Changes</button>
+                      <button type="button" onclick="closeModal('editClassModal')" class="bg-gray-200 text-gray-800 px-3 py-1 text-sm">Cancel</button>
+                  </div>
+              </form>
+          </div>
+      </div>
+
+      <!-- Edit Group Modal -->
+      <div id="editGroupModal" class="fixed inset-0 bg-black/60 z-[9999] hidden flex items-center justify-center px-4">
+          <div class="bg-white border border-gray-300 w-full max-w-md p-4 relative">
+              <h3 class="font-bold mb-3">Edit Group</h3>
+              <form onsubmit="editGroup(event)">
+                  <input type="hidden" name="group_id" id="edit_group_id">
+                  <div class="mb-3">
+                      <label class="block text-sm font-medium mb-1">Group Name</label>
+                      <input type="text" name="group_name" required class="w-full border border-gray-300 px-2 py-1" placeholder="e.g. Science, Arts">
+                  </div>
+                  <div class="flex gap-2">
+                      <button type="submit" class="bg-yellow-600 text-white px-3 py-1 text-sm" id="editGroupBtn">Save Changes</button>
+                      <button type="button" onclick="closeModal('editGroupModal')" class="bg-gray-200 text-gray-800 px-3 py-1 text-sm">Cancel</button>
+                  </div>
+              </form>
+          </div>
+      </div>
+
+      <!-- Edit Section Modal -->
+      <div id="editSectionModal" class="fixed inset-0 bg-black/60 z-[9999] hidden flex items-center justify-center px-4">
+          <div class="bg-white border border-gray-300 w-full max-w-md p-4 relative">
+              <h3 class="font-bold mb-3">Edit Section</h3>
+              <form onsubmit="editSection(event)">
+                  <input type="hidden" name="section_id" id="edit_section_id">
+                  <div class="mb-3">
+                      <label class="block text-sm font-medium mb-1">Section Name</label>
+                      <input type="text" name="section_name" required class="w-full border border-gray-300 px-2 py-1" placeholder="e.g. A, B">
+                  </div>
+                  <div class="flex gap-2">
+                      <button type="submit" class="bg-yellow-600 text-white px-3 py-1 text-sm" id="editSectionBtn">Save Changes</button>
+                      <button type="button" onclick="closeModal('editSectionModal')" class="bg-gray-200 text-gray-800 px-3 py-1 text-sm">Cancel</button>
+                  </div>
+              </form>
+          </div>
+      </div>
+
+      <!-- Dependency Warning Modal -->
+      <div id="dependencyModal" class="fixed inset-0 bg-black/60 z-[9999] hidden flex items-center justify-center px-4">
+          <div class="bg-white border border-gray-300 w-full max-w-lg p-4 relative">
+              <h3 class="font-bold mb-3 text-red-600">⚠️ Dependency Warning</h3>
+              <div id="dependencyDetails" class="mb-4">
+                  <!-- Dependency details will be populated here -->
+              </div>
+              <div class="flex gap-2">
+                  <button onclick="forceDelete()" class="bg-red-600 text-white px-3 py-1 text-sm" id="forceDeleteBtn">Force Delete</button>
+                  <button onclick="closeModal('dependencyModal')" class="bg-gray-200 text-gray-800 px-3 py-1 text-sm">Cancel</button>
+              </div>
+          </div>
+      </div>
+
       <script>
         const SCHOOL_ID = ${school.id};
         const CLASS_GROUPS = ${JSON.stringify(classGroups)};
@@ -417,13 +500,32 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
             });
         }
 
-        function deleteGroup(id) {
-            if(!confirm("Delete this group and all its sections?")) return;
+        function deleteClass(id) {
+            if(!confirm("Delete this class and all its data? This will remove all groups, sections, subjects, teachers, and routines associated with it.")) return;
             
             fetch('/admin/school/classes', {
                 method: 'DELETE',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({action: 'delete_group', id: id})
+                body: JSON.stringify({action: 'delete_class', id: id, school_id: SCHOOL_ID})
+            }).then(res => res.json()).then(response => {
+                if(response.success) {
+                    window.location.reload();
+                } else {
+                    showToast('Error deleting class: ' + (response.error || 'Unknown error'), 'error');
+                }
+            }).catch(error => {
+                console.error('Network error:', error);
+                showToast('Network error. Please check your connection and try again.', 'error');
+            });
+        }
+
+        function deleteGroup(id) {
+            if(!confirm("Delete this group and all its data? This will remove all sections, subjects, teachers, and routines associated with it.")) return;
+            
+            fetch('/admin/school/classes', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'delete_group', id: id, school_id: SCHOOL_ID})
             }).then(res => res.json()).then(response => {
                 if(response.success) {
                     window.location.reload();
@@ -437,12 +539,12 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
         }
 
         function deleteSection(id) {
-            if(!confirm("Delete this section?")) return;
+            if(!confirm("Delete this section and all its data? This will remove all teacher assignments and routines associated with it.")) return;
             
             fetch('/admin/school/classes', {
                 method: 'DELETE',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({action: 'delete_section', id: id})
+                body: JSON.stringify({action: 'delete_section', id: id, school_id: SCHOOL_ID})
             }).then(res => res.json()).then(response => {
                 if(response.success) {
                     window.location.reload();
@@ -452,6 +554,181 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
             }).catch(error => {
                 console.error('Network error:', error);
                 showToast('Network error. Please check your connection and try again.', 'error');
+            });
+        }
+
+        function showDependencyWarning(dependencies, action, id) {
+            const detailsDiv = document.getElementById('dependencyDetails');
+            const dependencyList = dependencies.map(function(dep) { 
+                return '<li class="text-sm text-gray-600">• ' + dep.message + '</li>';
+            }).join('');
+            
+            detailsDiv.innerHTML = 
+                '<p class="text-sm text-gray-700 mb-3">This item cannot be deleted because it has the following dependencies:</p>' +
+                '<ul class="list-disc pl-5 mb-4">' +
+                    dependencyList +
+                '</ul>' +
+                '<p class="text-sm text-red-600 font-medium">⚠️ Force deleting will permanently remove all dependent data!</p>';
+            
+            // Store action and id for force delete
+            window.pendingDelete = { action: action, id: id };
+            
+            openModal('dependencyModal');
+        }
+
+        function forceDelete() {
+            if(!window.pendingDelete) return;
+            
+            const { action, id } = window.pendingDelete;
+            const forceBtn = document.getElementById('forceDeleteBtn');
+            forceBtn.disabled = true;
+            forceBtn.textContent = 'Deleting...';
+            
+            fetch('/admin/school/classes', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action, id, school_id: SCHOOL_ID, force: true})
+            }).then(res => res.json()).then(response => {
+                if(response.success) {
+                    window.location.reload();
+                } else {
+                    showToast('Error force deleting: ' + (response.error || 'Unknown error'), 'error');
+                    forceBtn.disabled = false;
+                    forceBtn.textContent = 'Force Delete';
+                }
+            }).catch(error => {
+                console.error('Network error:', error);
+                showToast('Network error. Please check your connection and try again.', 'error');
+                forceBtn.disabled = false;
+                forceBtn.textContent = 'Force Delete';
+            });
+        }
+
+        function openEditClassModal(classId, className, hasGroups) {
+            document.getElementById('edit_class_id').value = classId;
+            document.querySelector('#editClassModal input[name="class_name"]').value = className;
+            document.getElementById('edit_has_groups').checked = hasGroups;
+            openModal('editClassModal');
+            setTimeout(() => {
+                document.querySelector('#editClassModal input[name="class_name"]').focus();
+            }, 100);
+        }
+
+        function openEditGroupModal(groupId, groupName) {
+            document.getElementById('edit_group_id').value = groupId;
+            document.querySelector('#editGroupModal input[name="group_name"]').value = groupName;
+            openModal('editGroupModal');
+            setTimeout(() => {
+                document.querySelector('#editGroupModal input[name="group_name"]').focus();
+            }, 100);
+        }
+
+        function openEditSectionModal(sectionId, sectionName) {
+            document.getElementById('edit_section_id').value = sectionId;
+            document.querySelector('#editSectionModal input[name="section_name"]').value = sectionName;
+            openModal('editSectionModal');
+            setTimeout(() => {
+                document.querySelector('#editSectionModal input[name="section_name"]').focus();
+            }, 100);
+        }
+
+        function editClass(e) {
+            e.preventDefault();
+            const submitBtn = document.getElementById('editClassBtn');
+            if (submitBtn.disabled) return;
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+            
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            data.action = 'edit_class';
+            data.school_id = SCHOOL_ID;
+            data.has_groups = formData.has('has_groups');
+
+            fetch('/admin/school/classes', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(res => res.json()).then(response => {
+                if(response.success) {
+                    window.location.reload();
+                } else {
+                    showToast('Error updating class: ' + (response.error || 'Unknown error'), 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Save Changes';
+                }
+            }).catch(error => {
+                console.error('Network error:', error);
+                showToast('Network error. Please check your connection and try again.', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Changes';
+            });
+        }
+
+        function editGroup(e) {
+            e.preventDefault();
+            const submitBtn = document.getElementById('editGroupBtn');
+            if (submitBtn.disabled) return;
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+            
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            data.action = 'edit_group';
+            data.school_id = SCHOOL_ID;
+
+            fetch('/admin/school/classes', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(res => res.json()).then(response => {
+                if(response.success) {
+                    window.location.reload();
+                } else {
+                    showToast('Error updating group: ' + (response.error || 'Unknown error'), 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Save Changes';
+                }
+            }).catch(error => {
+                console.error('Network error:', error);
+                showToast('Network error. Please check your connection and try again.', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Changes';
+            });
+        }
+
+        function editSection(e) {
+            e.preventDefault();
+            const submitBtn = document.getElementById('editSectionBtn');
+            if (submitBtn.disabled) return;
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+            
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            data.action = 'edit_section';
+            data.school_id = SCHOOL_ID;
+
+            fetch('/admin/school/classes', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(res => res.json()).then(response => {
+                if(response.success) {
+                    window.location.reload();
+                } else {
+                    showToast('Error updating section: ' + (response.error || 'Unknown error'), 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Save Changes';
+                }
+            }).catch(error => {
+                console.error('Network error:', error);
+                showToast('Network error. Please check your connection and try again.', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Changes';
             });
         }
 

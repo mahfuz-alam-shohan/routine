@@ -159,12 +159,79 @@ const DEFINED_SCHEMA = {
     subject_id: "INTEGER",
     teacher_id: "INTEGER",
     is_auto: "BOOLEAN DEFAULT 0", // 0 = manual assignment, 1 = auto-assign by system
+    is_primary: "BOOLEAN DEFAULT 0", // 0 = additional teacher, 1 = primary teacher
     created_at: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)",
     "FOREIGN KEY(class_id)": "REFERENCES academic_classes(id)",
     "FOREIGN KEY(group_id)": "REFERENCES class_groups(id)",
     "FOREIGN KEY(section_id)": "REFERENCES class_sections(id)",
     "FOREIGN KEY(subject_id)": "REFERENCES academic_subjects(id)",
+    "FOREIGN KEY(teacher_id)": "REFERENCES profiles_teacher(id)"
+  },
+
+  // --- ROUTINE GENERATION SYSTEM ---
+  generated_routines: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    school_id: "INTEGER",
+    name: "TEXT", // e.g., "Final Routine 2024", "Draft Routine v1"
+    version: "INTEGER DEFAULT 1", // For versioning
+    is_active: "BOOLEAN DEFAULT 0", // Only one routine can be active per school
+    generated_at: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+    generated_by: "TEXT", // "auto" or teacher email
+    total_periods: "INTEGER DEFAULT 0",
+    conflicts_resolved: "INTEGER DEFAULT 0",
+    "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)"
+  },
+
+  routine_entries: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    routine_id: "INTEGER",
+    school_id: "INTEGER",
+    day_of_week: "TEXT", // "monday", "tuesday", etc.
+    slot_index: "INTEGER", // References schedule_slots.slot_index
+    class_id: "INTEGER",
+    group_id: "INTEGER", // null if no groups
+    section_id: "INTEGER", // null if no sections
+    subject_id: "INTEGER",
+    teacher_id: "INTEGER",
+    room_number: "TEXT", // Optional room assignment
+    is_conflict: "BOOLEAN DEFAULT 0", // Flag for scheduling conflicts
+    conflict_reason: "TEXT", // Description of conflict if any
+    "FOREIGN KEY(routine_id)": "REFERENCES generated_routines(id)",
+    "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)",
+    "FOREIGN KEY(class_id)": "REFERENCES academic_classes(id)",
+    "FOREIGN KEY(group_id)": "REFERENCES class_groups(id)",
+    "FOREIGN KEY(section_id)": "REFERENCES class_sections(id)",
+    "FOREIGN KEY(subject_id)": "REFERENCES academic_subjects(id)",
+    "FOREIGN KEY(teacher_id)": "REFERENCES profiles_teacher(id)"
+  },
+
+  routine_generation_settings: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    school_id: "INTEGER UNIQUE",
+    // Generation preferences
+    prefer_same_teacher_consecutive: "BOOLEAN DEFAULT 1", // Try to give same teacher consecutive periods
+    avoid_teacher_duplicates: "BOOLEAN DEFAULT 1", // Avoid teacher teaching same class multiple times per day
+    balance_subject_distribution: "BOOLEAN DEFAULT 1", // Distribute subjects evenly across week
+    respect_preferred_times: "BOOLEAN DEFAULT 1", // Consider teacher time preferences
+    // Conflict resolution
+    auto_resolve_conflicts: "BOOLEAN DEFAULT 1",
+    allow_split_periods: "BOOLEAN DEFAULT 0", // Allow splitting double periods
+    max_teacher_daily_periods: "INTEGER DEFAULT 8",
+    break_between_same_subject: "INTEGER DEFAULT 1", // Minimum periods between same subject for same class
+    "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)"
+  },
+
+  teacher_preferences: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    school_id: "INTEGER",
+    teacher_id: "INTEGER",
+    preferred_days: "TEXT", // JSON array of preferred days
+    preferred_time_slots: "TEXT", // JSON array of preferred slot indices
+    unavailable_times: "TEXT", // JSON array of unavailable slot indices
+    max_daily_periods: "INTEGER DEFAULT 8",
+    notes: "TEXT", // Additional preferences
+    "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)",
     "FOREIGN KEY(teacher_id)": "REFERENCES profiles_teacher(id)"
   }
 };

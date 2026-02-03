@@ -12,6 +12,20 @@ function escapeHtml(text) {
 
 export function TeachersAssignmentPageHTML(school, classes = [], groups = [], sections = [], subjects = [], classSubjects = [], groupSubjects = [], teachers = [], teacherSubjects = [], teacherAssignments = []) {
     
+    // Debug: Log incoming data
+    console.log('TeachersAssignmentPageHTML - Debug:', {
+        school: school ? 'found' : 'missing',
+        classes: classes.length,
+        groups: groups.length,
+        sections: sections.length,
+        subjects: subjects.length,
+        classSubjects: classSubjects.length,
+        groupSubjects: groupSubjects.length,
+        teachers: teachers.length,
+        teacherSubjects: teacherSubjects.length,
+        teacherAssignments: teacherAssignments.length
+    });
+    
     // Create lookup objects
     const groupsByClass = {};
     groups.forEach(g => {
@@ -45,279 +59,135 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
         );
     }
     
-    // Build hierarchical table HTML
-    let tableHTML = '';
-    let lastClassId = null;
-    let lastGroupId = null;
+    // Professional color palette for sections
+    const sectionColors = [
+        '#E8F4FD', // Light Blue
+        '#F0F9FF', // Very Light Blue
+        '#F8FAFC', // Light Gray Blue
+        '#F0FDF4', // Light Green
+        '#FEF3C7', // Light Yellow
+        '#FEE2E2', // Light Red
+        '#F3E8FF', // Light Purple
+        '#ECFCCB', // Light Lime
+        '#FCE7F3', // Light Pink
+        '#E0F2FE'  // Sky Blue
+    ];
     
-    // Sort by class, then group, then subject for proper hierarchy
-    const sortedClasses = classes.sort((a, b) => a.class_name.localeCompare(b.class_name));
+    // Build flat hierarchical table data grouped by sections
+    const assignmentRows = [];
+    let colorIndex = 0;
     
-    sortedClasses.forEach(cls => {
-        const classGroups = groupsByClass[cls.id] || [];
+    try {
+        // Sort by class, then group, then section for proper hierarchy
+        const sortedClasses = classes.sort((a, b) => a.class_name.localeCompare(b.class_name));
         
-        // Handle class-level subjects (no group)
-        const classSubjectsList = classSubjects.filter(cs => cs.class_id === cls.id);
-        const classSections = sections.filter(s => s.class_id === cls.id && !s.group_id);
-        
-        if (classSubjectsList.length > 0) {
-            // Class header
-            tableHTML += `
-                <tr class="bg-gray-50 font-semibold">
-                    <td class="p-3 border" colspan="4">${escapeHtml(cls.class_name)}</td>
-                    <td class="p-3 border"></td>
-                </tr>
-            `;
+        sortedClasses.forEach(cls => {
+            const classGroups = groupsByClass[cls.id] || [];
             
-            classSubjectsList.forEach(cs => {
-                const subject = subjectsById[cs.subject_id];
-                if (!subject) return;
-                
-                if (classSections.length === 0) {
-                    // No sections, create one row for the class
-                    const existingAssignments = findAssignments(cls.id, null, null, subject.id);
-                    tableHTML += `
-                        <tr class="border-b">
-                            <td class="p-3 border"></td>
-                            <td class="p-3 border"></td>
-                            <td class="p-3 border"></td>
-                            <td class="p-3 border">${escapeHtml(subject.subject_name)}</td>
-                            <td class="p-3 border">
-                                ${existingAssignments.length === 0 ? `
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-purple-700 font-medium bg-purple-100 px-2 py-1 rounded">🤖 Auto</span>
-                                            <button type="button" onclick="assignTeacher('class-${cls.id}-${subject.id}')" 
-                                                    class="bg-green-600 text-white px-2 py-1 text-xs">
-                                                Assign Teacher
-                                            </button>
-                                        </div>
-                                    ` : `
-                                    <div class="space-y-1">
-                                        ${existingAssignments.map(assignment => `
-                                            <div class="flex items-center gap-2">
-                                                ${assignment.is_auto ? 
-                                                    `<span class="text-purple-700 font-medium bg-purple-100 px-2 py-1 rounded">🤖 Auto</span>` :
-                                                    `<span class="text-green-700 font-medium">${escapeHtml(assignment.teacher_name || 'Unknown')}</span>`
-                                                }
-                                                <button type="button" onclick="replaceTeacher(${assignment.id}, '${assignment.is_auto ? 'Auto' : escapeHtml(assignment.teacher_name)}', 'class-${cls.id}-${subject.id}')" 
-                                                        class="bg-orange-600 text-white px-2 py-1 text-xs">
-                                                    Replace
-                                                </button>
-                                                <button type="button" onclick="removeTeacher(${assignment.id}, '${assignment.is_auto ? 'Auto' : escapeHtml(assignment.teacher_name)}')" 
-                                                        class="bg-red-600 text-white px-2 py-1 text-xs">
-                                                    Remove
-                                                </button>
-                                            </div>
-                                        `).join('')}
-                                        <div class="flex gap-1 mt-1">
-                                            <button type="button" onclick="assignTeacher('class-${cls.id}-${subject.id}')" 
-                                                    class="bg-green-600 text-white px-2 py-1 text-xs">
-                                                Add Teacher
-                                            </button>
-                                            <button type="button" onclick="assignAuto('class-${cls.id}-${subject.id}')" 
-                                                    class="bg-purple-600 text-white px-2 py-1 text-xs">
-                                                Set Auto
-                                            </button>
-                                        </div>
-                                    </div>
-                                `}
-                            </td>
-                        </tr>
-                    `;
-                } else {
-                    // Create rows for each section
-                    classSections.forEach(section => {
-                        const existingAssignments = findAssignments(cls.id, null, section.id, subject.id);
-                        tableHTML += `
-                            <tr class="border-b">
-                                <td class="p-3 border"></td>
-                                <td class="p-3 border"></td>
-                                <td class="p-3 border">${escapeHtml(section.section_name)}</td>
-                                <td class="p-3 border">${escapeHtml(subject.subject_name)}</td>
-                                <td class="p-3 border">
-                                    ${existingAssignments.length === 0 ? `
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-purple-700 font-medium bg-purple-100 px-2 py-1 rounded">🤖 Auto</span>
-                                            <button type="button" onclick="assignTeacher('section-${section.id}-${subject.id}')" 
-                                                    class="bg-green-600 text-white px-2 py-1 text-xs">
-                                                Assign Teacher
-                                            </button>
-                                        </div>
-                                    ` : `
-                                        <div class="space-y-1">
-                                            ${existingAssignments.map(assignment => `
-                                                <div class="flex items-center gap-2">
-                                                    ${assignment.is_auto ? 
-                                                        `<span class="text-purple-700 font-medium bg-purple-100 px-2 py-1 rounded">🤖 Auto</span>` :
-                                                        `<span class="text-green-700 font-medium">${escapeHtml(assignment.teacher_name || 'Unknown')}</span>`
-                                                    }
-                                                    <button type="button" onclick="replaceTeacher(${assignment.id}, '${assignment.is_auto ? 'Auto' : escapeHtml(assignment.teacher_name)}', 'section-${section.id}-${subject.id}')" 
-                                                            class="bg-orange-600 text-white px-2 py-1 text-xs">
-                                                        Replace
-                                                    </button>
-                                                    <button type="button" onclick="removeTeacher(${assignment.id}, '${assignment.is_auto ? 'Auto' : escapeHtml(assignment.teacher_name)}')" 
-                                                            class="bg-red-600 text-white px-2 py-1 text-xs">
-                                                        Remove
-                                                    </button>
-                                                </div>
-                                            `).join('')}
-                                            <div class="flex gap-1 mt-1">
-                                                <button type="button" onclick="assignTeacher('section-${section.id}-${subject.id}')" 
-                                                        class="bg-green-600 text-white px-2 py-1 text-xs">
-                                                    Add Teacher
-                                                </button>
-                                                <button type="button" onclick="assignAuto('section-${section.id}-${subject.id}')" 
-                                                        class="bg-purple-600 text-white px-2 py-1 text-xs">
-                                                    Set Auto
-                                                </button>
-                                            </div>
-                                        </div>
-                                    `}
-                                </td>
-                            </tr>
-                        `;
-                    });
-                }
+            // Class header row
+            assignmentRows.push({
+                type: 'class',
+                class: cls,
+                groups: classGroups,
+                level: 0
             });
-        }
-        
-        // Handle group-level subjects
-        const sortedGroups = classGroups.sort((a, b) => a.group_name.localeCompare(b.group_name));
-        
-        sortedGroups.forEach(group => {
-            const groupSubjectsList = groupSubjects.filter(gs => gs.group_id === group.id);
-            const groupSections = sectionsByGroup[group.id] || [];
             
-            if (groupSubjectsList.length > 0) {
-                // Group header (only show class if different from last)
-                if (lastClassId !== cls.id) {
-                    tableHTML += `
-                        <tr class="bg-gray-50 font-semibold">
-                            <td class="p-3 border">${escapeHtml(cls.class_name)}</td>
-                            <td class="p-3 border" colspan="3"></td>
-                            <td class="p-3 border"></td>
-                        </tr>
-                    `;
-                    lastClassId = cls.id;
-                }
-                
-                // Group name header
-                tableHTML += `
-                    <tr class="bg-gray-100">
-                        <td class="p-3 border"></td>
-                        <td class="p-3 border font-medium">${escapeHtml(group.group_name)}</td>
-                        <td class="p-3 border" colspan="2"></td>
-                        <td class="p-3 border"></td>
-                    </tr>
-                `;
-                
-                groupSubjectsList.forEach(gs => {
-                    const subject = subjectsById[gs.subject_id];
-                    if (!subject) return;
+            // Handle class-level subjects (no group) - Group by sections
+            const classSubjectsList = classSubjects.filter(cs => cs.class_id === cls.id);
+            const classSections = sections.filter(s => s.class_id === cls.id && !s.group_id);
+            
+            if (classSubjectsList.length > 0 && classSections.length > 0) {
+                // Group by sections - include ALL class subjects with each section
+                classSections.forEach(section => {
+                    // Include ALL class subjects for this section, not just ones with existing assignments
+                    const sectionSubjects = classSubjectsList; // All class subjects
                     
-                    if (groupSections.length === 0) {
-                        // No sections, create one row for the group
-                        const existingAssignments = findAssignments(cls.id, group.id, null, subject.id);
-                        tableHTML += `
-                            <tr class="border-b">
-                                <td class="p-3 border"></td>
-                                <td class="p-3 border"></td>
-                                <td class="p-3 border"></td>
-                                <td class="p-3 border">${escapeHtml(subject.subject_name)}</td>
-                                <td class="p-3 border">
-                                    ${existingAssignments.length === 0 ? `
-                                        <div class="flex items-center gap-2">
-                                            <span class="text-purple-700 font-medium bg-purple-100 px-2 py-1 rounded">🤖 Auto</span>
-                                            <button type="button" onclick="assignTeacher('group-${group.id}-${subject.id}')" 
-                                                    class="bg-green-600 text-white px-2 py-1 text-xs">
-                                                Assign Teacher
-                                            </button>
-                                        </div>
-                                    ` : `
-                                        <div class="space-y-1">
-                                            ${existingAssignments.map(assignment => `
-                                                <div class="flex items-center gap-2">
-                                                    ${assignment.is_auto ? 
-                                                        `<span class="text-purple-700 font-medium bg-purple-100 px-2 py-1 rounded">🤖 Auto</span>` :
-                                                        `<span class="text-green-700 font-medium">${escapeHtml(assignment.teacher_name || 'Unknown')}</span>`
-                                                    }
-                                                    <button type="button" onclick="replaceTeacher(${assignment.id}, '${assignment.is_auto ? 'Auto' : escapeHtml(assignment.teacher_name)}', 'group-${group.id}-${subject.id}')" 
-                                                            class="bg-orange-600 text-white px-2 py-1 text-xs">
-                                                        Replace
-                                                    </button>
-                                                    <button type="button" onclick="removeTeacher(${assignment.id}, '${assignment.is_auto ? 'Auto' : escapeHtml(assignment.teacher_name)}')" 
-                                                            class="bg-red-600 text-white px-2 py-1 text-xs">
-                                                        Remove
-                                                    </button>
-                                                </div>
-                                            `).join('')}
-                                            <div class="flex gap-1 mt-1">
-                                                <button type="button" onclick="assignTeacher('group-${group.id}-${subject.id}')" 
-                                                        class="bg-green-600 text-white px-2 py-1 text-xs">
-                                                    Add Teacher
-                                                </button>
-                                                <button type="button" onclick="assignAuto('group-${group.id}-${subject.id}')" 
-                                                        class="bg-purple-600 text-white px-2 py-1 text-xs">
-                                                    Set Auto
-                                                </button>
-                                            </div>
-                                        </div>
-                                    `}
-                                </td>
-                            </tr>
-                        `;
-                    } else {
-                        // Create rows for each section in the group
-                        groupSections.forEach(section => {
-                            const existingAssignments = findAssignments(cls.id, group.id, section.id, subject.id);
-                            tableHTML += `
-                                <tr class="border-b">
-                                    <td class="p-3 border"></td>
-                                    <td class="p-3 border"></td>
-                                    <td class="p-3 border">${escapeHtml(section.section_name)}</td>
-                                    <td class="p-3 border">${escapeHtml(subject.subject_name)}</td>
-                                    <td class="p-3 border">
-                                        ${existingAssignments.length === 0 ? `
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-purple-700 font-medium bg-purple-100 px-2 py-1 rounded">🤖 Auto</span>
-                                                <button type="button" onclick="assignTeacher('section-${section.id}-${subject.id}')" 
-                                                        class="bg-green-600 text-white px-2 py-1 text-xs">
-                                                    Assign Teacher
-                                                </button>
-                                            </div>
-                                        ` : `
-                                            <div class="space-y-1">
-                                                ${existingAssignments.map(assignment => `
-                                                    <div class="flex items-center gap-2">
-                                                        ${assignment.is_auto ? 
-                                                            `<span class="text-purple-700 font-medium bg-purple-100 px-2 py-1 rounded">🤖 Auto</span>` :
-                                                            `<span class="text-green-700 font-medium">${escapeHtml(assignment.teacher_name || 'Unknown')}</span>`
-                                                        }
-                                                        <button type="button" onclick="replaceTeacher(${assignment.id}, '${assignment.is_auto ? 'Auto' : escapeHtml(assignment.teacher_name)}', 'section-${section.id}-${subject.id}')" 
-                                                                class="bg-orange-600 text-white px-2 py-1 text-xs">
-                                                            Replace
-                                                        </button>
-                                                        <button type="button" onclick="removeTeacher(${assignment.id}, '${assignment.is_auto ? 'Auto' : escapeHtml(assignment.teacher_name)}')" 
-                                                                class="bg-red-600 text-white px-2 py-1 text-xs">
-                                                            Remove
-                                                        </button>
-                                                    </div>
-                                                `).join('')}
-                                                <button type="button" onclick="assignTeacher('section-${section.id}-${subject.id}')" 
-                                                        class="bg-green-600 text-white px-2 py-1 text-xs mt-1">
-                                                    Add More
-                                                </button>
-                                            </div>
-                                        `}
-                                    </td>
-                                </tr>
-                            `;
+                    const sectionColor = sectionColors[colorIndex % sectionColors.length];
+                    colorIndex++;
+                    
+                    sectionSubjects.forEach(cs => {
+                        const subject = subjectsById[cs.subject_id];
+                        if (!subject) return;
+                        
+                        const existingAssignments = findAssignments(cls.id, null, section.id, subject.id);
+                        assignmentRows.push({
+                            type: 'section-subject',
+                            class: cls,
+                            section: section,
+                            subject: subject,
+                            assignments: existingAssignments,
+                            sectionColor: sectionColor,
+                            level: 2
                         });
-                    }
+                    });
                 });
             }
+            
+            // Handle group-level subjects - Group by sections
+            const sortedGroups = classGroups.sort((a, b) => a.group_name.localeCompare(b.group_name));
+            
+            sortedGroups.forEach(group => {
+                const groupSubjectsList = groupSubjects.filter(gs => gs.group_id === group.id);
+                const groupSections = sectionsByGroup[group.id] || [];
+                
+                if (groupSubjectsList.length > 0) {
+                    // Group header row
+                    assignmentRows.push({
+                        type: 'group',
+                        class: cls,
+                        group: group,
+                        sections: groupSections,
+                        level: 1
+                    });
+                    
+                    if (groupSections.length === 0) {
+                        // No sections, skip (no teacher assignment needed without sections)
+                        // Continue to next group
+                    } else {
+                        // Group by sections - include ALL group subjects + ALL class subjects with each section
+                        groupSections.forEach(section => {
+                            // Include ALL group subjects + ALL class subjects for this section
+                            const sectionSubjects = [...groupSubjectsList, ...classSubjectsList]; // Group + Class subjects
+                            
+                            const sectionColor = sectionColors[colorIndex % sectionColors.length];
+                            colorIndex++;
+                            
+                            sectionSubjects.forEach(cs => {
+                                const subject = subjectsById[cs.subject_id];
+                                if (!subject) return;
+                                
+                                const existingAssignments = findAssignments(cls.id, group.id, section.id, subject.id);
+                                assignmentRows.push({
+                                    type: 'group-section-subject',
+                                    class: cls,
+                                    group: group,
+                                    section: section,
+                                    subject: subject,
+                                    assignments: existingAssignments,
+                                    sectionColor: sectionColor,
+                                    level: 3
+                                });
+                            });
+                        });
+                    }
+                }
+            });
         });
-    });
+    } catch (error) {
+        console.error('Error in TeachersAssignmentPageHTML:', error);
+        return `
+            <div class="p-6">
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                    <h2 class="text-lg font-bold">Error Loading Teacher Assignments</h2>
+                    <p>There was an error loading the teacher assignment data. Please try again.</p>
+                    <details class="mt-2">
+                        <summary class="cursor-pointer">Technical Details</summary>
+                        <pre class="mt-2 text-sm bg-gray-100 p-2 rounded">${error.message}</pre>
+                    </details>
+                </div>
+            </div>
+        `;
+    }
 
     return `
       <div class="p-6">
@@ -327,39 +197,95 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
                   <button type="button" onclick="showTeachersList()" class="bg-gray-600 text-white px-4 py-2">
                       Teacher's List
                   </button>
-                  <button type="button" onclick="showAddTeacherForm()" class="bg-blue-600 text-white px-4 py-2">
-                      Add Teacher
-                  </button>
               </div>
           </div>
 
           <!-- Assignment Table -->
-          <div class="border">
-              <table class="w-full border-collapse">
-                  <thead class="bg-gray-100">
-                      <tr>
-                          <th class="border p-3 text-left">Class</th>
-                          <th class="border p-3 text-left">Group</th>
-                          <th class="border p-3 text-left">Section</th>
-                          <th class="border p-3 text-left">Subject</th>
-                          <th class="border p-3 text-left">Action</th>
+          <div>
+              <table border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+                  <thead>
+                      <tr style="background-color: #f0f0f0;">
+                          <th style="border: 1px solid #ccc; padding: 4px;">Class/Group</th>
+                          <th style="border: 1px solid #ccc; padding: 4px;">Section</th>
+                          <th style="border: 1px solid #ccc; padding: 4px;">Subject</th>
+                          <th style="border: 1px solid #ccc; padding: 4px;">Teacher(s)</th>
+                          <th style="border: 1px solid #ccc; padding: 4px;">Assign</th>
                       </tr>
                   </thead>
                   <tbody>
-                      ${tableHTML.length > 0 ? tableHTML : `
-                          <tr>
-                              <td colspan="5" class="border p-8 text-center text-gray-500">
-                                  No subjects found in curriculum. Please add subjects to classes first.
-                              </td>
-                          </tr>
-                      `}
+                      ${(assignmentRows || []).map(row => {
+                          if (row.type === 'class') {
+                              return `
+                                  <tr style="background-color: #f8f8f8; font-weight: bold;">
+                                      <td style="border: 1px solid #ccc; padding: 4px; text-align: left;">${row.class.class_name} (${row.groups.length} groups)</td>
+                                      <td style="border: 1px solid #ccc; padding: 4px;" colspan="4"></td>
+                                  </tr>
+                              `;
+                          } else if (row.type === 'section-subject') {
+                              return `
+                                  <tr style="background-color: ${row.sectionColor};">
+                                      <td style="border: 1px solid #ccc; padding: 4px; padding-left: 20px;">&nbsp;</td>
+                                      <td style="border: 1px solid #ccc; padding: 4px; text-align: right;">${row.section.section_name}</td>
+                                      <td style="border: 1px solid #ccc; padding: 4px;">${row.subject.subject_name}</td>
+                                      <td style="border: 1px solid #ccc; padding: 4px;">
+                                          ${row.assignments.length === 0 ? '<span style="color: #666; font-style: italic;">Unassigned</span>' : 
+                                            row.assignments.map(a => 
+                                                `<div style="margin-bottom: 2px;">
+                                                    ${a.is_auto ? '<span style="color: #666; font-style: italic;">Auto-Assigned</span>' : (a.teacher_name || (teachersById[a.teacher_id] ? teachersById[a.teacher_id].full_name : '') || `Teacher ${a.teacher_id || 'Unknown'}`)}${a.is_primary ? '<span style="color: #0066cc; font-weight: bold;"> (Primary)</span>' : '<span style="color: #666;"> (Additional)</span>'}
+                                                    <div style="margin-top: 2px;">
+                                                        <button onclick="replaceTeacher(${a.id}, '${a.is_auto ? 'Auto' : escapeHtml(a.teacher_name || (teachersById[a.teacher_id] ? teachersById[a.teacher_id].full_name : ''))}', 'section-${row.section.id}-${row.subject.id}')" style="background-color: #FF9800; color: white; border: none; padding: 2px 4px; border-radius: 2px; cursor: pointer; font-size: 10px; margin-right: 2px;">Replace</button>
+                                                        <button onclick="removeTeacher(${a.id}, '${a.is_auto ? 'Auto' : escapeHtml(a.teacher_name || (teachersById[a.teacher_id] ? teachersById[a.teacher_id].full_name : ''))}')" style="background-color: #f44336; color: white; border: none; padding: 2px 4px; border-radius: 2px; cursor: pointer; font-size: 10px;">Remove</button>
+                                                    </div>
+                                                </div>`
+                                            ).join('')
+                                          }
+                                      </td>
+                                      <td style="border: 1px solid #ccc; padding: 4px; text-align: center; background-color: rgba(240, 248, 255, 0.7);">
+                                          <button onclick="assignTeacher('section-${row.section.id}-${row.subject.id}')" style="background-color: #4CAF50; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 12px;">Assign</button>
+                                      </td>
+                                  </tr>
+                              `;
+                          } else if (row.type === 'group') {
+                              return `
+                                  <tr style="background-color: #fafafa; font-weight: bold;">
+                                      <td style="border: 1px solid #ccc; padding: 4px; padding-left: 20px; text-align: right;">${row.group.group_name} (${row.sections.length} sections)</td>
+                                      <td style="border: 1px solid #ccc; padding: 4px;" colspan="4"></td>
+                                  </tr>
+                              `;
+                          } else if (row.type === 'group-section-subject') {
+                              return `
+                                  <tr style="background-color: ${row.sectionColor};">
+                                      <td style="border: 1px solid #ccc; padding: 4px; padding-left: 40px;">&nbsp;</td>
+                                      <td style="border: 1px solid #ccc; padding: 4px; text-align: right;">${row.section.section_name}</td>
+                                      <td style="border: 1px solid #ccc; padding: 4px;">${row.subject.subject_name}</td>
+                                      <td style="border: 1px solid #ccc; padding: 4px;">
+                                          ${row.assignments.length === 0 ? '<span style="color: #666; font-style: italic;">Unassigned</span>' : 
+                                            row.assignments.map(a => 
+                                                `<div style="margin-bottom: 2px;">
+                                                    ${a.is_auto ? '<span style="color: #666; font-style: italic;">Auto-Assigned</span>' : (a.teacher_name || (teachersById[a.teacher_id] ? teachersById[a.teacher_id].full_name : '') || `Teacher ${a.teacher_id || 'Unknown'}`)}${a.is_primary ? '<span style="color: #0066cc; font-weight: bold;"> (Primary)</span>' : '<span style="color: #666;"> (Additional)</span>'}
+                                                    <div style="margin-top: 2px;">
+                                                        <button onclick="replaceTeacher(${a.id}, '${a.is_auto ? 'Auto' : escapeHtml(a.teacher_name || (teachersById[a.teacher_id] ? teachersById[a.teacher_id].full_name : ''))}', 'section-${row.section.id}-${row.subject.id}')" style="background-color: #FF9800; color: white; border: none; padding: 2px 4px; border-radius: 2px; cursor: pointer; font-size: 10px; margin-right: 2px;">Replace</button>
+                                                        <button onclick="removeTeacher(${a.id}, '${a.is_auto ? 'Auto' : escapeHtml(a.teacher_name || (teachersById[a.teacher_id] ? teachersById[a.teacher_id].full_name : ''))}')" style="background-color: #f44336; color: white; border: none; padding: 2px 4px; border-radius: 2px; cursor: pointer; font-size: 10px;">Remove</button>
+                                                    </div>
+                                                </div>`
+                                            ).join('')
+                                          }
+                                      </td>
+                                      <td style="border: 1px solid #ccc; padding: 4px; text-align: center; background-color: rgba(240, 248, 255, 0.7);">
+                                          <button onclick="assignTeacher('section-${row.section.id}-${row.subject.id}')" style="background-color: #4CAF50; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 12px;">Assign</button>
+                                      </td>
+                                  </tr>
+                              `;
+                          }
+                      }).join('')}
+                      ${(assignmentRows || []).length === 0 ? '<tr><td colspan="7" style="border: 1px solid #ccc; padding: 4px; text-align: center;">No subjects found in curriculum. Please add subjects to classes first.</td></tr>' : ''}
                   </tbody>
               </table>
           </div>
       </div>
 
       <!-- Add Teacher Modal -->
-      <div id="add-teacher-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+      <div id="add-teacher-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[9999] hidden flex items-center justify-center p-4">
           <div class="bg-white rounded max-w-md w-full">
               <div class="p-4 border-b">
                   <h3 class="font-semibold">Add New Teacher</h3>
@@ -395,7 +321,7 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
       </div>
 
       <!-- Assign Teacher Modal -->
-      <div id="assign-teacher-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+      <div id="assign-teacher-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[9999] hidden flex items-center justify-center p-4">
           <div class="bg-white rounded max-w-md w-full">
               <div class="p-4 border-b">
                   <h3 class="font-semibold">Assign Teacher</h3>
@@ -406,7 +332,7 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
                       <input type="hidden" id="assignment-data">
                       <div>
                           <label class="block text-sm font-medium mb-2">Select Teacher *</label>
-                          <select id="teacher-select" required class="w-full border px-3 py-2">
+                          <select id="teacher-select" name="teacher-select" required class="w-full border px-3 py-2">
                               <option value="">Select teacher...</option>
                               ${teachers.map(t => `<option value="${t.id}">${escapeHtml(t.full_name)}</option>`).join('')}
                           </select>
@@ -427,13 +353,13 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
       <script>
         // Store assignment data for lookup
         window.assignmentData = {
-            classes: ${JSON.stringify(classes)},
-            groups: ${JSON.stringify(groups)},
-            sections: ${JSON.stringify(sections)},
-            subjects: ${JSON.stringify(subjects)},
-            teachers: ${JSON.stringify(teachers)},
-            teacherSubjects: ${JSON.stringify(teacherSubjects)},
-            teacherAssignments: ${JSON.stringify(teacherAssignments)}
+            classes: ${JSON.stringify(classes || [])},
+            groups: ${JSON.stringify(groups || [])},
+            sections: ${JSON.stringify(sections || [])},
+            subjects: ${JSON.stringify(subjects || [])},
+            teachers: ${JSON.stringify(teachers || [])},
+            teacherSubjects: ${JSON.stringify(teacherSubjects || [])},
+            teacherAssignments: ${JSON.stringify(teacherAssignments || [])}
         };
         
         function showTeachersList() {
@@ -468,6 +394,11 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
             }).catch(err => {
                 alert('Network error. Please try again.');
             });
+        }
+        
+        function closeAssignModal() {
+            document.getElementById('assign-teacher-modal').classList.add('hidden');
+            document.querySelector('#assign-teacher-modal form').reset();
         }
         
         function assignTeacher(assignmentId) {
@@ -518,10 +449,7 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
                     className = cls.class_name;
                 }
                 
-                assignmentText = groupName ? 
-                    className + ' - ' + groupName + ' - ' + section.section_name + ' - ' + subject.subject_name :
-                    className + ' - ' + section.section_name + ' - ' + subject.subject_name;
-                
+                assignmentText = className + (groupName ? ' - ' + groupName : '') + ' - ' + section.section_name + ' - ' + subject.subject_name;
                 assignmentData.class_id = section.class_id;
                 assignmentData.group_id = section.group_id;
                 assignmentData.section_id = id;
@@ -598,13 +526,9 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
                 fetch('/school/teacher-assignments', {
                     method: 'DELETE',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        assignment_id: assignmentId,
-                        action: 'remove_teacher'
-                    })
+                    body: JSON.stringify({ action: 'remove_teacher', assignment_id: assignmentId })
                 }).then(r => r.json()).then(result => {
                     if (result.success) {
-                        alert('Teacher removed successfully!');
                         location.reload();
                     } else {
                         alert('Error: ' + (result.error || 'Unknown error'));
@@ -615,33 +539,29 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
             }
         }
         
-        function closeAssignModal() {
-            document.getElementById('assign-teacher-modal').classList.add('hidden');
-            document.getElementById('teacher-select').value = '';
-        }
-        
         function saveAssignment(e) {
             e.preventDefault();
-            
-            const assignment = JSON.parse(document.getElementById('assignment-data').value);
-            const teacherId = document.getElementById('teacher-select').value;
-            
-            let data = {
-                ...assignment
+            const assignmentData = JSON.parse(document.getElementById('assignment-data').value);
+            const teacherSelect = document.getElementById('teacher-select');
+            const selectedTeacher = teacherSelect.value;
+            if (!selectedTeacher || teacherSelect.disabled) {
+                alert('Please select a teacher or choose Auto-assign.');
+                return;
+            }
+
+            const data = {
+                action: assignmentData.is_replacement ? 'replace_teacher' : 'assign_teacher',
+                class_id: assignmentData.class_id,
+                group_id: assignmentData.group_id,
+                section_id: assignmentData.section_id,
+                subject_id: assignmentData.subject_id,
+                teacher_id: selectedTeacher === 'auto' ? null : selectedTeacher,
+                is_auto: selectedTeacher === 'auto' ? 1 : 0,
+                is_primary: 1
             };
             
-            if (teacherId === 'auto') {
-                // Handle auto-assignment
-                if (assignment.is_replacement) {
-                    data.action = 'set_auto';
-                    data.assignment_id = assignment.existing_assignment_id;
-                } else {
-                    data.action = 'assign_auto';
-                }
-            } else {
-                // Handle manual teacher assignment
-                data.teacher_id = parseInt(teacherId);
-                data.action = assignment.is_replacement ? 'replace_teacher' : 'assign_teacher';
+            if (assignmentData.is_replacement) {
+                data.existing_assignment_id = assignmentData.existing_assignment_id;
             }
             
             fetch('/school/teacher-assignments', {
@@ -651,10 +571,6 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
             }).then(r => r.json()).then(result => {
                 if (result.success) {
                     closeAssignModal();
-                    const message = teacherId === 'auto' ? 
-                        'Auto-assignment set successfully!' : 
-                        (assignment.is_replacement ? 'Teacher replaced successfully!' : 'Teacher assigned successfully!');
-                    alert(message);
                     location.reload();
                 } else {
                     alert('Error: ' + (result.error || 'Unknown error'));
@@ -662,106 +578,6 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
             }).catch(err => {
                 alert('Network error. Please try again.');
             });
-        }
-        
-        function assignAuto(assignmentKey) {
-            const parts = assignmentKey.split('-');
-            const type = parts[0]; // 'class', 'group', or 'section'
-            const id = parseInt(parts[1]);
-            const subjectId = parseInt(parts[2]);
-            
-            let assignmentData = {
-                subject_id: subjectId
-            };
-            
-            if (type === 'class') {
-                assignmentData.class_id = id;
-                assignmentData.group_id = null;
-                assignmentData.section_id = null;
-            } else if (type === 'group') {
-                const classAssignment = assignmentKey.match(/class-(\d+)-group/);
-                assignmentData.class_id = parseInt(classAssignment[1]);
-                assignmentData.group_id = id;
-                assignmentData.section_id = null;
-            } else if (type === 'section') {
-                const classAssignment = assignmentKey.match(/class-(\d+)-section/);
-                assignmentData.class_id = parseInt(classAssignment[1]);
-                assignmentData.group_id = null;
-                assignmentData.section_id = id;
-            }
-            
-            if (confirm('Set this subject to auto-assignment? The system will automatically assign teachers during routine generation.')) {
-                fetch('/school/teacher-assignments', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        ...assignmentData,
-                        action: 'assign_auto'
-                    })
-                }).then(r => r.json()).then(result => {
-                    if (result.success) {
-                        alert('Auto-assignment set successfully!');
-                        location.reload();
-                    } else {
-                        alert('Error: ' + (result.error || 'Unknown error'));
-                    }
-                }).catch(err => {
-                    alert('Network error. Please try again.');
-                });
-            }
-        }
-        
-        function updateReplaceModalForAuto() {
-            const teacherSelect = document.getElementById('teacher-select');
-            const currentValue = teacherSelect.value;
-            
-            // Add "Auto" option to teacher dropdown
-            const autoOption = document.createElement('option');
-            autoOption.value = 'auto';
-            autoOption.textContent = '🤖 Auto-assign (System will decide)';
-            
-            // Check if auto option already exists
-            if (!teacherSelect.querySelector('option[value="auto"]')) {
-                teacherSelect.appendChild(autoOption);
-            }
-        }
-        
-        // Update replaceTeacher function to handle auto option
-        function replaceTeacherWithAuto(assignmentId, currentTeacherName, assignmentKey) {
-            const assignment = JSON.parse(document.getElementById('assignment-data').value);
-            
-            // Set assignment details
-            document.getElementById('assignment-details').textContent = 'Replace ' + currentTeacherName + ' for this subject';
-            document.getElementById('assignment-data').value = JSON.stringify({
-                ...assignment,
-                existing_assignment_id: assignmentId,
-                is_replacement: true
-            });
-            
-            // Update teacher dropdown with qualified teachers plus auto option
-            const teacherSelect = document.getElementById('teacher-select');
-            teacherSelect.innerHTML = '<option value="">Select new option...</option>';
-            
-            const qualifiedTeachers = window.assignmentData.teachers.filter(t => {
-                return window.assignmentData.teacherSubjects.some(ts => ts.teacher_id === t.id && ts.subject_id === assignment.subject_id);
-            });
-            
-            // Add qualified teachers
-            qualifiedTeachers.forEach(t => {
-                const option = document.createElement('option');
-                option.value = t.id;
-                option.textContent = t.full_name;
-                teacherSelect.appendChild(option);
-            });
-            
-            // Add auto option
-            const autoOption = document.createElement('option');
-            autoOption.value = 'auto';
-            autoOption.textContent = '🤖 Auto-assign (System will decide)';
-            teacherSelect.appendChild(autoOption);
-            
-            teacherSelect.disabled = false;
-            document.getElementById('assign-teacher-modal').classList.remove('hidden');
         }
       </script>
     `;

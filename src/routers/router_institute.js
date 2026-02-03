@@ -6,6 +6,8 @@ import { ClassesPageHTML } from '../ui/institute/classes.js';
 import { SubjectsPageHTML } from '../ui/institute/subjects.js'; 
 import { SchedulesPageHTML } from '../ui/institute/schedules.js'; 
 import { TeachersAssignmentPageHTML } from '../ui/institute/teachers_assignment.js';
+import { RoutineGeneratorHTML } from '../ui/institute/routine_generator.js';
+import { RoutineViewerHTML } from '../ui/institute/routine_viewer.js';
 import { syncDatabase } from '../core/schema_manager.js';
 
 export async function handleInstituteRequest(request, env) {
@@ -20,7 +22,8 @@ export async function handleInstituteRequest(request, env) {
   if (url.pathname === '/school/dashboard') {
     const tCount = await env.DB.prepare("SELECT count(*) as count FROM profiles_teacher WHERE school_id = ?").bind(school.id).first();
     const cCount = await env.DB.prepare("SELECT count(*) as count FROM academic_classes WHERE school_id = ?").bind(school.id).first();
-    return htmlResponse(InstituteLayout(InstituteDashboardHTML({teachers: tCount.count, classes: cCount.count}), "Dashboard", school.school_name));
+    const rCount = await env.DB.prepare("SELECT count(*) as count FROM generated_routines WHERE school_id = ?").bind(school.id).first();
+    return htmlResponse(InstituteLayout(InstituteDashboardHTML({teachers: tCount.count, classes: cCount.count, routines: rCount.count}), "Dashboard", school.school_name));
   }
 
   // --- MASTER SCHEDULE ---
@@ -286,8 +289,8 @@ export async function handleInstituteRequest(request, env) {
                   
                   // Auto-create auto-assignment for this class subject
                   await env.DB.prepare(`
-                      INSERT INTO teacher_assignments (school_id, class_id, group_id, section_id, subject_id, teacher_id, is_auto) 
-                      VALUES (?, ?, ?, ?, ?, ?, 1)
+                      INSERT INTO teacher_assignments (school_id, class_id, group_id, section_id, subject_id, teacher_id, is_auto, is_primary) 
+                      VALUES (?, ?, ?, ?, ?, ?, 1, 0)
                   `).bind(body.school_id, body.class_id, null, null, body.subject_id, null).run();
                   
                   return jsonResponse({success:true});
@@ -320,8 +323,8 @@ export async function handleInstituteRequest(request, env) {
                   
                   // Auto-create auto-assignment for this group subject
                   await env.DB.prepare(`
-                      INSERT INTO teacher_assignments (school_id, class_id, group_id, section_id, subject_id, teacher_id, is_auto) 
-                      VALUES (?, ?, ?, ?, ?, ?, 1)
+                      INSERT INTO teacher_assignments (school_id, class_id, group_id, section_id, subject_id, teacher_id, is_auto, is_primary) 
+                      VALUES (?, ?, ?, ?, ?, ?, 1, 0)
                   `).bind(body.school_id, classInfo.class_id, body.group_id, null, body.subject_id, null).run();
                   
                   return jsonResponse({success:true});
@@ -481,12 +484,15 @@ export async function handleInstituteRequest(request, env) {
       `).bind(school.id).all();
       
       const teacherAssignments = await env.DB.prepare(`
-        SELECT ta.*, t.full_name as teacher_name, sub.subject_name
+        SELECT ta.*, t.full_name as teacher_name, sub.subject_name, g.group_name, g.class_id
         FROM teacher_assignments ta
         LEFT JOIN profiles_teacher t ON ta.teacher_id = t.id
         JOIN academic_subjects sub ON ta.subject_id = sub.id
+        LEFT JOIN class_groups g ON ta.group_id = g.id
         WHERE ta.school_id = ?
       `).bind(school.id).all();
+      
+      console.log('Teacher assignments data:', teacherAssignments.results);
       
       // Get subject assignments
       const classSubjects = await env.DB.prepare(`
@@ -608,13 +614,39 @@ export async function handleInstituteRequest(request, env) {
           const body = await request.json();
           
           if (body.action === 'assign_teacher') {
-              // Check if there's already an auto-assignment for this subject
-              const existingAssignment = await env.DB.prepare(`
+              if (!body.teacher_id) {
+                  return jsonResponse({ error: "Please select a teacher before assigning." }, 400);
+              }
+              // Check if this teacher is already assigned to this subject (to avoid duplicates)
+              const existingTeacherAssignment = await env.DB.prepare(`
                   SELECT id FROM teacher_assignments 
                   WHERE school_id = ? AND class_id = ? AND 
                         (group_id = ? OR (group_id IS NULL AND ? IS NULL)) AND
                         (section_id = ? OR (section_id IS NULL AND ? IS NULL)) AND
-                        subject_id = ?
+                        subject_id = ? AND teacher_id = ?
+              `).bind(
+                  school.id,
+                  body.class_id,
+                  body.group_id,
+                  body.group_id,
+                  body.section_id,
+                  body.section_id,
+                  body.subject_id,
+                  body.teacher_id
+              ).first();
+              
+              if (existingTeacherAssignment) {
+                  return jsonResponse({ error: "This teacher is already assigned to this subject" }, 400);
+              }
+              
+              // Check if there is already a manual primary assignment
+              const primaryAssignment = await env.DB.prepare(`
+                  SELECT id FROM teacher_assignments
+                  WHERE school_id = ? AND class_id = ? AND
+                        (group_id = ? OR (group_id IS NULL AND ? IS NULL)) AND
+                        (section_id = ? OR (section_id IS NULL AND ? IS NULL)) AND
+                        subject_id = ? AND is_primary = 1 AND is_auto = 0 AND teacher_id IS NOT NULL
+                  LIMIT 1
               `).bind(
                   school.id,
                   body.class_id,
@@ -625,46 +657,134 @@ export async function handleInstituteRequest(request, env) {
                   body.subject_id
               ).first();
               
-              if (existingAssignment) {
-                  // Update existing assignment to manual with specific teacher
+              const hasPrimaryAssignment = !!primaryAssignment;
+              const isPrimary = hasPrimaryAssignment ? 0 : 1; // Make this primary if no manual primary exists
+              
+              // If an auto placeholder exists, convert it to a manual assignment instead of adding a duplicate row
+              const autoAssignment = await env.DB.prepare(`
+                  SELECT id FROM teacher_assignments
+                  WHERE school_id = ? AND class_id = ? AND
+                        (group_id = ? OR (group_id IS NULL AND ? IS NULL)) AND
+                        (section_id = ? OR (section_id IS NULL AND ? IS NULL)) AND
+                        subject_id = ? AND (is_auto = 1 OR teacher_id IS NULL)
+                  ORDER BY id ASC
+                  LIMIT 1
+              `).bind(
+                  school.id,
+                  body.class_id,
+                  body.group_id,
+                  body.group_id,
+                  body.section_id,
+                  body.section_id,
+                  body.subject_id
+              ).first();
+              
+              if (autoAssignment) {
                   await env.DB.prepare(`
-                      UPDATE teacher_assignments 
-                      SET teacher_id = ?, is_auto = 0
+                      UPDATE teacher_assignments
+                      SET teacher_id = ?, is_auto = 0, is_primary = ?
                       WHERE id = ? AND school_id = ?
                   `).bind(
                       body.teacher_id,
-                      existingAssignment.id,
+                      isPrimary,
+                      autoAssignment.id,
                       school.id
                   ).run();
-              } else {
-                  // Create new teacher assignment record
-                  await env.DB.prepare(`
-                      INSERT INTO teacher_assignments (school_id, class_id, group_id, section_id, subject_id, teacher_id, is_auto) 
-                      VALUES (?, ?, ?, ?, ?, ?, 0)
-                  `).bind(
-                      school.id,
-                      body.class_id,
-                      body.group_id,
-                      body.section_id,
-                      body.subject_id,
-                      body.teacher_id
-                  ).run();
+                  
+                  if (!hasPrimaryAssignment) {
+                      await env.DB.prepare(`
+                          UPDATE teacher_assignments
+                          SET is_primary = 0
+                          WHERE school_id = ? AND class_id = ? AND
+                                (group_id = ? OR (group_id IS NULL AND ? IS NULL)) AND
+                                (section_id = ? OR (section_id IS NULL AND ? IS NULL)) AND
+                                subject_id = ? AND id != ? AND (is_auto = 1 OR teacher_id IS NULL)
+                      `).bind(
+                          school.id,
+                          body.class_id,
+                          body.group_id,
+                          body.group_id,
+                          body.section_id,
+                          body.section_id,
+                          body.subject_id,
+                          autoAssignment.id
+                      ).run();
+                  }
+                  
+                  return jsonResponse({ success: true });
               }
+              
+              // Create new teacher assignment record (allowing multiple teachers)
+              await env.DB.prepare(`
+                  INSERT INTO teacher_assignments (school_id, class_id, group_id, section_id, subject_id, teacher_id, is_auto, is_primary)
+                  VALUES (?, ?, ?, ?, ?, ?, 0, ?)
+              `).bind(
+                  school.id,
+                  body.class_id,
+                  body.group_id,
+                  body.section_id,
+                  body.subject_id,
+                  body.teacher_id,
+                  isPrimary
+              ).run();
               
               return jsonResponse({ success: true });
           }
           
           if (body.action === 'replace_teacher') {
-              // Update existing teacher assignment
-              await env.DB.prepare(`
-                  UPDATE teacher_assignments 
-                  SET teacher_id = ?, is_auto = 0
+              const currentAssignment = await env.DB.prepare(`
+                  SELECT id, class_id, group_id, section_id, subject_id, is_primary FROM teacher_assignments
                   WHERE id = ? AND school_id = ?
               `).bind(
-                  body.teacher_id,
                   body.existing_assignment_id,
                   school.id
-              ).run();
+              ).first();
+              
+              if (!currentAssignment) {
+                  return jsonResponse({ error: "Assignment not found" }, 404);
+              }
+              
+              if (!body.teacher_id) {
+                  await env.DB.prepare(`
+                      UPDATE teacher_assignments
+                      SET teacher_id = null, is_auto = 1, is_primary = 0
+                      WHERE id = ? AND school_id = ?
+                  `).bind(
+                      body.existing_assignment_id,
+                      school.id
+                  ).run();
+              } else {
+                  const primaryExists = await env.DB.prepare(`
+                      SELECT id FROM teacher_assignments
+                      WHERE school_id = ? AND class_id = ? AND
+                            (group_id = ? OR (group_id IS NULL AND ? IS NULL)) AND
+                            (section_id = ? OR (section_id IS NULL AND ? IS NULL)) AND
+                            subject_id = ? AND is_primary = 1 AND is_auto = 0 AND teacher_id IS NOT NULL AND id != ?
+                      LIMIT 1
+                  `).bind(
+                      school.id,
+                      currentAssignment.class_id,
+                      currentAssignment.group_id,
+                      currentAssignment.group_id,
+                      currentAssignment.section_id,
+                      currentAssignment.section_id,
+                      currentAssignment.subject_id,
+                      body.existing_assignment_id
+                  ).first();
+                  
+                  const shouldBePrimary = currentAssignment.is_primary === 1 || !primaryExists;
+                  
+                  await env.DB.prepare(`
+                      UPDATE teacher_assignments
+                      SET teacher_id = ?, is_auto = 0, is_primary = ?
+                      WHERE id = ? AND school_id = ?
+                  `).bind(
+                      body.teacher_id,
+                      shouldBePrimary ? 1 : 0,
+                      body.existing_assignment_id,
+                      school.id
+                  ).run();
+              }
               
               return jsonResponse({ success: true });
           }
@@ -672,8 +792,8 @@ export async function handleInstituteRequest(request, env) {
           if (body.action === 'assign_auto') {
               // Create auto-assignment record (teacher_id can be null)
               await env.DB.prepare(`
-                  INSERT INTO teacher_assignments (school_id, class_id, group_id, section_id, subject_id, teacher_id, is_auto) 
-                  VALUES (?, ?, ?, ?, ?, ?, 1)
+                  INSERT INTO teacher_assignments (school_id, class_id, group_id, section_id, subject_id, teacher_id, is_auto, is_primary) 
+                  VALUES (?, ?, ?, ?, ?, ?, 1, 0)
               `).bind(
                   school.id,
                   body.class_id,
@@ -690,7 +810,7 @@ export async function handleInstituteRequest(request, env) {
               // Convert existing assignment to auto
               await env.DB.prepare(`
                   UPDATE teacher_assignments 
-                  SET teacher_id = null, is_auto = 1
+                  SET teacher_id = null, is_auto = 1, is_primary = 0
                   WHERE id = ? AND school_id = ?
               `).bind(
                   body.assignment_id,
@@ -702,12 +822,46 @@ export async function handleInstituteRequest(request, env) {
           
           if (body.action === 'set_manual') {
               // Convert auto assignment to manual with specific teacher
+              const currentAssignment = await env.DB.prepare(`
+                  SELECT id, class_id, group_id, section_id, subject_id, is_primary
+                  FROM teacher_assignments
+                  WHERE id = ? AND school_id = ?
+              `).bind(
+                  body.assignment_id,
+                  school.id
+              ).first();
+              
+              if (!currentAssignment) {
+                  return jsonResponse({ error: "Assignment not found" }, 404);
+              }
+              
+              const primaryExists = await env.DB.prepare(`
+                  SELECT id FROM teacher_assignments
+                  WHERE school_id = ? AND class_id = ? AND
+                        (group_id = ? OR (group_id IS NULL AND ? IS NULL)) AND
+                        (section_id = ? OR (section_id IS NULL AND ? IS NULL)) AND
+                        subject_id = ? AND is_primary = 1 AND is_auto = 0 AND teacher_id IS NOT NULL AND id != ?
+                  LIMIT 1
+              `).bind(
+                  school.id,
+                  currentAssignment.class_id,
+                  currentAssignment.group_id,
+                  currentAssignment.group_id,
+                  currentAssignment.section_id,
+                  currentAssignment.section_id,
+                  currentAssignment.subject_id,
+                  body.assignment_id
+              ).first();
+              
+              const shouldBePrimary = currentAssignment.is_primary === 1 || !primaryExists;
+              
               await env.DB.prepare(`
                   UPDATE teacher_assignments 
-                  SET teacher_id = ?, is_auto = 0
+                  SET teacher_id = ?, is_auto = 0, is_primary = ?
                   WHERE id = ? AND school_id = ?
               `).bind(
                   body.teacher_id,
+                  shouldBePrimary ? 1 : 0,
                   body.assignment_id,
                   school.id
               ).run();
@@ -796,6 +950,1158 @@ export async function handleInstituteRequest(request, env) {
         "Classes & Groups", 
         school.school_name
       ));
+  }
+
+  // --- ROUTINE GENERATOR ---
+  if (url.pathname === '/school/routine-generator') {
+    try {
+      const existingRoutines = (await env.DB.prepare("SELECT * FROM generated_routines WHERE school_id = ? ORDER BY generated_at DESC").bind(school.id).all()).results;
+      const generationSettings = await env.DB.prepare("SELECT * FROM routine_generation_settings WHERE school_id = ?").bind(school.id).first();
+      const classes = (await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ?").bind(school.id).all()).results;
+      const groups = (await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ?").bind(school.id).all()).results;
+      const sections = (await env.DB.prepare("SELECT * FROM class_sections WHERE school_id = ?").bind(school.id).all()).results;
+      const teachers = (await env.DB.prepare("SELECT * FROM profiles_teacher WHERE school_id = ?").bind(school.id).all()).results;
+      const subjects = (await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ?").bind(school.id).all()).results;
+      const classSubjects = (await env.DB.prepare("SELECT * FROM class_subjects WHERE school_id = ?").bind(school.id).all()).results;
+      const groupSubjects = (await env.DB.prepare("SELECT * FROM group_subjects WHERE school_id = ?").bind(school.id).all()).results;
+      const teacherAssignments = (await env.DB.prepare("SELECT * FROM teacher_assignments WHERE school_id = ?").bind(school.id).all()).results;
+      const teacherSubjects = (await env.DB.prepare("SELECT * FROM teacher_subjects WHERE school_id = ?").bind(school.id).all()).results;
+      const scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+      let workingDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+      try {
+        if (scheduleConfig?.working_days) {
+          const parsed = JSON.parse(scheduleConfig.working_days);
+          if (Array.isArray(parsed) && parsed.length) workingDays = parsed;
+        }
+      } catch (error) {
+        console.error('Invalid working_days config:', error);
+      }
+      const slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
+      const classSlots = slots.filter(slot => slot.type === 'class');
+      let generationWarnings = { items: [] };
+      try {
+        generationWarnings = buildGenerationWarnings({
+          sections,
+          classes,
+          groups,
+          subjects,
+          classSubjects,
+          groupSubjects,
+          teacherAssignments,
+          teacherSubjects,
+          workingDays,
+          classSlots
+        });
+      } catch (error) {
+        console.error('Generation warnings failed:', error);
+      }
+      const schoolData = { classes, teachers, subjects, slots };
+      return htmlResponse(InstituteLayout(
+        RoutineGeneratorHTML(existingRoutines, generationSettings, schoolData, generationWarnings), 
+        "Routine Generator", 
+        school.school_name
+      ));
+    } catch (error) {
+      console.error('Routine generator error:', error);
+      try {
+        await syncDatabase(env);
+        const existingRoutines = (await env.DB.prepare("SELECT * FROM generated_routines WHERE school_id = ? ORDER BY generated_at DESC").bind(school.id).all()).results;
+        const generationSettings = await env.DB.prepare("SELECT * FROM routine_generation_settings WHERE school_id = ?").bind(school.id).first();
+        const classes = (await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ?").bind(school.id).all()).results;
+        const groups = (await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ?").bind(school.id).all()).results;
+        const sections = (await env.DB.prepare("SELECT * FROM class_sections WHERE school_id = ?").bind(school.id).all()).results;
+        const teachers = (await env.DB.prepare("SELECT * FROM profiles_teacher WHERE school_id = ?").bind(school.id).all()).results;
+        const subjects = (await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ?").bind(school.id).all()).results;
+        const classSubjects = (await env.DB.prepare("SELECT * FROM class_subjects WHERE school_id = ?").bind(school.id).all()).results;
+        const groupSubjects = (await env.DB.prepare("SELECT * FROM group_subjects WHERE school_id = ?").bind(school.id).all()).results;
+        const teacherAssignments = (await env.DB.prepare("SELECT * FROM teacher_assignments WHERE school_id = ?").bind(school.id).all()).results;
+        const teacherSubjects = (await env.DB.prepare("SELECT * FROM teacher_subjects WHERE school_id = ?").bind(school.id).all()).results;
+        const scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+        let workingDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+        try {
+          if (scheduleConfig?.working_days) {
+            const parsed = JSON.parse(scheduleConfig.working_days);
+            if (Array.isArray(parsed) && parsed.length) workingDays = parsed;
+          }
+        } catch (error) {
+          console.error('Invalid working_days config:', error);
+        }
+        const slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
+        const classSlots = slots.filter(slot => slot.type === 'class');
+        let generationWarnings = { items: [] };
+        try {
+          generationWarnings = buildGenerationWarnings({
+            sections,
+            classes,
+            groups,
+            subjects,
+            classSubjects,
+            groupSubjects,
+            teacherAssignments,
+            teacherSubjects,
+            workingDays,
+            classSlots
+          });
+        } catch (error) {
+          console.error('Generation warnings failed:', error);
+        }
+        const schoolData = { classes, teachers, subjects, slots };
+        return htmlResponse(InstituteLayout(
+          RoutineGeneratorHTML(existingRoutines, generationSettings, schoolData, generationWarnings), 
+          "Routine Generator", 
+          school.school_name
+        ));
+      } catch (retryError) {
+        console.error('Retry failed:', retryError);
+        return htmlResponse("<h1>Database Error</h1><p>Unable to initialize routine generator. Please try again.</p>");
+      }
+    }
+  }
+
+  // --- ROUTINE VIEWER ---
+  if (url.pathname === '/school/routine-viewer') {
+    const routineId = url.searchParams.get('id');
+    if (!routineId) {
+      return new Response("Routine ID required", {status: 400});
+    }
+    
+    const routine = await env.DB.prepare("SELECT * FROM generated_routines WHERE id = ? AND school_id = ?").bind(routineId, school.id).first();
+    if (!routine) {
+      return new Response("Routine not found", {status: 404});
+    }
+    
+    const entries = (await env.DB.prepare(`
+      SELECT re.*, 
+             c.class_name, 
+             s.subject_name, 
+             t.full_name as teacher_name,
+             sl.start_time, 
+             sl.end_time,
+             sl.label as slot_label,
+             sec.section_name,
+             g.group_name
+      FROM routine_entries re
+      LEFT JOIN academic_classes c ON re.class_id = c.id
+      LEFT JOIN academic_subjects s ON re.subject_id = s.id  
+      LEFT JOIN profiles_teacher t ON re.teacher_id = t.id
+      LEFT JOIN schedule_slots sl ON re.slot_index = sl.slot_index AND sl.school_id = re.school_id
+      LEFT JOIN class_sections sec ON re.section_id = sec.id
+      LEFT JOIN class_groups g ON re.group_id = g.id
+      WHERE re.routine_id = ? AND re.school_id = ?
+      ORDER BY re.day_of_week, re.slot_index
+    `).bind(routineId, school.id).all()).results;
+    
+    const classes = (await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ?").bind(school.id).all()).results;
+    const teachers = (await env.DB.prepare("SELECT * FROM profiles_teacher WHERE school_id = ?").bind(school.id).all()).results;
+    const subjects = (await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ?").bind(school.id).all()).results;
+    const slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
+    const groups = (await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ?").bind(school.id).all()).results;
+    const sections = (await env.DB.prepare("SELECT * FROM class_sections WHERE school_id = ?").bind(school.id).all()).results;
+    const classSubjects = (await env.DB.prepare("SELECT * FROM class_subjects WHERE school_id = ?").bind(school.id).all()).results;
+    const groupSubjects = (await env.DB.prepare("SELECT * FROM group_subjects WHERE school_id = ?").bind(school.id).all()).results;
+    const teacherAssignments = (await env.DB.prepare("SELECT * FROM teacher_assignments WHERE school_id = ?").bind(school.id).all()).results;
+    const teacherSubjects = (await env.DB.prepare("SELECT * FROM teacher_subjects WHERE school_id = ?").bind(school.id).all()).results;
+    const scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+    let workingDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+    try {
+      if (scheduleConfig?.working_days) {
+        const parsed = JSON.parse(scheduleConfig.working_days);
+        if (Array.isArray(parsed) && parsed.length) workingDays = parsed;
+      }
+    } catch (error) {
+      console.error('Invalid working_days config:', error);
+    }
+    const classSlots = slots.filter(slot => slot.type === 'class');
+    
+    const conflictSummary = buildConflictSummary({
+      entries,
+      classes,
+      groups,
+      sections,
+      subjects,
+      classSubjects,
+      groupSubjects,
+      teacherAssignments,
+      teacherSubjects,
+      workingDays,
+      classSlots
+    });
+    
+    const routineData = { routine, entries, classes, teachers, subjects, slots, groups, sections, workingDays, conflictSummary };
+    
+    return htmlResponse(InstituteLayout(
+      RoutineViewerHTML(routineData), 
+      routine.name, 
+      school.school_name
+    ));
+  }
+
+  // --- ROUTINE GENERATION DATA (CLIENT) ---
+  if (url.pathname === '/school/api/routine-generation-data' && request.method === 'GET') {
+    try {
+      const classes = (await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ?").bind(school.id).all()).results;
+      const groups = (await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ?").bind(school.id).all()).results;
+      const sections = (await env.DB.prepare("SELECT * FROM class_sections WHERE school_id = ?").bind(school.id).all()).results;
+      const subjects = (await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ?").bind(school.id).all()).results;
+      const classSubjects = (await env.DB.prepare("SELECT * FROM class_subjects WHERE school_id = ?").bind(school.id).all()).results;
+      const groupSubjects = (await env.DB.prepare("SELECT * FROM group_subjects WHERE school_id = ?").bind(school.id).all()).results;
+      const teacherAssignments = (await env.DB.prepare("SELECT * FROM teacher_assignments WHERE school_id = ?").bind(school.id).all()).results;
+      const teacherSubjects = (await env.DB.prepare("SELECT * FROM teacher_subjects WHERE school_id = ?").bind(school.id).all()).results;
+      const scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+      const slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
+
+      let workingDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+      try {
+        if (scheduleConfig?.working_days) {
+          const parsed = JSON.parse(scheduleConfig.working_days);
+          if (Array.isArray(parsed) && parsed.length) workingDays = parsed;
+        }
+      } catch (error) {
+        console.error('Invalid working_days config:', error);
+      }
+
+      const classSlots = slots.filter(slot => slot.type === 'class').sort((a, b) => a.slot_index - b.slot_index);
+
+      return jsonResponse({
+        success: true,
+        data: {
+          classes,
+          groups,
+          sections,
+          subjects,
+          classSubjects,
+          groupSubjects,
+          teacherAssignments,
+          teacherSubjects,
+          workingDays,
+          classSlots
+        }
+      });
+    } catch (error) {
+      console.error('Routine generation data error:', error);
+      return jsonResponse({ error: error.message }, 500);
+    }
+  }
+
+  // --- ROUTINE GENERATION API ---
+  if (url.pathname === '/school/api/generate-routine' && request.method === 'POST') {
+    try {
+      const body = await request.json();
+
+      const classes = (await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ?").bind(school.id).all()).results;
+      const groups = (await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ?").bind(school.id).all()).results;
+      const sections = (await env.DB.prepare("SELECT * FROM class_sections WHERE school_id = ?").bind(school.id).all()).results;
+      const subjects = (await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ?").bind(school.id).all()).results;
+      const classSubjects = (await env.DB.prepare("SELECT * FROM class_subjects WHERE school_id = ?").bind(school.id).all()).results;
+      const groupSubjects = (await env.DB.prepare("SELECT * FROM group_subjects WHERE school_id = ?").bind(school.id).all()).results;
+      const teacherAssignments = (await env.DB.prepare("SELECT * FROM teacher_assignments WHERE school_id = ?").bind(school.id).all()).results;
+      const teacherSubjects = (await env.DB.prepare("SELECT * FROM teacher_subjects WHERE school_id = ?").bind(school.id).all()).results;
+      const scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+      const slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
+
+      let workingDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+      try {
+        if (scheduleConfig?.working_days) {
+          const parsed = JSON.parse(scheduleConfig.working_days);
+          if (Array.isArray(parsed) && parsed.length) workingDays = parsed;
+        }
+      } catch (error) {
+        console.error('Invalid working_days config:', error);
+      }
+
+      const classSlots = slots.filter(slot => slot.type === 'class').sort((a, b) => a.slot_index - b.slot_index);
+
+      if (!sections.length) return jsonResponse({ error: "No sections configured for routine generation." }, 400);
+      if (!classSlots.length) return jsonResponse({ error: "No class periods found in Master Schedule." }, 400);
+
+      const plan = generateRoutinePlan({
+        schoolId: school.id,
+        sections,
+        classes,
+        groups,
+        subjects,
+        classSubjects,
+        groupSubjects,
+        teacherAssignments,
+        teacherSubjects,
+        workingDays,
+        classSlots
+      });
+
+      const routineName = body.name || `Generated Routine ${new Date().toLocaleDateString()}`;
+      const result = await env.DB.prepare(`
+        INSERT INTO generated_routines (school_id, name, generated_by, total_periods, conflicts_resolved) 
+        VALUES (?, ?, 'auto', ?, ?)
+      `).bind(school.id, routineName, plan.totalPeriods, plan.conflicts).run();
+      
+      const routineId = result.meta.last_row_id;
+      
+      for (const entry of plan.entries) {
+        await env.DB.prepare(`
+          INSERT INTO routine_entries (routine_id, school_id, day_of_week, slot_index, class_id, group_id, section_id, subject_id, teacher_id, is_conflict, conflict_reason)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          routineId, school.id, entry.day_of_week, entry.slot_index,
+          entry.class_id, entry.group_id, entry.section_id,
+          entry.subject_id, entry.teacher_id, entry.is_conflict || 0, entry.conflict_reason || null
+        ).run();
+      }
+      
+      return jsonResponse({ 
+        success: true, 
+        routineId,
+        message: `Generated routine with ${plan.totalPeriods} periods for ${sections.length} sections. ${plan.conflicts} conflicts.` 
+      });
+    } catch (error) {
+      console.error('Routine generation error:', error);
+      return jsonResponse({ error: error.message }, 500);
+    }
+  }
+
+  // --- ROUTINE SAVE (CLIENT GENERATED) ---
+  if (url.pathname === '/school/api/routine/save-generated' && request.method === 'POST') {
+    try {
+      const body = await request.json();
+      const entries = Array.isArray(body.entries) ? body.entries : [];
+      if (!entries.length) return jsonResponse({ error: "No routine entries provided." }, 400);
+
+      const classes = (await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ?").bind(school.id).all()).results;
+      const groups = (await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ?").bind(school.id).all()).results;
+      const sections = (await env.DB.prepare("SELECT * FROM class_sections WHERE school_id = ?").bind(school.id).all()).results;
+      const subjects = (await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ?").bind(school.id).all()).results;
+      const classSubjects = (await env.DB.prepare("SELECT * FROM class_subjects WHERE school_id = ?").bind(school.id).all()).results;
+      const groupSubjects = (await env.DB.prepare("SELECT * FROM group_subjects WHERE school_id = ?").bind(school.id).all()).results;
+      const teacherAssignments = (await env.DB.prepare("SELECT * FROM teacher_assignments WHERE school_id = ?").bind(school.id).all()).results;
+      const teacherSubjects = (await env.DB.prepare("SELECT * FROM teacher_subjects WHERE school_id = ?").bind(school.id).all()).results;
+      const scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+      const slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
+
+      let workingDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+      try {
+        if (scheduleConfig?.working_days) {
+          const parsed = JSON.parse(scheduleConfig.working_days);
+          if (Array.isArray(parsed) && parsed.length) workingDays = parsed;
+        }
+      } catch (error) {
+        console.error('Invalid working_days config:', error);
+      }
+
+      const classSlots = slots.filter(slot => slot.type === 'class').sort((a, b) => a.slot_index - b.slot_index);
+
+      const validation = validateGeneratedRoutine({
+        entries,
+        classes,
+        groups,
+        sections,
+        subjects,
+        classSubjects,
+        groupSubjects,
+        teacherAssignments,
+        teacherSubjects,
+        workingDays,
+        classSlots
+      });
+
+      if (!validation.valid) {
+        return jsonResponse({ error: validation.errors[0] || "Routine validation failed.", errors: validation.errors }, 400);
+      }
+
+      const routineName = body.name || `Generated Routine ${new Date().toLocaleDateString()}`;
+      const result = await env.DB.prepare(`
+        INSERT INTO generated_routines (school_id, name, generated_by, total_periods, conflicts_resolved)
+        VALUES (?, ?, 'client', ?, ?)
+      `).bind(school.id, routineName, entries.length, 0).run();
+
+      const routineId = result.meta.last_row_id;
+
+      for (const entry of entries) {
+        await env.DB.prepare(`
+          INSERT INTO routine_entries (routine_id, school_id, day_of_week, slot_index, class_id, group_id, section_id, subject_id, teacher_id, is_conflict, conflict_reason)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          routineId,
+          school.id,
+          entry.day_of_week,
+          entry.slot_index,
+          entry.class_id,
+          entry.group_id ?? null,
+          entry.section_id ?? null,
+          entry.subject_id,
+          entry.teacher_id ?? null,
+          0,
+          null
+        ).run();
+      }
+
+      return jsonResponse({
+        success: true,
+        routineId,
+        message: `Routine saved with ${entries.length} periods.`
+      });
+    } catch (error) {
+      console.error('Routine save error:', error);
+      return jsonResponse({ error: error.message }, 500);
+    }
+  }
+
+  // --- ROUTINE MANAGEMENT API ---
+  if (url.pathname.startsWith('/school/api/routine/') && request.method === 'DELETE') {
+    const routineId = url.pathname.split('/').pop();
+    
+    try {
+      await env.DB.prepare("DELETE FROM routine_entries WHERE routine_id = ? AND school_id = ?").bind(routineId, school.id).run();
+      await env.DB.prepare("DELETE FROM generated_routines WHERE id = ? AND school_id = ?").bind(routineId, school.id).run();
+      return jsonResponse({ success: true });
+    } catch (error) {
+      return jsonResponse({ error: error.message }, 500);
+    }
+  }
+
+  if (url.pathname.startsWith('/school/api/routine/') && request.method === 'POST') {
+    const parts = url.pathname.split('/');
+    const routineId = parts[parts.length - 2];
+    const action = parts[parts.length - 1];
+    
+    if (action === 'activate') {
+      try {
+        await env.DB.prepare("UPDATE generated_routines SET is_active = 0 WHERE school_id = ?").bind(school.id).run();
+        await env.DB.prepare("UPDATE generated_routines SET is_active = 1 WHERE id = ? AND school_id = ?").bind(routineId, school.id).run();
+        return jsonResponse({ success: true });
+      } catch (error) {
+        return jsonResponse({ error: error.message }, 500);
+      }
+    }
+  }
+
+  function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+
+  function pickAssignmentsForSection(assignments, section, subjectId) {
+    const relevant = assignments.filter(a => a.subject_id === subjectId && a.class_id === section.class_id);
+    const sectionLevel = relevant.filter(a => a.section_id === section.id);
+    if (sectionLevel.length) return sectionLevel;
+    if (section.group_id) {
+      const groupLevel = relevant.filter(a => a.group_id === section.group_id && !a.section_id);
+      if (groupLevel.length) return groupLevel;
+    }
+    const classLevel = relevant.filter(a => !a.group_id && !a.section_id);
+    return classLevel;
+  }
+
+  function buildSectionTargets({
+    section,
+    classSubjects,
+    groupSubjects,
+    workingDays,
+    classSlots
+  }) {
+    const subjectMap = {};
+    const addSubject = (subjectId, minCount, maxCount) => {
+      if (!subjectMap[subjectId]) {
+        subjectMap[subjectId] = { min: 0, max: 0, fixed: true };
+      }
+      subjectMap[subjectId].min += Math.max(0, minCount || 0);
+      subjectMap[subjectId].max += Math.max(0, maxCount || 0);
+    };
+
+    classSubjects
+      .filter(cs => cs.class_id === section.class_id)
+      .forEach(cs => {
+        if (cs.is_fixed) {
+          addSubject(cs.subject_id, cs.classes_per_week, cs.classes_per_week);
+        } else {
+          addSubject(cs.subject_id, cs.min_classes, cs.max_classes);
+        }
+      });
+
+    if (section.group_id) {
+      groupSubjects
+        .filter(gs => gs.group_id === section.group_id)
+        .forEach(gs => {
+          if (gs.is_fixed) {
+            addSubject(gs.subject_id, gs.classes_per_week, gs.classes_per_week);
+          } else {
+            addSubject(gs.subject_id, gs.min_classes, gs.max_classes);
+          }
+        });
+    }
+
+    const totalSlots = workingDays.length * classSlots.length;
+    const subjectIds = Object.keys(subjectMap);
+    const targets = {};
+    let minSum = 0;
+
+    subjectIds.forEach(subjectId => {
+      const subject = subjectMap[subjectId];
+      const rawMin = subject.min;
+      const rawMax = Math.max(subject.max, rawMin);
+
+      subjectMap[subjectId].max = rawMax;
+      subjectMap[subjectId].min = rawMin;
+      subjectMap[subjectId].fixed = rawMin === rawMax;
+
+      targets[subjectId] = rawMin;
+      minSum += rawMin;
+    });
+
+    return { targets, totalSlots };
+  }
+
+  function buildTeacherPools({ section, subjectIds, teacherAssignments, teacherSubjects }) {
+    const pools = {};
+    subjectIds.forEach(subjectId => {
+      const assignments = pickAssignmentsForSection(teacherAssignments || [], section, subjectId);
+      const manualTeachers = assignments.filter(a => a.is_auto === 0 && a.teacher_id).map(a => a.teacher_id);
+      let pool = [];
+      if (manualTeachers.length) {
+        pool = [...new Set(manualTeachers)];
+      } else {
+        pool = (teacherSubjects || []).filter(ts => ts.subject_id === subjectId).map(ts => ts.teacher_id);
+      }
+      pools[subjectId] = [...new Set(pool)];
+    });
+    return pools;
+  }
+
+  function generateRoutinePlanGreedy({
+    sectionList,
+    classSubjects,
+    groupSubjects,
+    teacherAssignments,
+    teacherSubjects,
+    workingDays,
+    classSlots
+  }) {
+    const entries = [];
+    const maxTeacherDaily = classSlots.length;
+    const teacherSchedule = {};
+    const teacherDailyCount = {};
+    const teacherWeeklyCount = {};
+    const teacherSubjectCount = {};
+
+    const sectionPlans = sectionList.map(section => {
+      const { targets } = buildSectionTargets({
+        section,
+        classSubjects,
+        groupSubjects,
+        workingDays,
+        classSlots
+      });
+      const subjectIds = Object.keys(targets).map(id => Number(id));
+      const teacherPools = buildTeacherPools({
+        section,
+        subjectIds,
+        teacherAssignments,
+        teacherSubjects
+      });
+      const remaining = {};
+      let remainingTotal = 0;
+      subjectIds.forEach(subjectId => {
+        remaining[subjectId] = targets[subjectId] || 0;
+        remainingTotal += remaining[subjectId];
+      });
+      const usedSubjectsByDay = {};
+      workingDays.forEach(day => {
+        usedSubjectsByDay[day] = new Set();
+      });
+      return {
+        section,
+        remaining,
+        remainingTotal,
+        subjectIds,
+        teacherPools,
+        usedSubjectsByDay
+      };
+    });
+
+    sectionPlans.sort((a, b) => b.remainingTotal - a.remainingTotal);
+
+    const pickTeacherCandidateFast = (pool, day, slotIndex, subjectId) => {
+      let best = null;
+      for (const teacherId of pool) {
+        if (teacherSchedule[teacherId]?.[day]?.[slotIndex]) continue;
+        if ((teacherDailyCount[teacherId]?.[day] || 0) >= maxTeacherDaily) continue;
+        const weekly = teacherWeeklyCount[teacherId] || 0;
+        const daily = teacherDailyCount[teacherId]?.[day] || 0;
+        const subjectCount = teacherSubjectCount[teacherId]?.[subjectId] || 0;
+        const score = weekly * 10 + daily * 5 + subjectCount;
+        if (!best || score < best.score) {
+          best = { teacherId, score };
+        }
+      }
+      return best ? best.teacherId : null;
+    };
+
+    const chooseAssignmentForSlotFast = (plan, day, slotIndex) => {
+      const options = [];
+      plan.subjectIds.forEach(subjectId => {
+        const remaining = plan.remaining[subjectId] || 0;
+        if (remaining <= 0) return;
+        if (plan.usedSubjectsByDay[day].has(subjectId)) return;
+        const pool = plan.teacherPools[subjectId] || [];
+        if (!pool.length) {
+          options.push({ subjectId, teacherId: null, score: remaining * 10 });
+          return;
+        }
+        const teacherId = pickTeacherCandidateFast(pool, day, slotIndex, subjectId);
+        if (!teacherId) return;
+        const score = remaining * 100 - pool.length * 10;
+        options.push({ subjectId, teacherId, score });
+      });
+
+      if (!options.length) return null;
+      options.sort((a, b) => {
+        const aUnassigned = !a.teacherId;
+        const bUnassigned = !b.teacherId;
+        if (aUnassigned !== bUnassigned) return aUnassigned ? 1 : -1;
+        return b.score - a.score;
+      });
+      return options[0];
+    };
+
+    workingDays.forEach(day => {
+      classSlots.forEach(slot => {
+        const sectionsByNeed = sectionPlans.slice().sort((a, b) => b.remainingTotal - a.remainingTotal);
+        sectionsByNeed.forEach(plan => {
+          if (plan.remainingTotal <= 0) return;
+          const assignment = chooseAssignmentForSlotFast(plan, day, slot.slot_index);
+          if (!assignment) return;
+
+          entries.push({
+            day_of_week: day,
+            slot_index: slot.slot_index,
+            class_id: plan.section.class_id,
+            group_id: plan.section.group_id,
+            section_id: plan.section.id,
+            subject_id: assignment.subjectId,
+            teacher_id: assignment.teacherId,
+            is_conflict: 0,
+            conflict_reason: null
+          });
+
+          plan.remaining[assignment.subjectId] -= 1;
+          plan.remainingTotal -= 1;
+          plan.usedSubjectsByDay[day].add(assignment.subjectId);
+
+          if (assignment.teacherId) {
+            if (!teacherSchedule[assignment.teacherId]) teacherSchedule[assignment.teacherId] = {};
+            if (!teacherSchedule[assignment.teacherId][day]) teacherSchedule[assignment.teacherId][day] = {};
+            teacherSchedule[assignment.teacherId][day][slot.slot_index] = true;
+
+            if (!teacherDailyCount[assignment.teacherId]) teacherDailyCount[assignment.teacherId] = {};
+            teacherDailyCount[assignment.teacherId][day] = (teacherDailyCount[assignment.teacherId][day] || 0) + 1;
+            teacherWeeklyCount[assignment.teacherId] = (teacherWeeklyCount[assignment.teacherId] || 0) + 1;
+
+            if (!teacherSubjectCount[assignment.teacherId]) teacherSubjectCount[assignment.teacherId] = {};
+            teacherSubjectCount[assignment.teacherId][assignment.subjectId] = (teacherSubjectCount[assignment.teacherId][assignment.subjectId] || 0) + 1;
+          }
+        });
+      });
+    });
+
+    return { success: true, entries };
+  }
+
+  function generateRoutinePlan({
+    schoolId,
+    sections,
+    classes,
+    groups,
+    subjects,
+    classSubjects,
+    groupSubjects,
+    teacherAssignments,
+    teacherSubjects,
+    workingDays,
+    classSlots
+  }) {
+    const sectionList = sections.length
+      ? sections
+      : classes.map(cls => ({
+          id: 0,
+          class_id: cls.id,
+          group_id: null,
+          section_name: 'Main'
+        }));
+
+    const plan = generateRoutinePlanGreedy({
+      sectionList,
+      classSubjects,
+      groupSubjects,
+      teacherAssignments,
+      teacherSubjects,
+      workingDays,
+      classSlots
+    });
+
+    const totalRequired = sectionList.reduce((sum, section) => {
+      const targets = buildSectionTargets({ section, classSubjects, groupSubjects, workingDays, classSlots }).targets;
+      const subjectIds = Object.keys(targets);
+      const sectionTotal = subjectIds.reduce((acc, id) => acc + (targets[id] || 0), 0);
+      return sum + sectionTotal;
+    }, 0);
+
+    const conflicts = Math.max(0, totalRequired - plan.entries.length);
+    return { entries: plan.entries, totalPeriods: plan.entries.length, conflicts };
+  }
+
+  function validateGeneratedRoutine({
+    entries,
+    classes,
+    groups,
+    sections,
+    subjects,
+    classSubjects,
+    groupSubjects,
+    teacherAssignments,
+    teacherSubjects,
+    workingDays,
+    classSlots
+  }) {
+    const errors = [];
+    const sectionList = sections;
+    if (!sectionList.length) {
+      return { valid: false, errors: ["No sections configured. Add sections before generating routines."] };
+    }
+
+    const workingDaySet = new Set(workingDays);
+    const slotIndexSet = new Set(classSlots.map(slot => slot.slot_index));
+
+    const sectionMap = new Map();
+    sectionList.forEach(sec => {
+      const key = `${sec.class_id}-${sec.group_id || 0}-${sec.id || 0}`;
+      sectionMap.set(key, sec);
+    });
+
+    const subjectNameMap = new Map((subjects || []).map(subject => [subject.id, subject.subject_name || `Subject ${subject.id}`]));
+    const classNameMap = new Map((classes || []).map(cls => [cls.id, cls.class_name || `Class ${cls.id}`]));
+    const groupNameMap = new Map((groups || []).map(group => [group.id, group.group_name || `Group ${group.id}`]));
+    const sectionNameMap = new Map((sections || []).map(sec => [sec.id, sec.section_name || 'Main']));
+
+    const getSubjectLabel = (subjectId) => subjectNameMap.get(subjectId) || `Subject ${subjectId}`;
+    const getSectionLabel = (classId, groupId, sectionId) => {
+      const className = classNameMap.get(classId) || `Class ${classId}`;
+      const groupName = groupId ? (groupNameMap.get(groupId) || `Group ${groupId}`) : '';
+      const sectionName = sectionId ? (sectionNameMap.get(sectionId) || `Section ${sectionId}`) : 'Main';
+      let label = className;
+      if (groupName) label += ` - ${groupName}`;
+      if (sectionName) label += ` - ${sectionName}`;
+      return label;
+    };
+
+    const subjectRequirements = {};
+    sectionList.forEach(section => {
+      const sectionKey = `${section.class_id}-${section.group_id || 0}-${section.id || 0}`;
+      subjectRequirements[sectionKey] = {};
+
+      classSubjects
+        .filter(cs => cs.class_id === section.class_id)
+        .forEach(cs => {
+          const min = cs.is_fixed ? (cs.classes_per_week || 0) : (cs.min_classes || 0);
+          const max = cs.is_fixed ? (cs.classes_per_week || 0) : (cs.max_classes || 0);
+          subjectRequirements[sectionKey][cs.subject_id] = {
+            min,
+            max: Math.max(max, min)
+          };
+        });
+
+      if (section.group_id) {
+        groupSubjects
+          .filter(gs => gs.group_id === section.group_id)
+          .forEach(gs => {
+            const min = gs.is_fixed ? (gs.classes_per_week || 0) : (gs.min_classes || 0);
+            const max = gs.is_fixed ? (gs.classes_per_week || 0) : (gs.max_classes || 0);
+            const existing = subjectRequirements[sectionKey][gs.subject_id] || { min: 0, max: 0 };
+            subjectRequirements[sectionKey][gs.subject_id] = {
+              min: existing.min + min,
+              max: Math.max(existing.max + max, existing.min + min)
+            };
+          });
+      }
+    });
+
+    const sectionSlotMap = new Map();
+    const sectionDaySubject = new Map();
+    const sectionSubjectCount = {};
+    const teacherSlotMap = new Map();
+    const teacherDailyCount = {};
+
+    for (const entry of entries) {
+      const sectionKey = `${entry.class_id}-${entry.group_id || 0}-${entry.section_id || 0}`;
+      const section = sectionMap.get(sectionKey);
+      if (!section) {
+        errors.push(`Invalid section mapping for class ${entry.class_id}.`);
+        continue;
+      }
+
+      if (!workingDaySet.has(entry.day_of_week)) {
+        errors.push(`Invalid day ${entry.day_of_week} for section ${sectionKey}.`);
+        continue;
+      }
+
+      if (!slotIndexSet.has(entry.slot_index)) {
+        errors.push(`Invalid slot ${entry.slot_index} for section ${sectionKey}.`);
+        continue;
+      }
+
+      if (!entry.subject_id) {
+        errors.push(`Missing subject for ${getSectionLabel(entry.class_id, entry.group_id, entry.section_id)} on ${entry.day_of_week}.`);
+        continue;
+      }
+
+      const subjectReqs = subjectRequirements[sectionKey] || {};
+      if (!subjectReqs[entry.subject_id]) {
+        errors.push(`${getSubjectLabel(entry.subject_id)} not allowed for ${getSectionLabel(entry.class_id, entry.group_id, entry.section_id)}.`);
+        continue;
+      }
+
+      const assignments = pickAssignmentsForSection(teacherAssignments || [], section, entry.subject_id);
+      const manualTeachers = assignments.filter(a => a.is_auto === 0 && a.teacher_id).map(a => a.teacher_id);
+      let qualifiedTeachers = [];
+      if (manualTeachers.length) {
+        qualifiedTeachers = manualTeachers;
+      } else {
+        qualifiedTeachers = (teacherSubjects || []).filter(ts => ts.subject_id === entry.subject_id).map(ts => ts.teacher_id);
+      }
+
+      if (!entry.teacher_id) {
+        if (qualifiedTeachers.length) {
+          errors.push(`Missing teacher for ${getSectionLabel(entry.class_id, entry.group_id, entry.section_id)} on ${entry.day_of_week}.`);
+          continue;
+        }
+      } else if (!qualifiedTeachers.includes(entry.teacher_id)) {
+        if (manualTeachers.length) {
+          errors.push(`Teacher ${entry.teacher_id} not allowed for ${getSubjectLabel(entry.subject_id)} in ${getSectionLabel(entry.class_id, entry.group_id, entry.section_id)}.`);
+        } else {
+          errors.push(`Teacher ${entry.teacher_id} not qualified for ${getSubjectLabel(entry.subject_id)}.`);
+        }
+        continue;
+      }
+
+      const sectionSlotKey = `${sectionKey}-${entry.day_of_week}-${entry.slot_index}`;
+      if (sectionSlotMap.has(sectionSlotKey)) {
+        errors.push(`Duplicate entry for ${getSectionLabel(entry.class_id, entry.group_id, entry.section_id)} on ${entry.day_of_week} slot ${entry.slot_index}.`);
+        continue;
+      }
+      sectionSlotMap.set(sectionSlotKey, true);
+
+      const sectionDayKey = `${sectionKey}-${entry.day_of_week}`;
+      if (!sectionDaySubject.has(sectionDayKey)) sectionDaySubject.set(sectionDayKey, new Set());
+      if (sectionDaySubject.get(sectionDayKey).has(entry.subject_id)) {
+        errors.push(`${getSubjectLabel(entry.subject_id)} repeated on same day for ${getSectionLabel(entry.class_id, entry.group_id, entry.section_id)} (${entry.day_of_week}).`);
+        continue;
+      }
+      sectionDaySubject.get(sectionDayKey).add(entry.subject_id);
+
+      if (entry.teacher_id) {
+        const teacherSlotKey = `${entry.teacher_id}-${entry.day_of_week}-${entry.slot_index}`;
+        if (teacherSlotMap.has(teacherSlotKey)) {
+          errors.push(`Teacher ${entry.teacher_id} double-booked on ${entry.day_of_week} slot ${entry.slot_index}.`);
+          continue;
+        }
+        teacherSlotMap.set(teacherSlotKey, true);
+
+        if (!teacherDailyCount[entry.teacher_id]) teacherDailyCount[entry.teacher_id] = {};
+        teacherDailyCount[entry.teacher_id][entry.day_of_week] = (teacherDailyCount[entry.teacher_id][entry.day_of_week] || 0) + 1;
+        if (teacherDailyCount[entry.teacher_id][entry.day_of_week] > classSlots.length) {
+          errors.push(`Teacher ${entry.teacher_id} exceeds daily maximum on ${entry.day_of_week}.`);
+          continue;
+        }
+      }
+
+      if (!sectionSubjectCount[sectionKey]) sectionSubjectCount[sectionKey] = {};
+      sectionSubjectCount[sectionKey][entry.subject_id] = (sectionSubjectCount[sectionKey][entry.subject_id] || 0) + 1;
+    }
+
+    sectionList.forEach(section => {
+      const sectionKey = `${section.class_id}-${section.group_id || 0}-${section.id || 0}`;
+
+      const subjectReqs = subjectRequirements[sectionKey] || {};
+      Object.entries(subjectReqs).forEach(([subjectId, req]) => {
+        const actual = sectionSubjectCount[sectionKey]?.[subjectId] || 0;
+        if (actual < req.min) {
+          errors.push(`${getSectionLabel(section.class_id, section.group_id, section.id)} requires at least ${req.min} of ${getSubjectLabel(Number(subjectId))}, found ${actual}.`);
+        }
+        if (actual > req.max) {
+          errors.push(`${getSectionLabel(section.class_id, section.group_id, section.id)} exceeds max ${req.max} for ${getSubjectLabel(Number(subjectId))}, found ${actual}.`);
+        }
+      });
+    });
+
+    return { valid: errors.length === 0, errors };
+  }
+
+  function buildConflictSummary({ entries, classes, groups, sections, subjects, classSubjects, groupSubjects, teacherAssignments, teacherSubjects, workingDays, classSlots }) {
+    const entryConflicts = entries.filter(entry => entry.is_conflict || entry.conflict_reason).map(entry => ({
+      day_of_week: entry.day_of_week,
+      slot_index: entry.slot_index,
+      class_id: entry.class_id,
+      group_id: entry.group_id,
+      section_id: entry.section_id,
+      subject_id: entry.subject_id,
+      teacher_id: entry.teacher_id,
+      reason: entry.conflict_reason || 'Conflict'
+    }));
+
+    const teacherSchedule = {};
+    entries.forEach(entry => {
+      if (!entry.teacher_id) return;
+      if (!teacherSchedule[entry.teacher_id]) teacherSchedule[entry.teacher_id] = {};
+      if (!teacherSchedule[entry.teacher_id][entry.day_of_week]) teacherSchedule[entry.teacher_id][entry.day_of_week] = {};
+      teacherSchedule[entry.teacher_id][entry.day_of_week][entry.slot_index] = true;
+    });
+
+    const sectionList = [];
+    const classSectionMap = new Map();
+    sections.forEach(sec => {
+      sectionList.push(sec);
+      classSectionMap.set(`${sec.class_id}-${sec.group_id || 0}-${sec.id || 0}`, sec);
+    });
+    classes.forEach(cls => {
+      const hasSection = sections.some(sec => sec.class_id === cls.id);
+      if (!hasSection) {
+        sectionList.push({ id: 0, class_id: cls.id, group_id: null, section_name: 'Main' });
+      }
+    });
+
+    const requiredBySection = {};
+    const ensureSection = (sectionKey) => {
+      if (!requiredBySection[sectionKey]) requiredBySection[sectionKey] = {};
+      return requiredBySection[sectionKey];
+    };
+
+    sectionList.forEach(sec => {
+      const sectionKey = `${sec.class_id}-${sec.group_id || 0}-${sec.id || 0}`;
+      const sectionSubjects = classSubjects.filter(cs => cs.class_id === sec.class_id);
+      sectionSubjects.forEach(cs => {
+        const subjectId = cs.subject_id;
+        const required = cs.is_fixed ? (cs.classes_per_week || 0) : (cs.min_classes || 0);
+        if (!required) return;
+        const sectionReq = ensureSection(sectionKey);
+        sectionReq[subjectId] = (sectionReq[subjectId] || 0) + required;
+      });
+      if (sec.group_id) {
+        const groupReqs = groupSubjects.filter(gs => gs.group_id === sec.group_id);
+        groupReqs.forEach(gs => {
+          const subjectId = gs.subject_id;
+          const required = gs.is_fixed ? (gs.classes_per_week || 0) : (gs.min_classes || 0);
+          if (!required) return;
+          const sectionReq = ensureSection(sectionKey);
+          sectionReq[subjectId] = (sectionReq[subjectId] || 0) + required;
+        });
+      }
+    });
+
+    const actualBySection = {};
+    const usedSubjectsByDay = {};
+    entries.forEach(entry => {
+      const sectionKey = `${entry.class_id}-${entry.group_id || 0}-${entry.section_id || 0}`;
+      if (!actualBySection[sectionKey]) actualBySection[sectionKey] = {};
+      actualBySection[sectionKey][entry.subject_id] = (actualBySection[sectionKey][entry.subject_id] || 0) + 1;
+      if (!usedSubjectsByDay[sectionKey]) usedSubjectsByDay[sectionKey] = {};
+      if (!usedSubjectsByDay[sectionKey][entry.day_of_week]) usedSubjectsByDay[sectionKey][entry.day_of_week] = new Set();
+      usedSubjectsByDay[sectionKey][entry.day_of_week].add(entry.subject_id);
+    });
+
+    const missingRequirements = [];
+    Object.entries(requiredBySection).forEach(([sectionKey, subjectMap]) => {
+      const [classId, groupId, sectionId] = sectionKey.split('-').map(Number);
+      const classInfo = classes.find(c => c.id === classId);
+      const groupInfo = groups.find(g => g.id === groupId);
+      const sectionInfo = sections.find(s => s.id === sectionId) || classSectionMap.get(sectionKey);
+      const className = classInfo?.class_name || 'Class';
+      const groupName = groupInfo?.group_name || '';
+      const sectionName = sectionInfo?.section_name || 'Main';
+
+      Object.entries(subjectMap).forEach(([subjectId, required]) => {
+        const actual = actualBySection[sectionKey]?.[subjectId] || 0;
+        if (actual < required) {
+          const subjectInfo = subjects.find(s => s.id === Number(subjectId));
+          missingRequirements.push({
+            class_id: classId,
+            group_id: groupId || null,
+            section_id: sectionId || null,
+            class_name: className,
+            group_name: groupName,
+            section_name: sectionName,
+            subject_id: Number(subjectId),
+            subject_name: subjectInfo?.subject_name || 'Subject',
+            required,
+            scheduled: actual,
+            missing: required - actual
+          });
+        }
+      });
+    });
+
+    const gapReasons = [];
+    const sectionKeys = Object.keys(requiredBySection);
+    sectionKeys.forEach(sectionKey => {
+      const [classId, groupId, sectionId] = sectionKey.split('-').map(Number);
+      const classInfo = classes.find(c => c.id === classId);
+      const groupInfo = groups.find(g => g.id === groupId);
+      const sectionInfo = sections.find(s => s.id === sectionId) || classSectionMap.get(sectionKey);
+      const className = classInfo?.class_name || 'Class';
+      const groupName = groupInfo?.group_name || '';
+      const sectionName = sectionInfo?.section_name || 'Main';
+
+      const remainingBySubject = {};
+      Object.entries(requiredBySection[sectionKey]).forEach(([subjectId, required]) => {
+        const actual = actualBySection[sectionKey]?.[subjectId] || 0;
+        remainingBySubject[subjectId] = Math.max(0, required - actual);
+      });
+
+      workingDays.forEach(day => {
+        classSlots.forEach(slot => {
+          const existingEntry = entries.find(entry =>
+            entry.class_id === classId &&
+            (entry.group_id || 0) === (groupId || 0) &&
+            (entry.section_id || 0) === (sectionId || 0) &&
+            entry.day_of_week === day &&
+            entry.slot_index === slot.slot_index
+          );
+          if (existingEntry) return;
+
+          const usedToday = usedSubjectsByDay[sectionKey]?.[day] || new Set();
+          const candidates = Object.entries(remainingBySubject)
+            .filter(([subjectId, remaining]) => remaining > 0 && !usedToday.has(Number(subjectId)))
+            .map(([subjectId]) => Number(subjectId));
+
+          if (!candidates.length) {
+            gapReasons.push({
+              day_of_week: day,
+              slot_index: slot.slot_index,
+              class_id: classId,
+              group_id: groupId || null,
+              section_id: sectionId || null,
+              class_name: className,
+              group_name: groupName,
+              section_name: sectionName,
+              reason: 'No remaining subject without breaking one-per-day rule'
+            });
+            return;
+          }
+
+          let hasAvailableTeacher = false;
+          for (const subjectId of candidates) {
+            const assignments = pickAssignmentsForSection(teacherAssignments || [], { class_id: classId, group_id: groupId || null, id: sectionId || null }, subjectId);
+            const manualTeachers = assignments.filter(a => a.is_auto === 0 && a.teacher_id).map(a => a.teacher_id);
+            let pool = [];
+            if (manualTeachers.length) {
+              pool = [...new Set(manualTeachers)];
+            } else {
+              pool = (teacherSubjects || []).filter(ts => ts.subject_id === subjectId).map(ts => ts.teacher_id);
+            }
+
+            for (const teacherId of pool) {
+              if (!teacherSchedule[teacherId]?.[day]?.[slot.slot_index]) {
+                hasAvailableTeacher = true;
+                break;
+              }
+            }
+            if (hasAvailableTeacher) break;
+          }
+
+          gapReasons.push({
+            day_of_week: day,
+            slot_index: slot.slot_index,
+            class_id: classId,
+            group_id: groupId || null,
+            section_id: sectionId || null,
+            class_name: className,
+            group_name: groupName,
+            section_name: sectionName,
+            reason: hasAvailableTeacher
+              ? 'Scheduler could not place a subject at this slot'
+              : 'No available teacher for remaining subjects'
+          });
+        });
+      });
+    });
+
+    return { entryConflicts, missingRequirements, gapReasons };
+  }
+
+  function buildGenerationWarnings({ sections, classes, groups, subjects, classSubjects, groupSubjects, teacherAssignments, teacherSubjects, workingDays, classSlots }) {
+    const warnings = [];
+    const capacityPerSection = workingDaysCount * classSlots.length;
+
+    const sectionList = sections.length ? sections : classes.map(cls => ({
+      id: 0,
+      class_id: cls.id,
+      group_id: null,
+      section_name: 'Main'
+    }));
+
+    sectionList.forEach(section => {
+      const classInfo = classes.find(c => c.id === section.class_id);
+      const groupInfo = groups.find(g => g.id === section.group_id);
+      const className = classInfo?.class_name || 'Class';
+      const groupName = groupInfo?.group_name || '';
+      const sectionName = section.section_name || 'Main';
+      const sectionLabel = `${className}${groupName ? ' - ' + groupName : ''} - ${sectionName}`;
+
+      const subjectReqs = [];
+      classSubjects.filter(cs => cs.class_id === section.class_id).forEach(cs => {
+        const required = cs.is_fixed ? (cs.classes_per_week || 0) : (cs.min_classes || 0);
+        if (required > 0) subjectReqs.push({ subject_id: cs.subject_id, required });
+      });
+      if (section.group_id) {
+        groupSubjects.filter(gs => gs.group_id === section.group_id).forEach(gs => {
+          const required = gs.is_fixed ? (gs.classes_per_week || 0) : (gs.min_classes || 0);
+          if (required > 0) subjectReqs.push({ subject_id: gs.subject_id, required });
+        });
+      }
+
+      const totalRequired = subjectReqs.reduce((sum, item) => sum + item.required, 0);
+      if (totalRequired !== capacityPerSection) {
+        warnings.push({
+          type: 'capacity',
+          message: `${sectionLabel}: total required (${totalRequired}) does not match capacity (${capacityPerSection}).`
+        });
+      }
+
+      const effectivePlaceable = subjectReqs.reduce((sum, item) => sum + Math.min(item.required, workingDaysCount), 0);
+      if (effectivePlaceable < capacityPerSection) {
+        warnings.push({
+          type: 'one-per-day',
+          message: `${sectionLabel}: one-per-day rule caps subjects, leaving ${(capacityPerSection - effectivePlaceable)} slot(s) empty.`
+        });
+      }
+
+      subjectReqs.forEach(item => {
+        const subjectInfo = subjects.find(s => s.id === item.subject_id);
+        const subjectName = subjectInfo?.subject_name || `Subject ${item.subject_id}`;
+        if (item.required > workingDaysCount) {
+          warnings.push({
+            type: 'one-per-day',
+            message: `${sectionLabel}: ${subjectName} requires ${item.required} but only ${workingDaysCount} days are available.`
+          });
+        }
+
+        const assignments = pickAssignmentsForSection(teacherAssignments || [], section, item.subject_id);
+        const manualTeachers = assignments.filter(a => a.is_auto === 0 && a.teacher_id).map(a => a.teacher_id);
+        let pool = [];
+        if (manualTeachers.length) {
+          pool = [...new Set(manualTeachers)];
+        } else {
+          pool = (teacherSubjects || []).filter(ts => ts.subject_id === item.subject_id).map(ts => ts.teacher_id);
+        }
+
+        if (!pool.length) {
+          warnings.push({
+            type: 'teacher',
+            message: `${sectionLabel}: no qualified teachers found for ${subjectName}.`
+          });
+        }
+      });
+    });
+
+    return { items: warnings };
   }
 
   return new Response("Not Found", {status:404});

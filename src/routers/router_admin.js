@@ -120,6 +120,13 @@ export async function handleAdminRequest(request, env) {
                   return jsonResponse({success:true});
               }
               
+              if(body.action === 'edit_class') {
+                  // Edit class name
+                  await env.DB.prepare("UPDATE academic_classes SET class_name = ? WHERE id = ? AND school_id = ?")
+                      .bind(body.class_name, body.class_id, body.school_id).run();
+                  return jsonResponse({success:true});
+              }
+              
               if(body.action === 'add_group') {
                   // Add group to existing class
                   await env.DB.prepare("INSERT INTO class_groups (school_id, class_id, group_name) VALUES (?, ?, ?)")
@@ -127,10 +134,24 @@ export async function handleAdminRequest(request, env) {
                   return jsonResponse({success:true});
               }
               
+              if(body.action === 'edit_group') {
+                  // Edit group name
+                  await env.DB.prepare("UPDATE class_groups SET group_name = ? WHERE id = ? AND school_id = ?")
+                      .bind(body.group_name, body.group_id, body.school_id).run();
+                  return jsonResponse({success:true});
+              }
+              
               if(body.action === 'add_section') {
                   // Add section to class (with optional group) - single shift only
                   await env.DB.prepare("INSERT INTO class_sections (school_id, class_id, group_id, section_name) VALUES (?, ?, ?, ?)")
                       .bind(body.school_id, body.class_id, body.group_id || null, body.section_name).run();
+                  return jsonResponse({success:true});
+              }
+              
+              if(body.action === 'edit_section') {
+                  // Edit section name
+                  await env.DB.prepare("UPDATE class_sections SET section_name = ? WHERE id = ? AND school_id = ?")
+                      .bind(body.section_name, body.section_id, body.school_id).run();
                   return jsonResponse({success:true});
               }
           } catch(e) {
@@ -148,17 +169,20 @@ export async function handleAdminRequest(request, env) {
           const body = await request.json();
           
           if(body.action === 'delete_class') {
-              await env.DB.prepare("DELETE FROM academic_classes WHERE id=?").bind(body.id).run();
+              // Always force delete - remove all dependencies then delete
+              await forceDeleteClass(env, body.id, body.school_id);
               return jsonResponse({success:true});
           }
           
           if(body.action === 'delete_group') {
-              await env.DB.prepare("DELETE FROM class_groups WHERE id=?").bind(body.id).run();
+              // Always force delete - remove all dependencies then delete
+              await forceDeleteGroup(env, body.id, body.school_id);
               return jsonResponse({success:true});
           }
           
           if(body.action === 'delete_section') {
-              await env.DB.prepare("DELETE FROM class_sections WHERE id=?").bind(body.id).run();
+              // Always force delete - remove all dependencies then delete
+              await forceDeleteSection(env, body.id, body.school_id);
               return jsonResponse({success:true});
           }
       }
@@ -182,6 +206,129 @@ export async function handleAdminRequest(request, env) {
         companyName, 
         {email}
       ));
+  }
+
+  // Helper functions for dependency checking
+  async function checkClassDependencies(env, classId, schoolId) {
+      const details = [];
+      let hasDependencies = false;
+      
+      // Check for sections
+      const sections = await env.DB.prepare("SELECT COUNT(*) as count FROM class_sections WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).first();
+      if(sections.count > 0) {
+          details.push({type: 'sections', count: sections.count, message: `${sections.count} section(s)`});
+          hasDependencies = true;
+      }
+      
+      // Check for groups
+      const groups = await env.DB.prepare("SELECT COUNT(*) as count FROM class_groups WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).first();
+      if(groups.count > 0) {
+          details.push({type: 'groups', count: groups.count, message: `${groups.count} group(s)`});
+          hasDependencies = true;
+      }
+      
+      // Check for subject assignments
+      const subjects = await env.DB.prepare("SELECT COUNT(*) as count FROM class_subjects WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).first();
+      if(subjects.count > 0) {
+          details.push({type: 'subjects', count: subjects.count, message: `${subjects.count} subject assignment(s)`});
+          hasDependencies = true;
+      }
+      
+      // Check for teacher assignments
+      const teachers = await env.DB.prepare("SELECT COUNT(*) as count FROM teacher_assignments WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).first();
+      if(teachers.count > 0) {
+          details.push({type: 'teachers', count: teachers.count, message: `${teachers.count} teacher assignment(s)`});
+          hasDependencies = true;
+      }
+      
+      // Check for routine entries
+      const routines = await env.DB.prepare("SELECT COUNT(*) as count FROM routine_entries WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).first();
+      if(routines.count > 0) {
+          details.push({type: 'routines', count: routines.count, message: `${routines.count} routine entrie(s)`});
+          hasDependencies = true;
+      }
+      
+      return { hasDependencies, details };
+  }
+  
+  async function checkGroupDependencies(env, groupId, schoolId) {
+      const details = [];
+      let hasDependencies = false;
+      
+      // Check for sections
+      const sections = await env.DB.prepare("SELECT COUNT(*) as count FROM class_sections WHERE group_id = ? AND school_id = ?").bind(groupId, schoolId).first();
+      if(sections.count > 0) {
+          details.push({type: 'sections', count: sections.count, message: `${sections.count} section(s)`});
+          hasDependencies = true;
+      }
+      
+      // Check for subject assignments
+      const subjects = await env.DB.prepare("SELECT COUNT(*) as count FROM group_subjects WHERE group_id = ? AND school_id = ?").bind(groupId, schoolId).first();
+      if(subjects.count > 0) {
+          details.push({type: 'subjects', count: subjects.count, message: `${subjects.count} subject assignment(s)`});
+          hasDependencies = true;
+      }
+      
+      // Check for teacher assignments
+      const teachers = await env.DB.prepare("SELECT COUNT(*) as count FROM teacher_assignments WHERE group_id = ? AND school_id = ?").bind(groupId, schoolId).first();
+      if(teachers.count > 0) {
+          details.push({type: 'teachers', count: teachers.count, message: `${teachers.count} teacher assignment(s)`});
+          hasDependencies = true;
+      }
+      
+      // Check for routine entries
+      const routines = await env.DB.prepare("SELECT COUNT(*) as count FROM routine_entries WHERE group_id = ? AND school_id = ?").bind(groupId, schoolId).first();
+      if(routines.count > 0) {
+          details.push({type: 'routines', count: routines.count, message: `${routines.count} routine entrie(s)`});
+          hasDependencies = true;
+      }
+      
+      return { hasDependencies, details };
+  }
+  
+  async function checkSectionDependencies(env, sectionId, schoolId) {
+      const details = [];
+      let hasDependencies = false;
+      
+      // Check for teacher assignments
+      const teachers = await env.DB.prepare("SELECT COUNT(*) as count FROM teacher_assignments WHERE section_id = ? AND school_id = ?").bind(sectionId, schoolId).first();
+      if(teachers.count > 0) {
+          details.push({type: 'teachers', count: teachers.count, message: `${teachers.count} teacher assignment(s)`});
+          hasDependencies = true;
+      }
+      
+      // Check for routine entries
+      const routines = await env.DB.prepare("SELECT COUNT(*) as count FROM routine_entries WHERE section_id = ? AND school_id = ?").bind(sectionId, schoolId).first();
+      if(routines.count > 0) {
+          details.push({type: 'routines', count: routines.count, message: `${routines.count} routine entrie(s)`});
+          hasDependencies = true;
+      }
+      
+      return { hasDependencies, details };
+  }
+  
+  async function forceDeleteClass(env, classId, schoolId) {
+      // Delete all dependent records
+      await env.DB.prepare("DELETE FROM routine_entries WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).run();
+      await env.DB.prepare("DELETE FROM teacher_assignments WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).run();
+      await env.DB.prepare("DELETE FROM class_subjects WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).run();
+      await env.DB.prepare("DELETE FROM class_sections WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).run();
+      await env.DB.prepare("DELETE FROM class_groups WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).run();
+      await env.DB.prepare("DELETE FROM academic_classes WHERE id = ? AND school_id = ?").bind(classId, schoolId).run();
+  }
+  
+  async function forceDeleteGroup(env, groupId, schoolId) {
+      await env.DB.prepare("DELETE FROM routine_entries WHERE group_id = ? AND school_id = ?").bind(groupId, schoolId).run();
+      await env.DB.prepare("DELETE FROM teacher_assignments WHERE group_id = ? AND school_id = ?").bind(groupId, schoolId).run();
+      await env.DB.prepare("DELETE FROM group_subjects WHERE group_id = ? AND school_id = ?").bind(groupId, schoolId).run();
+      await env.DB.prepare("DELETE FROM class_sections WHERE group_id = ? AND school_id = ?").bind(groupId, schoolId).run();
+      await env.DB.prepare("DELETE FROM class_groups WHERE id = ? AND school_id = ?").bind(groupId, schoolId).run();
+  }
+  
+  async function forceDeleteSection(env, sectionId, schoolId) {
+      await env.DB.prepare("DELETE FROM routine_entries WHERE section_id = ? AND school_id = ?").bind(sectionId, schoolId).run();
+      await env.DB.prepare("DELETE FROM teacher_assignments WHERE section_id = ? AND school_id = ?").bind(sectionId, schoolId).run();
+      await env.DB.prepare("DELETE FROM class_sections WHERE id = ? AND school_id = ?").bind(sectionId, schoolId).run();
   }
 
   // --- SETUP ---
