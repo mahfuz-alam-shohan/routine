@@ -20,6 +20,7 @@ const DEFINED_SCHEMA = {
     eiin_code: "TEXT",
     address: "TEXT", 
     max_teachers: "INTEGER DEFAULT 10", 
+    shifts_enabled: "BOOLEAN DEFAULT 0",
     "FOREIGN KEY(auth_id)": "REFERENCES auth_accounts(id)" 
   },
 
@@ -60,6 +61,7 @@ const DEFINED_SCHEMA = {
     school_id: "INTEGER",
     class_name: "TEXT",
     has_groups: "INTEGER DEFAULT 0", 
+    shift_name: "TEXT DEFAULT 'Full Day'",
     "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)"
   },
 

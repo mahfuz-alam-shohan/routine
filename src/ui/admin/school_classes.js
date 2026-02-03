@@ -1,5 +1,9 @@
 
-export function SchoolClassesHTML(school, classesData = [], groupsData = [], sectionsData = []) {
+export function SchoolClassesHTML(school, classesData = [], groupsData = [], sectionsData = [], shiftConfig = null) {
+    const shiftsEnabled = !!(shiftConfig && shiftConfig.enabled);
+    const shifts = (shiftConfig && Array.isArray(shiftConfig.shifts) && shiftConfig.shifts.length)
+        ? shiftConfig.shifts
+        : ['Full Day'];
     
     const classGroups = {};
     groupsData.forEach(g => {
@@ -143,6 +147,14 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                          <input type="checkbox" name="has_groups" id="has_groups">
                          <label for="has_groups" class="text-sm">Has Groups</label>
                      </div>
+                     ${shiftsEnabled ? `
+                     <div class="flex items-center gap-1">
+                         <label for="shift_name" class="text-sm">Shift</label>
+                         <select name="shift_name" id="shift_name" class="border border-gray-300 px-2 py-1 text-sm">
+                             ${shifts.map(shift => `<option value="${shift}">${shift}</option>`).join('')}
+                         </select>
+                     </div>
+                     ` : `<input type="hidden" name="shift_name" value="Full Day">`}
                      <button type="submit" class="bg-gray-800 text-white px-3 py-1 text-sm">
                          Create Class
                      </button>

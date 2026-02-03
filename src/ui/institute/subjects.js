@@ -29,7 +29,16 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
     });
 
     // Calculate capacity for each section based on master schedule
-    const maxClassesPerSection = scheduleConfig.maxClassesPerSection || 40;
+    const defaultMaxClassesPerSection = scheduleConfig.maxClassesPerSection || 40;
+    const classCapacityMap = scheduleConfig.classCapacityMap || {};
+    const shiftsEnabled = !!scheduleConfig.shiftsEnabled;
+    const shiftList = scheduleConfig.shiftList || [];
+    const shiftSlotCounts = scheduleConfig.shiftSlotCounts || {};
+    const shiftCapacityMap = scheduleConfig.shiftCapacityMap || {};
+
+    function getClassCapacity(classId) {
+        return classCapacityMap[classId] || defaultMaxClassesPerSection;
+    }
     
     function calculateSectionCapacity(classId, groupId) {
         let totalClasses = 0;
@@ -58,6 +67,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             }, 0);
         }
         
+        const maxClassesPerSection = getClassCapacity(classId);
         return {
             current: totalClasses,
             max: maxClassesPerSection,
@@ -287,10 +297,20 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                      </div>
                  </div>
                  <div class="text-sm text-gray-600">
-                     <strong>Total Capacity:</strong> ${maxClassesPerSection} classes/week per section
+                     ${shiftsEnabled ? `
+                     <strong>Total Capacity:</strong> varies by shift
+                     <div class="text-xs text-gray-500 mt-1">
+                         Shift periods/day: ${shiftList.map(shift => `${shift}: ${shiftSlotCounts[shift] || 0}`).join(', ')}
+                     </div>
+                     <div class="text-xs text-gray-500 mt-1">
+                         Shift capacity/week: ${shiftList.map(shift => `${shift}: ${shiftCapacityMap[shift] || 0}`).join(', ')}
+                     </div>
+                     ` : `
+                     <strong>Total Capacity:</strong> ${defaultMaxClassesPerSection} classes/week per section
                      <div class="text-xs text-gray-500 mt-1">
                          (Calculated from master schedule: ${scheduleConfig.workingDaysCount || 5} days x ${scheduleConfig.actualClassPeriodsPerDay || 8} class periods)
                      </div>
+                     `}
                  </div>
              </div>
              <div class="text-xs text-gray-500 mt-2">
@@ -495,7 +515,8 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
 
       <script>
         const SCHOOL_ID = ${school.id};
-        const MAX_CLASSES_PER_SECTION = ${maxClassesPerSection};
+        const DEFAULT_MAX_CLASSES_PER_SECTION = ${defaultMaxClassesPerSection};
+        const CLASS_CAPACITY_MAP = ${JSON.stringify(classCapacityMap)};
         
         // Store subjects data for validation
         const CLASS_SUBJECTS = ${JSON.stringify(classSubjects)};
@@ -619,7 +640,8 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             const current = getClassSubjectLoad(group.class_id) + getGroupSubjectLoad(groupId);
             const cell = document.querySelector('[data-capacity-cell="group-' + groupId + '"]');
             if (cell) {
-                cell.textContent = current + '/' + MAX_CLASSES_PER_SECTION;
+                const maxCap = CLASS_CAPACITY_MAP[group.class_id] || DEFAULT_MAX_CLASSES_PER_SECTION;
+                cell.textContent = current + '/' + maxCap;
             }
         }
 

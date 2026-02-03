@@ -29,7 +29,16 @@ export function ClassesPageHTML(school, classes = [], groups = [], sections = []
     });
 
     // Calculate capacity for each section based on master schedule
-    const maxClassesPerSection = scheduleConfig.maxClassesPerSection || 40;
+    const defaultMaxClassesPerSection = scheduleConfig.maxClassesPerSection || 40;
+    const classCapacityMap = scheduleConfig.classCapacityMap || {};
+    const shiftsEnabled = !!scheduleConfig.shiftsEnabled;
+    const shiftList = scheduleConfig.shiftList || [];
+    const shiftSlotCounts = scheduleConfig.shiftSlotCounts || {};
+    const shiftCapacityMap = scheduleConfig.shiftCapacityMap || {};
+
+    function getClassCapacity(classId) {
+        return classCapacityMap[classId] || defaultMaxClassesPerSection;
+    }
     
     function calculateSectionCapacity(classId, groupId) {
         let totalClasses = 0;
@@ -44,6 +53,7 @@ export function ClassesPageHTML(school, classes = [], groups = [], sections = []
             totalClasses += groupSubjects.reduce((sum, s) => sum + (s.classes_per_week || 0), 0);
         }
         
+        const maxClassesPerSection = getClassCapacity(classId);
         return {
             current: totalClasses,
             max: maxClassesPerSection,
@@ -122,7 +132,7 @@ export function ClassesPageHTML(school, classes = [], groups = [], sections = []
                                 <span class="font-semibold">No Group</span>
                                 <span class="text-xs text-gray-500 ml-2">(${sectionsWithoutGroup.length} sections)</span>
                                 <div class="text-xs px-2 py-1 border border-gray-300 text-gray-700 inline-block ml-2">
-                                    ${calculateSectionCapacity(cls.id, null).current}/${maxClassesPerSection} classes
+                                    ${calculateSectionCapacity(cls.id, null).current}/${getClassCapacity(cls.id)} classes
                                 </div>
                             </div>
                             <div class="flex flex-wrap gap-1">
@@ -179,10 +189,20 @@ export function ClassesPageHTML(school, classes = [], groups = [], sections = []
                      </div>
                  </div>
                  <div class="text-sm text-gray-600">
-                     <strong>Total Capacity:</strong> ${maxClassesPerSection} classes/week per section
+                     ${shiftsEnabled ? `
+                     <strong>Total Capacity:</strong> varies by shift
+                     <div class="text-xs text-gray-500 mt-1">
+                         Shift periods/day: ${shiftList.map(shift => `${shift}: ${shiftSlotCounts[shift] || 0}`).join(', ')}
+                     </div>
+                     <div class="text-xs text-gray-500 mt-1">
+                         Shift capacity/week: ${shiftList.map(shift => `${shift}: ${shiftCapacityMap[shift] || 0}`).join(', ')}
+                     </div>
+                     ` : `
+                     <strong>Total Capacity:</strong> ${defaultMaxClassesPerSection} classes/week per section
                      <div class="text-xs text-gray-500 mt-1">
                          (Calculated from master schedule: ${scheduleConfig.workingDaysCount || 5} days  ${scheduleConfig.actualClassPeriodsPerDay || 8} class periods)
                      </div>
+                     `}
                  </div>
              </div>
              <div class="text-xs text-gray-500 mt-2">

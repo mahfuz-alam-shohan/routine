@@ -33,21 +33,30 @@ export async function handleInstituteRequest(request, env) {
           try {
               const body = await request.json();
               if(body.action === 'save_schedule') {
-                  
+                  let scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+                  if (!scheduleConfig) {
+                      await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days, shifts_json) VALUES (?, ?, ?, ?, ?, ?)")
+                          .bind(school.id, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]', '["Full Day"]').run();
+                      scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+                  }
+                  const shiftList = school.shifts_enabled ? parseShiftList(scheduleConfig?.shifts_json) : ['Full Day'];
+
                   await env.DB.prepare("DELETE FROM schedule_slots WHERE school_id = ?").bind(school.id).run();
-                  
-                  
+
                   for(let i = 0; i < body.slots.length; i++) {
                       const slot = body.slots[i];
+                      const applicableShifts = school.shifts_enabled
+                        ? parseApplicableShifts(slot.applicable_shifts, shiftList)
+                        : ['Full Day'];
                       await env.DB.prepare("INSERT INTO schedule_slots (school_id, slot_index, start_time, end_time, label, duration, type, applicable_shifts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-                          .bind(school.id, i, slot.start_time, slot.end_time, slot.label, slot.duration, slot.type, JSON.stringify(["all"])).run();
+                          .bind(school.id, i, slot.start_time, slot.end_time, slot.label, slot.duration, slot.type, JSON.stringify(applicableShifts)).run();
                   }
-                  
-                  
-                  const workingDays = JSON.stringify(body.working_days || ["monday","tuesday","wednesday","thursday","friday"]);
+
+                  const workingDaysArray = parseWorkingDays(body.working_days);
+                  const workingDays = JSON.stringify(workingDaysArray);
                   const allDays = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
-                  const offDays = JSON.stringify(allDays.filter(day => !body.working_days?.includes(day)));
-                  const workingDaysCount = body.working_days?.length || 5;
+                  const offDays = JSON.stringify(allDays.filter(day => !workingDaysArray.includes(day)));
+                  const workingDaysCount = workingDaysArray.length || 5;
                   
                   
                   await env.DB.prepare("UPDATE schedule_config SET working_days = ?, off_days = ?, active_days = ? WHERE school_id = ?")
@@ -63,7 +72,14 @@ export async function handleInstituteRequest(request, env) {
       
       if (request.method === 'DELETE') {
           await env.DB.prepare("DELETE FROM schedule_slots WHERE school_id = ?").bind(school.id).run();
+          let shiftsJson = '["Full Day"]';
+          try {
+              const existingConfig = await env.DB.prepare("SELECT shifts_json FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+              if (existingConfig?.shifts_json) shiftsJson = existingConfig.shifts_json;
+          } catch (e) {}
           await env.DB.prepare("DELETE FROM schedule_config WHERE school_id = ?").bind(school.id).run();
+          await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days, shifts_json) VALUES (?, ?, ?, ?, ?, ?)")
+              .bind(school.id, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]', shiftsJson).run();
           return jsonResponse({ success: true });
       }
 
@@ -87,8 +103,47 @@ export async function handleInstituteRequest(request, env) {
           console.error('Database error:', e);
           await syncDatabase(env); 
       }
-      
-      return htmlResponse(InstituteLayout(SchedulesPageHTML(config, slots), "Master Schedule", school.school_name));
+      const shiftList = parseShiftList(config?.shifts_json);
+      if (config) {
+          const workingDaysArray = parseWorkingDays(config.working_days);
+          if (config.working_days !== JSON.stringify(workingDaysArray)) {
+              await env.DB.prepare("UPDATE schedule_config SET working_days = ?, active_days = ? WHERE school_id = ?")
+                  .bind(JSON.stringify(workingDaysArray), workingDaysArray.length, school.id).run();
+              config.working_days = workingDaysArray;
+              config.active_days = workingDaysArray.length;
+          } else {
+              config.working_days = workingDaysArray;
+          }
+      }
+      if (config && config.shifts_json !== JSON.stringify(shiftList)) {
+          await env.DB.prepare("UPDATE schedule_config SET shifts_json = ? WHERE school_id = ?")
+              .bind(JSON.stringify(shiftList), school.id).run();
+          config.shifts_json = JSON.stringify(shiftList);
+      }
+      let normalizedSlots = normalizeSlotsForShifts(slots, shiftList);
+      const slotUpdates = normalizedSlots.filter(slot => {
+          const normalized = parseApplicableShifts(slot.applicable_shifts, shiftList);
+          const normalizedJson = JSON.stringify(normalized);
+          const raw = typeof slot.applicable_shifts === 'string'
+              ? slot.applicable_shifts
+              : JSON.stringify(slot.applicable_shifts || []);
+          return normalizedJson !== raw;
+      });
+      for (const slot of slotUpdates) {
+          const normalized = parseApplicableShifts(slot.applicable_shifts, shiftList);
+          await env.DB.prepare("UPDATE schedule_slots SET applicable_shifts = ? WHERE id = ?")
+              .bind(JSON.stringify(normalized), slot.id).run();
+      }
+      if (slotUpdates.length) {
+          const refreshed = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
+          normalizedSlots = normalizeSlotsForShifts(refreshed, shiftList);
+      }
+      const shiftConfig = {
+          enabled: !!school.shifts_enabled,
+          shifts: shiftList
+      };
+      slots = normalizedSlots;
+      return htmlResponse(InstituteLayout(SchedulesPageHTML(config, slots, shiftConfig), "Master Schedule", school.school_name));
   }
 
   
@@ -420,22 +475,48 @@ export async function handleInstituteRequest(request, env) {
       
       let scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
       if (!scheduleConfig) {
-        await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days) VALUES (?, ?, ?, ?, ?)")
-          .bind(school.id, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]').run();
+        await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days, shifts_json) VALUES (?, ?, ?, ?, ?, ?)")
+          .bind(school.id, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]', '["Full Day"]').run();
         scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
       }
       
       
-      const workingDaysArray = scheduleConfig.working_days ? JSON.parse(scheduleConfig.working_days) : ["monday","tuesday","wednesday","thursday","friday"];
+      const workingDaysArray = parseWorkingDays(scheduleConfig?.working_days);
       const workingDaysCount = workingDaysArray.length; 
       const scheduleSlots = await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? AND type = 'class'").bind(school.id).all();
-      const actualClassPeriodsPerDay = scheduleSlots.results.length || 8;
-      const maxClassesPerSection = workingDaysCount * actualClassPeriodsPerDay;
+      const shiftList = parseShiftList(scheduleConfig?.shifts_json);
+      const normalizedSlots = normalizeSlotsForShifts(scheduleSlots.results || [], shiftList);
+      const slotIndexesByShift = buildSlotIndexesByShift(normalizedSlots, shiftList);
+      const shiftSlotCounts = {};
+      shiftList.forEach(shift => { shiftSlotCounts[shift] = (slotIndexesByShift[shift] || []).length; });
+      const fallbackPeriods = normalizedSlots.length || 8;
+      const fullDaySlots = shiftSlotCounts['Full Day'] || fallbackPeriods;
+      const maxClassesPerSection = workingDaysCount * fullDaySlots;
+      const classShiftMap = {};
+      const classSlotsPerDayMap = {};
+      const classCapacityMap = {};
+      (classes.results || []).forEach(cls => {
+        const rawShift = cls.shift_name || 'Full Day';
+        const shiftName = shiftList.includes(rawShift) ? rawShift : 'Full Day';
+        classShiftMap[cls.id] = shiftName;
+        const slotsPerDay = shiftSlotCounts[shiftName] || fallbackPeriods;
+        classSlotsPerDayMap[cls.id] = slotsPerDay;
+        classCapacityMap[cls.id] = workingDaysCount * slotsPerDay;
+      });
+      const shiftCapacityMap = {};
+      shiftList.forEach(shift => { shiftCapacityMap[shift] = workingDaysCount * (shiftSlotCounts[shift] || 0); });
       
-      scheduleConfig.actualClassPeriodsPerDay = actualClassPeriodsPerDay;
+      scheduleConfig.actualClassPeriodsPerDay = fullDaySlots;
       scheduleConfig.maxClassesPerSection = maxClassesPerSection;
       scheduleConfig.workingDaysCount = workingDaysCount;
       scheduleConfig.workingDaysArray = workingDaysArray;
+      scheduleConfig.shiftsEnabled = !!school.shifts_enabled;
+      scheduleConfig.shiftList = shiftList;
+      scheduleConfig.shiftSlotCounts = shiftSlotCounts;
+      scheduleConfig.shiftCapacityMap = shiftCapacityMap;
+      scheduleConfig.classCapacityMap = classCapacityMap;
+      scheduleConfig.classSlotsPerDayMap = classSlotsPerDayMap;
+      scheduleConfig.classShiftMap = classShiftMap;
       
       return htmlResponse(InstituteLayout(
         SubjectsPageHTML(
@@ -936,22 +1017,48 @@ export async function handleInstituteRequest(request, env) {
       
       let scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
       if (!scheduleConfig) {
-        await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days) VALUES (?, ?, ?, ?, ?)")
-          .bind(school.id, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]').run();
+        await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days, shifts_json) VALUES (?, ?, ?, ?, ?, ?)")
+          .bind(school.id, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]', '["Full Day"]').run();
         scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
       }
       
       
-      const workingDaysArray = scheduleConfig.working_days ? JSON.parse(scheduleConfig.working_days) : ["monday","tuesday","wednesday","thursday","friday"];
+      const workingDaysArray = parseWorkingDays(scheduleConfig?.working_days);
       const workingDaysCount = workingDaysArray.length; 
       const scheduleSlots = await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? AND type = 'class'").bind(school.id).all();
-      const actualClassPeriodsPerDay = scheduleSlots.results.length || 8;
-      const maxClassesPerSection = workingDaysCount * actualClassPeriodsPerDay;
+      const shiftList = parseShiftList(scheduleConfig?.shifts_json);
+      const normalizedSlots = normalizeSlotsForShifts(scheduleSlots.results || [], shiftList);
+      const slotIndexesByShift = buildSlotIndexesByShift(normalizedSlots, shiftList);
+      const shiftSlotCounts = {};
+      shiftList.forEach(shift => { shiftSlotCounts[shift] = (slotIndexesByShift[shift] || []).length; });
+      const fallbackPeriods = normalizedSlots.length || 8;
+      const fullDaySlots = shiftSlotCounts['Full Day'] || fallbackPeriods;
+      const maxClassesPerSection = workingDaysCount * fullDaySlots;
+      const classShiftMap = {};
+      const classSlotsPerDayMap = {};
+      const classCapacityMap = {};
+      (classes.results || []).forEach(cls => {
+        const rawShift = cls.shift_name || 'Full Day';
+        const shiftName = shiftList.includes(rawShift) ? rawShift : 'Full Day';
+        classShiftMap[cls.id] = shiftName;
+        const slotsPerDay = shiftSlotCounts[shiftName] || fallbackPeriods;
+        classSlotsPerDayMap[cls.id] = slotsPerDay;
+        classCapacityMap[cls.id] = workingDaysCount * slotsPerDay;
+      });
+      const shiftCapacityMap = {};
+      shiftList.forEach(shift => { shiftCapacityMap[shift] = workingDaysCount * (shiftSlotCounts[shift] || 0); });
       
-      scheduleConfig.actualClassPeriodsPerDay = actualClassPeriodsPerDay;
+      scheduleConfig.actualClassPeriodsPerDay = fullDaySlots;
       scheduleConfig.maxClassesPerSection = maxClassesPerSection;
       scheduleConfig.workingDaysCount = workingDaysCount;
       scheduleConfig.workingDaysArray = workingDaysArray;
+      scheduleConfig.shiftsEnabled = !!school.shifts_enabled;
+      scheduleConfig.shiftList = shiftList;
+      scheduleConfig.shiftSlotCounts = shiftSlotCounts;
+      scheduleConfig.shiftCapacityMap = shiftCapacityMap;
+      scheduleConfig.classCapacityMap = classCapacityMap;
+      scheduleConfig.classSlotsPerDayMap = classSlotsPerDayMap;
+      scheduleConfig.classShiftMap = classShiftMap;
       
       return htmlResponse(InstituteLayout(
         ClassesPageHTML(
@@ -984,17 +1091,11 @@ export async function handleInstituteRequest(request, env) {
       const teacherAssignments = (await env.DB.prepare("SELECT * FROM teacher_assignments WHERE school_id = ?").bind(school.id).all()).results;
       const teacherSubjects = (await env.DB.prepare("SELECT * FROM teacher_subjects WHERE school_id = ?").bind(school.id).all()).results;
       const scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
-      let workingDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-      try {
-        if (scheduleConfig?.working_days) {
-          const parsed = JSON.parse(scheduleConfig.working_days);
-          if (Array.isArray(parsed) && parsed.length) workingDays = parsed;
-        }
-      } catch (error) {
-        console.error('Invalid working_days config:', error);
-      }
+      let workingDays = parseWorkingDays(scheduleConfig?.working_days);
       const slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
-      const classSlots = slots.filter(slot => slot.type === 'class');
+      const shiftList = parseShiftList(scheduleConfig?.shifts_json);
+      const normalizedSlots = normalizeSlotsForShifts(slots, shiftList);
+      const classSlots = normalizedSlots.filter(slot => slot.type === 'class');
       let generationWarnings = { items: [] };
       try {
         generationWarnings = buildGenerationWarnings({
@@ -1007,12 +1108,13 @@ export async function handleInstituteRequest(request, env) {
           teacherAssignments,
           teacherSubjects,
           workingDays,
-          classSlots
+          classSlots,
+          shiftList
         });
       } catch (error) {
         console.error('Generation warnings failed:', error);
       }
-      const schoolData = { classes, teachers, subjects, slots };
+      const schoolData = { classes, teachers, subjects, slots: normalizedSlots };
       return htmlResponse(InstituteLayout(
         RoutineGeneratorHTML(existingRoutines, generationSettings, schoolData, generationWarnings), 
         "Routine Generator", 
@@ -1034,17 +1136,11 @@ export async function handleInstituteRequest(request, env) {
         const teacherAssignments = (await env.DB.prepare("SELECT * FROM teacher_assignments WHERE school_id = ?").bind(school.id).all()).results;
         const teacherSubjects = (await env.DB.prepare("SELECT * FROM teacher_subjects WHERE school_id = ?").bind(school.id).all()).results;
         const scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
-        let workingDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-        try {
-          if (scheduleConfig?.working_days) {
-            const parsed = JSON.parse(scheduleConfig.working_days);
-            if (Array.isArray(parsed) && parsed.length) workingDays = parsed;
-          }
-        } catch (error) {
-          console.error('Invalid working_days config:', error);
-        }
+        let workingDays = parseWorkingDays(scheduleConfig?.working_days);
         const slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
-        const classSlots = slots.filter(slot => slot.type === 'class');
+        const shiftList = parseShiftList(scheduleConfig?.shifts_json);
+        const normalizedSlots = normalizeSlotsForShifts(slots, shiftList);
+        const classSlots = normalizedSlots.filter(slot => slot.type === 'class');
         let generationWarnings = { items: [] };
         try {
           generationWarnings = buildGenerationWarnings({
@@ -1057,12 +1153,13 @@ export async function handleInstituteRequest(request, env) {
             teacherAssignments,
             teacherSubjects,
             workingDays,
-            classSlots
-          });
-        } catch (error) {
-          console.error('Generation warnings failed:', error);
-        }
-        const schoolData = { classes, teachers, subjects, slots };
+          classSlots,
+          shiftList
+        });
+      } catch (error) {
+        console.error('Generation warnings failed:', error);
+      }
+        const schoolData = { classes, teachers, subjects, slots: normalizedSlots };
         return htmlResponse(InstituteLayout(
           RoutineGeneratorHTML(existingRoutines, generationSettings, schoolData, generationWarnings), 
           "Routine Generator", 
@@ -1119,16 +1216,10 @@ export async function handleInstituteRequest(request, env) {
     const teacherAssignments = (await env.DB.prepare("SELECT * FROM teacher_assignments WHERE school_id = ?").bind(school.id).all()).results;
     const teacherSubjects = (await env.DB.prepare("SELECT * FROM teacher_subjects WHERE school_id = ?").bind(school.id).all()).results;
     const scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
-    let workingDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-    try {
-      if (scheduleConfig?.working_days) {
-        const parsed = JSON.parse(scheduleConfig.working_days);
-        if (Array.isArray(parsed) && parsed.length) workingDays = parsed;
-      }
-    } catch (error) {
-      console.error('Invalid working_days config:', error);
-    }
-    const classSlots = slots.filter(slot => slot.type === 'class');
+    let workingDays = parseWorkingDays(scheduleConfig?.working_days);
+    const shiftList = parseShiftList(scheduleConfig?.shifts_json);
+    const normalizedSlots = normalizeSlotsForShifts(slots, shiftList);
+    const classSlots = normalizedSlots.filter(slot => slot.type === 'class');
     
     const conflictSummary = buildConflictSummary({
       entries,
@@ -1141,10 +1232,11 @@ export async function handleInstituteRequest(request, env) {
       teacherAssignments,
       teacherSubjects,
       workingDays,
-      classSlots
+      classSlots,
+      shiftList
     });
     
-    const routineData = { routine, entries, classes, teachers, subjects, slots, groups, sections, workingDays, conflictSummary };
+    const routineData = { routine, entries, classes, teachers, subjects, slots: normalizedSlots, groups, sections, workingDays, conflictSummary, shiftList };
     
     return htmlResponse(InstituteLayout(
       RoutineViewerHTML(routineData), 
@@ -1167,17 +1259,10 @@ export async function handleInstituteRequest(request, env) {
       const scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
       const slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
 
-      let workingDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-      try {
-        if (scheduleConfig?.working_days) {
-          const parsed = JSON.parse(scheduleConfig.working_days);
-          if (Array.isArray(parsed) && parsed.length) workingDays = parsed;
-        }
-      } catch (error) {
-        console.error('Invalid working_days config:', error);
-      }
-
-      const classSlots = slots.filter(slot => slot.type === 'class').sort((a, b) => a.slot_index - b.slot_index);
+      let workingDays = parseWorkingDays(scheduleConfig?.working_days);
+      const shiftList = parseShiftList(scheduleConfig?.shifts_json);
+      const normalizedSlots = normalizeSlotsForShifts(slots, shiftList);
+      const classSlots = normalizedSlots.filter(slot => slot.type === 'class').sort((a, b) => a.slot_index - b.slot_index);
 
       return jsonResponse({
         success: true,
@@ -1191,7 +1276,9 @@ export async function handleInstituteRequest(request, env) {
           teacherAssignments,
           teacherSubjects,
           workingDays,
-          classSlots
+          classSlots,
+          shifts: shiftList,
+          shiftsEnabled: !!school.shifts_enabled
         }
       });
     } catch (error) {
@@ -1216,17 +1303,11 @@ export async function handleInstituteRequest(request, env) {
       const scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
       const slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
 
-      let workingDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-      try {
-        if (scheduleConfig?.working_days) {
-          const parsed = JSON.parse(scheduleConfig.working_days);
-          if (Array.isArray(parsed) && parsed.length) workingDays = parsed;
-        }
-      } catch (error) {
-        console.error('Invalid working_days config:', error);
-      }
+      let workingDays = parseWorkingDays(scheduleConfig?.working_days);
 
-      const classSlots = slots.filter(slot => slot.type === 'class').sort((a, b) => a.slot_index - b.slot_index);
+      const shiftList = parseShiftList(scheduleConfig?.shifts_json);
+      const normalizedSlots = normalizeSlotsForShifts(slots, shiftList);
+      const classSlots = normalizedSlots.filter(slot => slot.type === 'class').sort((a, b) => a.slot_index - b.slot_index);
 
       if (!sections.length) return jsonResponse({ error: "No sections configured for routine generation." }, 400);
       if (!classSlots.length) return jsonResponse({ error: "No class periods found in Master Schedule." }, 400);
@@ -1242,7 +1323,8 @@ export async function handleInstituteRequest(request, env) {
         teacherAssignments,
         teacherSubjects,
         workingDays,
-        classSlots
+        classSlots,
+        shiftList
       });
 
       const routineName = body.name || `Generated Routine ${new Date().toLocaleDateString()}`;
@@ -1293,17 +1375,11 @@ export async function handleInstituteRequest(request, env) {
       const scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
       const slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
 
-      let workingDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-      try {
-        if (scheduleConfig?.working_days) {
-          const parsed = JSON.parse(scheduleConfig.working_days);
-          if (Array.isArray(parsed) && parsed.length) workingDays = parsed;
-        }
-      } catch (error) {
-        console.error('Invalid working_days config:', error);
-      }
+      let workingDays = parseWorkingDays(scheduleConfig?.working_days);
 
-      const classSlots = slots.filter(slot => slot.type === 'class').sort((a, b) => a.slot_index - b.slot_index);
+      const shiftList = parseShiftList(scheduleConfig?.shifts_json);
+      const normalizedSlots = normalizeSlotsForShifts(slots, shiftList);
+      const classSlots = normalizedSlots.filter(slot => slot.type === 'class').sort((a, b) => a.slot_index - b.slot_index);
 
       const validation = validateGeneratedRoutine({
         entries,
@@ -1316,7 +1392,8 @@ export async function handleInstituteRequest(request, env) {
         teacherAssignments,
         teacherSubjects,
         workingDays,
-        classSlots
+        classSlots,
+        shiftList
       });
 
       if (!validation.valid) {
@@ -1397,6 +1474,120 @@ export async function handleInstituteRequest(request, env) {
     }
   }
 
+  function parseShiftList(raw) {
+    if (!raw) return ['Full Day'];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length) {
+        const cleaned = parsed
+          .map(item => String(item).trim())
+          .filter(Boolean)
+          .filter(name => name.toLowerCase() !== 'standard');
+        if (!cleaned.includes('Full Day')) cleaned.unshift('Full Day');
+        return Array.from(new Set(cleaned));
+      }
+    } catch (e) {}
+    return ['Full Day'];
+  }
+
+  function parseWorkingDays(raw) {
+    const defaultDays = ["monday","tuesday","wednesday","thursday","friday"];
+    if (!raw) return defaultDays.slice();
+    let parsed = raw;
+    if (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed); } catch (e) { parsed = null; }
+    }
+    if (typeof parsed === 'string') {
+      try { parsed = JSON.parse(parsed); } catch (e) { parsed = null; }
+    }
+    if (!Array.isArray(parsed)) return defaultDays.slice();
+    const validDays = new Set(["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]);
+    const cleaned = parsed
+      .map(day => String(day || '').toLowerCase().trim())
+      .filter(day => validDays.has(day));
+    const unique = Array.from(new Set(cleaned));
+    return unique.length ? unique : defaultDays.slice();
+  }
+
+  function parseApplicableShifts(raw, shiftList) {
+    if (!raw) return shiftList.slice();
+    let parsed = [];
+    if (Array.isArray(raw)) {
+      parsed = raw;
+    } else if (typeof raw === 'string') {
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        parsed = raw ? [raw] : [];
+      }
+    }
+    if (!Array.isArray(parsed)) parsed = [];
+    if (!parsed.length || parsed.includes('all')) return shiftList.slice();
+    const filtered = parsed.filter(name => shiftList.includes(name));
+    const result = filtered.length ? filtered : shiftList.slice();
+    const ordered = shiftList.filter(name => result.includes(name));
+    if (ordered.length) {
+      ordered.push(...result.filter(name => !ordered.includes(name)));
+    }
+    const finalList = ordered.length ? ordered : result.slice();
+    if (shiftList.includes('Full Day') && !finalList.includes('Full Day')) {
+      finalList.unshift('Full Day');
+    }
+    return finalList;
+  }
+
+  function normalizeSlotsForShifts(slots, shiftList) {
+    return (slots || []).map(slot => ({
+      ...slot,
+      applicable_shifts: parseApplicableShifts(slot.applicable_shifts, shiftList)
+    }));
+  }
+
+  function buildSlotIndexesByShift(classSlots, shiftList) {
+    const byShift = {};
+    shiftList.forEach(shift => { byShift[shift] = []; });
+    (classSlots || []).forEach(slot => {
+      const applicable = parseApplicableShifts(slot.applicable_shifts, shiftList);
+      shiftList.forEach(shift => {
+        if (applicable.includes(shift)) byShift[shift].push(slot.slot_index);
+      });
+    });
+    Object.keys(byShift).forEach(shift => {
+      byShift[shift] = Array.from(new Set(byShift[shift])).sort((a, b) => a - b);
+    });
+    return byShift;
+  }
+
+  function buildSectionListWithSlots({ sections, classes, classSlots, shiftList }) {
+    const slotIndexesByShift = buildSlotIndexesByShift(classSlots, shiftList);
+    const allSlotIndexes = (classSlots || []).map(slot => slot.slot_index).sort((a, b) => a - b);
+    const classShiftMap = new Map((classes || []).map(cls => [cls.id, cls.shift_name || 'Full Day']));
+
+    const resolveSlots = (classId) => {
+      const rawShift = classShiftMap.get(classId) || 'Full Day';
+      const shiftName = shiftList.includes(rawShift) ? rawShift : 'Full Day';
+      let slotIndexes = slotIndexesByShift[shiftName] || [];
+      if (!slotIndexes.length && !shiftList.includes(rawShift)) {
+        slotIndexes = allSlotIndexes.slice();
+      }
+      return slotIndexes;
+    };
+
+    const baseSections = sections.length ? sections : (classes || []).map(cls => ({
+      id: 0,
+      class_id: cls.id,
+      group_id: null,
+      section_name: 'Main'
+    }));
+
+    const sectionList = baseSections.map(sec => ({
+      ...sec,
+      slotIndexes: resolveSlots(sec.class_id)
+    }));
+
+    return { sectionList, slotIndexesByShift, allSlotIndexes };
+  }
+
   function pickAssignmentsForSection(assignments, section, subjectId) {
     const relevant = assignments.filter(a => a.subject_id === subjectId && a.class_id === section.class_id);
     const sectionLevel = relevant.filter(a => a.section_id === section.id);
@@ -1414,7 +1605,7 @@ export async function handleInstituteRequest(request, env) {
     classSubjects,
     groupSubjects,
     workingDays,
-    classSlots
+    slotsPerDay
   }) {
     const subjectMap = {};
     const addSubject = (subjectId, minCount, maxCount) => {
@@ -1447,7 +1638,7 @@ export async function handleInstituteRequest(request, env) {
         });
     }
 
-    const totalSlots = workingDays.length * classSlots.length;
+    const totalSlots = workingDays.length * (slotsPerDay || 0);
     const subjectIds = Object.keys(subjectMap);
     const targets = {};
     let minSum = 0;
@@ -1501,12 +1692,16 @@ export async function handleInstituteRequest(request, env) {
     const teacherSubjectCount = {};
 
     const sectionPlans = sectionList.map(section => {
+      const slotIndexes = (section.slotIndexes && section.slotIndexes.length)
+        ? section.slotIndexes
+        : classSlots.map(slot => slot.slot_index);
+      const slotsPerDay = slotIndexes.length;
       const { targets } = buildSectionTargets({
         section,
         classSubjects,
         groupSubjects,
         workingDays,
-        classSlots
+        slotsPerDay
       });
       const subjectIds = Object.keys(targets).map(id => Number(id));
       const teacherPools = buildTeacherPools({
@@ -1531,7 +1726,8 @@ export async function handleInstituteRequest(request, env) {
         remainingTotal,
         subjectIds,
         teacherPools,
-        usedSubjectsByDay
+        usedSubjectsByDay,
+        slotIndexSet: new Set(slotIndexes)
       };
     });
 
@@ -1585,6 +1781,7 @@ export async function handleInstituteRequest(request, env) {
         const sectionsByNeed = sectionPlans.slice().sort((a, b) => b.remainingTotal - a.remainingTotal);
         sectionsByNeed.forEach(plan => {
           if (plan.remainingTotal <= 0) return;
+          if (!plan.slotIndexSet.has(slot.slot_index)) return;
           const assignment = chooseAssignmentForSlotFast(plan, day, slot.slot_index);
           if (!assignment) return;
 
@@ -1634,16 +1831,10 @@ export async function handleInstituteRequest(request, env) {
     teacherAssignments,
     teacherSubjects,
     workingDays,
-    classSlots
+    classSlots,
+    shiftList
   }) {
-    const sectionList = sections.length
-      ? sections
-      : classes.map(cls => ({
-          id: 0,
-          class_id: cls.id,
-          group_id: null,
-          section_name: 'Main'
-        }));
+    const { sectionList } = buildSectionListWithSlots({ sections, classes, classSlots, shiftList: shiftList || ['Full Day'] });
 
     const plan = generateRoutinePlanGreedy({
       sectionList,
@@ -1656,7 +1847,8 @@ export async function handleInstituteRequest(request, env) {
     });
 
     const totalRequired = sectionList.reduce((sum, section) => {
-      const targets = buildSectionTargets({ section, classSubjects, groupSubjects, workingDays, classSlots }).targets;
+      const slotsPerDay = section.slotIndexes ? section.slotIndexes.length : classSlots.length;
+      const targets = buildSectionTargets({ section, classSubjects, groupSubjects, workingDays, slotsPerDay }).targets;
       const subjectIds = Object.keys(targets);
       const sectionTotal = subjectIds.reduce((acc, id) => acc + (targets[id] || 0), 0);
       return sum + sectionTotal;
@@ -1677,16 +1869,24 @@ export async function handleInstituteRequest(request, env) {
     teacherAssignments,
     teacherSubjects,
     workingDays,
-    classSlots
+    classSlots,
+    shiftList
   }) {
     const errors = [];
-    const sectionList = sections;
+    const { sectionList } = buildSectionListWithSlots({ sections, classes, classSlots, shiftList: shiftList || ['Full Day'] });
     if (!sectionList.length) {
       return { valid: false, errors: ["No sections configured. Add sections before generating routines."] };
     }
 
     const workingDaySet = new Set(workingDays);
-    const slotIndexSet = new Set(classSlots.map(slot => slot.slot_index));
+    const slotIndexMap = new Map();
+    sectionList.forEach(sec => {
+      const key = `${sec.class_id}-${sec.group_id || 0}-${sec.id || 0}`;
+      const slotIndexes = (sec.slotIndexes && sec.slotIndexes.length)
+        ? sec.slotIndexes
+        : classSlots.map(slot => slot.slot_index);
+      slotIndexMap.set(key, new Set(slotIndexes));
+    });
 
     const sectionMap = new Map();
     sectionList.forEach(sec => {
@@ -1760,7 +1960,8 @@ export async function handleInstituteRequest(request, env) {
         continue;
       }
 
-      if (!slotIndexSet.has(entry.slot_index)) {
+      const allowedSlots = slotIndexMap.get(sectionKey);
+      if (!allowedSlots || !allowedSlots.has(entry.slot_index)) {
         errors.push(`Invalid slot ${entry.slot_index} for section ${sectionKey}.`);
         continue;
       }
@@ -1852,7 +2053,7 @@ export async function handleInstituteRequest(request, env) {
     return { valid: errors.length === 0, errors };
   }
 
-  function buildConflictSummary({ entries, classes, groups, sections, subjects, classSubjects, groupSubjects, teacherAssignments, teacherSubjects, workingDays, classSlots }) {
+  function buildConflictSummary({ entries, classes, groups, sections, subjects, classSubjects, groupSubjects, teacherAssignments, teacherSubjects, workingDays, classSlots, shiftList }) {
     const entryConflicts = entries.filter(entry => entry.is_conflict || entry.conflict_reason).map(entry => ({
       day_of_week: entry.day_of_week,
       slot_index: entry.slot_index,
@@ -1872,17 +2073,10 @@ export async function handleInstituteRequest(request, env) {
       teacherSchedule[entry.teacher_id][entry.day_of_week][entry.slot_index] = true;
     });
 
-    const sectionList = [];
+    const { sectionList } = buildSectionListWithSlots({ sections, classes, classSlots, shiftList: shiftList || ['Full Day'] });
     const classSectionMap = new Map();
-    sections.forEach(sec => {
-      sectionList.push(sec);
+    sectionList.forEach(sec => {
       classSectionMap.set(`${sec.class_id}-${sec.group_id || 0}-${sec.id || 0}`, sec);
-    });
-    classes.forEach(cls => {
-      const hasSection = sections.some(sec => sec.class_id === cls.id);
-      if (!hasSection) {
-        sectionList.push({ id: 0, class_id: cls.id, group_id: null, section_name: 'Main' });
-      }
     });
 
     const requiredBySection = {};
@@ -1929,7 +2123,8 @@ export async function handleInstituteRequest(request, env) {
       const [classId, groupId, sectionId] = sectionKey.split('-').map(Number);
       const classInfo = classes.find(c => c.id === classId);
       const groupInfo = groups.find(g => g.id === groupId);
-      const sectionInfo = sections.find(s => s.id === sectionId) || classSectionMap.get(sectionKey);
+      const mappedSection = classSectionMap.get(sectionKey);
+      const sectionInfo = sections.find(s => s.id === sectionId) || mappedSection;
       const className = classInfo?.class_name || 'Class';
       const groupName = groupInfo?.group_name || '';
       const sectionName = sectionInfo?.section_name || 'Main';
@@ -1961,7 +2156,8 @@ export async function handleInstituteRequest(request, env) {
       const [classId, groupId, sectionId] = sectionKey.split('-').map(Number);
       const classInfo = classes.find(c => c.id === classId);
       const groupInfo = groups.find(g => g.id === groupId);
-      const sectionInfo = sections.find(s => s.id === sectionId) || classSectionMap.get(sectionKey);
+      const mappedSection = classSectionMap.get(sectionKey);
+      const sectionInfo = sections.find(s => s.id === sectionId) || mappedSection;
       const className = classInfo?.class_name || 'Class';
       const groupName = groupInfo?.group_name || '';
       const sectionName = sectionInfo?.section_name || 'Main';
@@ -1972,14 +2168,18 @@ export async function handleInstituteRequest(request, env) {
         remainingBySubject[subjectId] = Math.max(0, required - actual);
       });
 
+      const slotIndexes = (mappedSection && mappedSection.slotIndexes && mappedSection.slotIndexes.length)
+        ? mappedSection.slotIndexes
+        : classSlots.map(slot => slot.slot_index);
+
       workingDays.forEach(day => {
-        classSlots.forEach(slot => {
+        slotIndexes.forEach(slotIndex => {
           const existingEntry = entries.find(entry =>
             entry.class_id === classId &&
             (entry.group_id || 0) === (groupId || 0) &&
             (entry.section_id || 0) === (sectionId || 0) &&
             entry.day_of_week === day &&
-            entry.slot_index === slot.slot_index
+            entry.slot_index === slotIndex
           );
           if (existingEntry) return;
 
@@ -1991,7 +2191,7 @@ export async function handleInstituteRequest(request, env) {
           if (!candidates.length) {
             gapReasons.push({
               day_of_week: day,
-              slot_index: slot.slot_index,
+              slot_index: slotIndex,
               class_id: classId,
               group_id: groupId || null,
               section_id: sectionId || null,
@@ -2015,7 +2215,7 @@ export async function handleInstituteRequest(request, env) {
             }
 
             for (const teacherId of pool) {
-              if (!teacherSchedule[teacherId]?.[day]?.[slot.slot_index]) {
+              if (!teacherSchedule[teacherId]?.[day]?.[slotIndex]) {
                 hasAvailableTeacher = true;
                 break;
               }
@@ -2025,7 +2225,7 @@ export async function handleInstituteRequest(request, env) {
 
           gapReasons.push({
             day_of_week: day,
-            slot_index: slot.slot_index,
+            slot_index: slotIndex,
             class_id: classId,
             group_id: groupId || null,
             section_id: sectionId || null,
@@ -2043,16 +2243,10 @@ export async function handleInstituteRequest(request, env) {
     return { entryConflicts, missingRequirements, gapReasons };
   }
 
-  function buildGenerationWarnings({ sections, classes, groups, subjects, classSubjects, groupSubjects, teacherAssignments, teacherSubjects, workingDays, classSlots }) {
+  function buildGenerationWarnings({ sections, classes, groups, subjects, classSubjects, groupSubjects, teacherAssignments, teacherSubjects, workingDays, classSlots, shiftList }) {
     const warnings = [];
-    const capacityPerSection = workingDaysCount * classSlots.length;
-
-    const sectionList = sections.length ? sections : classes.map(cls => ({
-      id: 0,
-      class_id: cls.id,
-      group_id: null,
-      section_name: 'Main'
-    }));
+    const workingDaysCount = workingDays.length;
+    const { sectionList } = buildSectionListWithSlots({ sections, classes, classSlots, shiftList: shiftList || ['Full Day'] });
 
     sectionList.forEach(section => {
       const classInfo = classes.find(c => c.id === section.class_id);
@@ -2061,6 +2255,16 @@ export async function handleInstituteRequest(request, env) {
       const groupName = groupInfo?.group_name || '';
       const sectionName = section.section_name || 'Main';
       const sectionLabel = `${className}${groupName ? ' - ' + groupName : ''} - ${sectionName}`;
+      const slotsPerDay = (section.slotIndexes && section.slotIndexes.length)
+        ? section.slotIndexes.length
+        : classSlots.length;
+      const capacityPerSection = workingDaysCount * slotsPerDay;
+      if (slotsPerDay === 0) {
+        warnings.push({
+          type: 'shift',
+          message: `${sectionLabel}: no periods selected for the assigned shift.`
+        });
+      }
 
       const subjectReqs = [];
       classSubjects.filter(cs => cs.class_id === section.class_id).forEach(cs => {

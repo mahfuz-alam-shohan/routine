@@ -355,7 +355,33 @@ export function RoutineGeneratorHTML(existingRoutines = [], generationSettings =
                             }
                         };
 
-                        const buildSectionTargets = (section, classSubjects, groupSubjects, workingDays, classSlots) => {
+                        const normalizeShiftList = (list) => {
+                            if (!Array.isArray(list) || !list.length) return ['Full Day'];
+                            const cleaned = list.map(item => String(item).trim()).filter(Boolean);
+                            if (!cleaned.includes('Full Day')) cleaned.unshift('Full Day');
+                            return Array.from(new Set(cleaned));
+                        };
+
+                        const normalizeSlotShifts = (slot, shiftList) => {
+                            let shifts = [];
+                            if (Array.isArray(slot.applicable_shifts)) {
+                                shifts = slot.applicable_shifts.slice();
+                            } else if (typeof slot.applicable_shifts === 'string') {
+                                try { shifts = JSON.parse(slot.applicable_shifts); } catch (e) { shifts = []; }
+                            }
+                            if (!Array.isArray(shifts)) shifts = [];
+                            if (!shifts.length || shifts.includes('all')) {
+                                return shiftList.slice();
+                            }
+                            const filtered = shifts.filter(name => shiftList.includes(name));
+                            const result = filtered.length ? filtered : shiftList.slice();
+                            if (shiftList.includes('Full Day') && !result.includes('Full Day')) {
+                                result.unshift('Full Day');
+                            }
+                            return result;
+                        };
+
+                        const buildSectionTargets = (section, classSubjects, groupSubjects, workingDays, slotsPerDay) => {
                             const subjectMap = {};
                             const addSubject = (subjectId, minCount, maxCount) => {
                                 if (!subjectMap[subjectId]) {
@@ -387,7 +413,7 @@ export function RoutineGeneratorHTML(existingRoutines = [], generationSettings =
                                     });
                             }
 
-                            const totalSlots = workingDays.length * classSlots.length;
+                            const totalSlots = workingDays.length * slotsPerDay;
                             const subjectIds = Object.keys(subjectMap);
                             const targets = {};
                             let minSum = 0;
@@ -1018,6 +1044,9 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
 
                             const plans = sectionKeys.map(key => {
                                 const data = sectionData[key];
+                                const slotIndexes = (data.slotIndexes && data.slotIndexes.length)
+                                    ? data.slotIndexes
+                                    : classSlots.map(slot => slot.slot_index);
                                 const remaining = {};
                                 let remainingTotal = 0;
                                 data.subjectIds.forEach(subjectId => {
@@ -1035,7 +1064,8 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                                     teacherPools: data.teacherPools,
                                     remaining,
                                     remainingTotal,
-                                    usedSubjectsByDay
+                                    usedSubjectsByDay,
+                                    slotIndexSet: new Set(slotIndexes)
                                 };
                             });
 
@@ -1085,6 +1115,7 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                                     const orderedPlans = plans.slice().sort((a, b) => b.remainingTotal - a.remainingTotal);
                                     orderedPlans.forEach(plan => {
                                         if (plan.remainingTotal <= 0) return;
+                                        if (!plan.slotIndexSet.has(slot.slot_index)) return;
                                         const assignment = chooseAssignmentForSlotFast(plan, day, slot.slot_index);
                                         if (!assignment) return;
 
@@ -1179,19 +1210,32 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                                 };
 
                                 const workingDays = payload.workingDays || [];
-                                const classSlots = payload.classSlots || [];
-                                const allowAutoTeachers = true;
-                                const slotGrid = [];
-                                workingDays.forEach((day, dayIndex) => {
-                                    classSlots.forEach((slot, slotOrder) => {
-                                        slotGrid.push({
-                                            day,
-                                            dayIndex,
-                                            slotIndex: slot.slot_index,
-                                            slotOrder
-                                        });
+                                const shifts = normalizeShiftList(payload.shifts || []);
+                                const rawClassSlots = payload.classSlots || [];
+                                const classSlots = rawClassSlots.map(slot => ({
+                                    ...slot,
+                                    applicable_shifts: normalizeSlotShifts(slot, shifts)
+                                }));
+                                const allSlotIndexes = classSlots.map(slot => slot.slot_index).sort((a, b) => a - b);
+                                const slotIndexesByShift = {};
+                                shifts.forEach(shift => { slotIndexesByShift[shift] = []; });
+                                classSlots.forEach(slot => {
+                                    const applicable = Array.isArray(slot.applicable_shifts) && slot.applicable_shifts.length
+                                        ? slot.applicable_shifts
+                                        : shifts;
+                                    shifts.forEach(shift => {
+                                        if (applicable.includes(shift)) slotIndexesByShift[shift].push(slot.slot_index);
                                     });
                                 });
+                                Object.keys(slotIndexesByShift).forEach(shift => {
+                                    const unique = Array.from(new Set(slotIndexesByShift[shift]));
+                                    slotIndexesByShift[shift] = unique.sort((a, b) => a - b);
+                                });
+                                const classShiftMap = {};
+                                (payload.classes || []).forEach(cls => {
+                                    classShiftMap[cls.id] = cls.shift_name || 'Full Day';
+                                });
+                                const allowAutoTeachers = true;
 
                                 const sectionKeys = [];
                                 const sectionData = {};
@@ -1200,7 +1244,14 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
 
                                 for (const section of sections) {
                                     const sectionKey = section.class_id + '-' + (section.group_id || 0) + '-' + (section.id || 0);
-                                    const targetData = buildSectionTargets(section, payload.classSubjects || [], payload.groupSubjects || [], workingDays, classSlots);
+                                    const rawShiftName = classShiftMap[section.class_id] || 'Full Day';
+                                    const shiftName = shifts.includes(rawShiftName) ? rawShiftName : 'Full Day';
+                                    let slotIndexes = slotIndexesByShift[shiftName] || [];
+                                    if (!slotIndexes.length && !shifts.includes(rawShiftName)) {
+                                        slotIndexes = allSlotIndexes.slice();
+                                    }
+                                    const slotsPerDay = slotIndexes.length;
+                                    const targetData = buildSectionTargets(section, payload.classSubjects || [], payload.groupSubjects || [], workingDays, slotsPerDay);
                                     if (targetData.error) {
                                         validationError = targetData.error;
                                         break;
@@ -1229,7 +1280,9 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                                         section,
                                         targets,
                                         subjectIds,
-                                        teacherPools
+                                        teacherPools,
+                                        slotIndexes,
+                                        slotsPerDay
                                     };
                                 }
 
@@ -1238,8 +1291,7 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                                     return;
                                 }
 
-                                const periodsPerDay = classSlots.length;
-                                const slotIndexes = classSlots.map(slot => slot.slot_index).sort((a, b) => a - b);
+                                const periodsPerDay = allSlotIndexes.length;
                                 const feasibilityErrors = [];
 
                                 sectionKeys.forEach(key => {
@@ -1247,7 +1299,13 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                                     const subjectIds = data.subjectIds;
                                     const targets = data.targets;
                                     const totalRequired = subjectIds.reduce((sum, id) => sum + (targets[id] || 0), 0);
-                                    const capacity = workingDays.length * periodsPerDay;
+                                    const slotsPerDay = data.slotsPerDay || 0;
+                                    const capacity = workingDays.length * slotsPerDay;
+                                    if (slotsPerDay === 0 && totalRequired > 0) {
+                                        const sectionLabel = getSectionLabel(data.section);
+                                        feasibilityErrors.push('No periods assigned to shift for ' + sectionLabel + '.');
+                                        return;
+                                    }
 
                                     subjectIds.forEach(subjectId => {
                                         const required = targets[subjectId] || 0;
@@ -1295,7 +1353,7 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                                         const targets = data.targets;
                                         const shuffledDays = workingDays.slice();
                                         shuffleArray(shuffledDays);
-                                        const flowResult = assignSubjectsToDays(subjectIds, targets, shuffledDays, periodsPerDay);
+                                        const flowResult = assignSubjectsToDays(subjectIds, targets, shuffledDays, data.slotsPerDay || 0);
                                         if (flowResult.flow !== flowResult.totalRequired) {
                                             const sectionLabel = getSectionLabel(data.section);
                                             flowError = 'Unable to place all subjects across days for ' + sectionLabel + '.';
@@ -1316,7 +1374,7 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                                         workingDays.forEach(day => {
                                             const subjectsForDay = dayAssignments[day] ? dayAssignments[day].slice() : [];
                                             shuffleArray(subjectsForDay);
-                                            const daySlots = slotIndexes.slice();
+                                            const daySlots = (data.slotIndexes || []).slice();
                                             shuffleArray(daySlots);
                                             for (let i = 0; i < subjectsForDay.length && i < daySlots.length; i += 1) {
                                                 entries.push({

@@ -1,4 +1,14 @@
-export function SchoolDetailHTML(school) {
+export function SchoolDetailHTML(school, shiftConfig = null) {
+    const shiftsEnabled = !!(shiftConfig && shiftConfig.enabled);
+    const shifts = (shiftConfig && Array.isArray(shiftConfig.shifts) && shiftConfig.shifts.length)
+        ? shiftConfig.shifts
+        : ['Full Day'];
+    const escapeHtml = (value) => String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     return `
       <div class="space-y-8">
           
@@ -57,6 +67,97 @@ export function SchoolDetailHTML(school) {
 
                   </div>
           </div>
+
+          <div>
+              <h3 class="font-bold text-gray-900 mb-4 text-lg">Shift Scheduling</h3>
+              <div class="bg-white border border-gray-300 p-4 space-y-4">
+                  <label class="flex items-center gap-2 text-sm text-gray-700">
+                      <input type="checkbox" id="shift-enabled" ${shiftsEnabled ? 'checked' : ''} onchange="toggleShiftEnabled(this)" class="w-4 h-4">
+                      <span>Enable shift scheduling for this institution</span>
+                  </label>
+                  <div id="shift-config-panel" class="${shiftsEnabled ? '' : 'hidden'}">
+                      <div class="flex items-center justify-between text-xs font-semibold text-gray-500 uppercase mb-2">
+                          <span>Shifts</span>
+                          <span>Full Day is default</span>
+                      </div>
+                      <div class="space-y-2">
+                          ${shifts.map(shift => `
+                              <div class="flex items-center justify-between border border-gray-300 px-3 py-2">
+                                  <span class="text-sm text-gray-900">${escapeHtml(shift)}</span>
+                                  ${shift === 'Full Day' ? `<span class="text-xs text-gray-500">Default</span>` : `
+                                      <button onclick='removeShift(${JSON.stringify(shift)})' class="text-xs text-red-600 hover:text-red-700">Remove</button>
+                                  `}
+                              </div>
+                          `).join('')}
+                      </div>
+                      <form onsubmit="addShift(event)" class="flex flex-col sm:flex-row gap-2 mt-3">
+                          <input type="text" id="shift-name" placeholder="Shift name (e.g. Morning)" class="flex-1 border border-gray-300 px-2 py-1 text-sm" required>
+                          <button type="submit" class="bg-gray-900 text-white px-3 py-1 text-sm">Add Shift</button>
+                      </form>
+                      <p class="text-xs text-gray-500 mt-2">Shift tabs will appear in the Master Schedule for selecting applicable periods.</p>
+                  </div>
+              </div>
+          </div>
       </div>
+
+      <script>
+        const SCHOOL_ID = ${school.id};
+
+        function toggleShiftEnabled(input) {
+            fetch('/admin/school/shifts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'set_enabled', school_id: SCHOOL_ID, enabled: input.checked })
+            }).then(res => res.json()).then(result => {
+                if (result.success) {
+                    document.getElementById('shift-config-panel').classList.toggle('hidden', !input.checked);
+                } else {
+                    alert(result.error || 'Unable to update shift settings.');
+                    input.checked = !input.checked;
+                }
+            }).catch(() => {
+                alert('Network error. Please try again.');
+                input.checked = !input.checked;
+            });
+        }
+
+        function addShift(event) {
+            event.preventDefault();
+            const input = document.getElementById('shift-name');
+            const name = input.value.trim();
+            if (!name) return;
+
+            fetch('/admin/school/shifts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'add_shift', school_id: SCHOOL_ID, shift_name: name })
+            }).then(res => res.json()).then(result => {
+                if (result.success) {
+                    window.location.reload();
+                } else {
+                    alert(result.error || 'Unable to add shift.');
+                }
+            }).catch(() => {
+                alert('Network error. Please try again.');
+            });
+        }
+
+        function removeShift(name) {
+            if (!confirm('Remove shift ' + name + '?')) return;
+            fetch('/admin/school/shifts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'remove_shift', school_id: SCHOOL_ID, shift_name: name })
+            }).then(res => res.json()).then(result => {
+                if (result.success) {
+                    window.location.reload();
+                } else {
+                    alert(result.error || 'Unable to remove shift.');
+                }
+            }).catch(() => {
+                alert('Network error. Please try again.');
+            });
+        }
+      </script>
     `;
 }

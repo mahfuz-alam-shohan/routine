@@ -9,7 +9,8 @@ export function RoutineViewerHTML(routineData = {}) {
         groups = [],
         sections = [],
         workingDays = [],
-        conflictSummary = { entryConflicts: [], missingRequirements: [], gapReasons: [] }
+        conflictSummary = { entryConflicts: [], missingRequirements: [], gapReasons: [] },
+        shiftList: rawShiftList = []
     } = routineData;
 
     const activeDays = workingDays.length
@@ -18,6 +19,13 @@ export function RoutineViewerHTML(routineData = {}) {
 
     const sortedSlots = slots.slice().sort((a, b) => a.slot_index - b.slot_index);
     const classSlots = sortedSlots.filter(slot => slot.type !== 'break');
+    const shiftList = Array.isArray(rawShiftList) && rawShiftList.length ? rawShiftList.slice() : ['Full Day'];
+    if (!shiftList.includes('Full Day')) shiftList.unshift('Full Day');
+    const escapeHtml = (value) => String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    const escapeAttr = (value) => escapeHtml(value).replace(/"/g, '&quot;');
     const slotLabelMap = new Map();
     sortedSlots.forEach(slot => {
         const label = slot.label || `${slot.start_time} - ${slot.end_time}`;
@@ -25,12 +33,44 @@ export function RoutineViewerHTML(routineData = {}) {
     });
     const getSlotLabel = (slotIndex) => slotLabelMap.get(slotIndex) || `Period ${slotIndex + 1}`;
 
+    const classShiftMap = new Map(classes.map(cls => [cls.id, cls.shift_name || 'Full Day']));
     const sectionMap = new Map();
-    const addSection = (key, label) => {
+    const addSection = (key, label, shiftName) => {
         if (!sectionMap.has(key)) {
-            sectionMap.set(key, { key, label });
+            sectionMap.set(key, { key, label, shift: shiftName || 'Full Day' });
         }
     };
+
+    const normalizeSlotShifts = (slot) => {
+        let shifts = [];
+        if (Array.isArray(slot.applicable_shifts)) {
+            shifts = slot.applicable_shifts.slice();
+        } else if (typeof slot.applicable_shifts === 'string') {
+            try { shifts = JSON.parse(slot.applicable_shifts); } catch (e) { shifts = []; }
+        }
+        if (!Array.isArray(shifts)) shifts = [];
+        if (!shifts.length || shifts.includes('all')) {
+            shifts = shiftList.slice();
+        } else {
+            shifts = shifts.filter(name => shiftList.includes(name));
+            if (!shifts.length) shifts = shiftList.slice();
+        }
+        if (!shifts.includes('Full Day')) shifts.unshift('Full Day');
+        return shifts;
+    };
+
+    const shiftSlotMap = {};
+    shiftList.forEach(shift => { shiftSlotMap[shift] = []; });
+    sortedSlots.forEach(slot => {
+        const applicable = normalizeSlotShifts(slot);
+        applicable.forEach(shift => {
+            if (!shiftSlotMap[shift]) shiftSlotMap[shift] = [];
+            shiftSlotMap[shift].push(slot.slot_index);
+        });
+    });
+    Object.keys(shiftSlotMap).forEach(shift => {
+        shiftSlotMap[shift] = Array.from(new Set(shiftSlotMap[shift]));
+    });
 
     sections.forEach(sec => {
         const cls = classes.find(c => c.id === sec.class_id);
@@ -40,7 +80,7 @@ export function RoutineViewerHTML(routineData = {}) {
         const sectionName = sec.section_name ? ` - ${sec.section_name}` : '';
         const label = `${className}${groupName}${sectionName || ' - Main'}`;
         const key = `${sec.class_id}-${sec.group_id || 0}-${sec.id || 0}`;
-        addSection(key, label);
+        addSection(key, label, classShiftMap.get(sec.class_id));
     });
 
     entries.forEach(entry => {
@@ -49,13 +89,13 @@ export function RoutineViewerHTML(routineData = {}) {
         const sectionName = entry.section_name ? ` - ${entry.section_name}` : ' - Main';
         const key = `${entry.class_id}-${entry.group_id || 0}-${entry.section_id || 0}`;
         const label = `${className}${groupName}${sectionName}`;
-        addSection(key, label);
+        addSection(key, label, classShiftMap.get(entry.class_id));
     });
 
     if (sectionMap.size === 0 && classes.length) {
         classes.forEach(cls => {
             const key = `${cls.id}-0-0`;
-            addSection(key, `${cls.class_name} - Main`);
+            addSection(key, `${cls.class_name} - Main`, classShiftMap.get(cls.id));
         });
     }
 
@@ -100,7 +140,11 @@ export function RoutineViewerHTML(routineData = {}) {
             if (!teacherSchedule[entry.teacher_id][entry.day_of_week][entry.slot_index]) {
                 teacherSchedule[entry.teacher_id][entry.day_of_week][entry.slot_index] = [];
             }
-            teacherSchedule[entry.teacher_id][entry.day_of_week][entry.slot_index].push(getSectionLabel(entry));
+            const shiftName = classShiftMap.get(entry.class_id) || 'Full Day';
+            teacherSchedule[entry.teacher_id][entry.day_of_week][entry.slot_index].push({
+                label: getSectionLabel(entry),
+                shift: shiftName
+            });
             teacherLoad[entry.teacher_id] = (teacherLoad[entry.teacher_id] || 0) + 1;
             if (!teacherDayLoad[entry.teacher_id]) teacherDayLoad[entry.teacher_id] = {};
             teacherDayLoad[entry.teacher_id][entry.day_of_week] = (teacherDayLoad[entry.teacher_id][entry.day_of_week] || 0) + 1;
@@ -192,6 +236,17 @@ export function RoutineViewerHTML(routineData = {}) {
                           <button type="button" class="ui-button view-toggle" data-view="section">Section View</button>
                           <button type="button" class="ui-button view-toggle" data-view="teacher">Teacher View</button>
                       </div>
+                      ${shiftList.length > 1 ? `
+                      <div class="flex items-center gap-2" id="shift-filter-wrap">
+                          <label class="text-xs text-gray-500">Shift</label>
+                          <select id="shift-filter" onchange="app.filterByShift(this.value)" class="ui-select text-xs md:text-sm">
+                              <option value="all">All Shifts</option>
+                              ${shiftList.map(shift => `
+                                  <option value="${escapeAttr(shift)}">${escapeHtml(shift)}</option>
+                              `).join('')}
+                          </select>
+                      </div>
+                      ` : ''}
                       <div class="flex items-center gap-2" id="section-filter-wrap">
                           <label class="text-xs text-gray-500">Section</label>
                           <select id="section-filter" onchange="app.filterBySection(this.value)" class="ui-select text-xs md:text-sm">
@@ -342,7 +397,7 @@ export function RoutineViewerHTML(routineData = {}) {
 
           <div class="mt-6 space-y-6" id="section-view">
               ${sectionsList.map(section => `
-                  <div class="ui-panel" data-section-table="${section.key}">
+                  <div class="ui-panel" data-section-table="${section.key}" data-shift="${section.shift || 'Full Day'}">
                       <div class="px-4 py-3 border-b border-gray-200">
                           <h3 class="text-sm font-medium text-gray-900">${section.label}</h3>
                       </div>
@@ -354,7 +409,7 @@ export function RoutineViewerHTML(routineData = {}) {
                                       ${sortedSlots.map(slot => {
                                           const timeLabel = slot.start_time && slot.end_time ? `${slot.start_time}-${slot.end_time}` : '';
                                           return `
-                                              <th class="px-2 py-2 text-center text-gray-500 font-medium border border-gray-200">
+                                              <th class="px-2 py-2 text-center text-gray-500 font-medium border border-gray-200" data-slot-index="${slot.slot_index}">
                                                   <div>${getPeriodLabel(slot)}</div>
                                                   ${timeLabel ? `<div class="text-[10px] text-gray-400">${timeLabel}</div>` : ''}
                                               </th>
@@ -369,7 +424,7 @@ export function RoutineViewerHTML(routineData = {}) {
                                               <td class="px-3 py-2 text-gray-700 font-medium border border-gray-200">${day.charAt(0).toUpperCase() + day.slice(1)}</td>
                                               ${sortedSlots.map(slot => {
                                                   if (slot.type === 'break') {
-                                                      return `<td class="px-2 py-2 text-center text-gray-400 bg-gray-50 border border-gray-200">Break Period</td>`;
+                                                      return `<td class="px-2 py-2 text-center text-gray-400 bg-gray-50 border border-gray-200" data-slot-index="${slot.slot_index}">Break Period</td>`;
                                                   }
                                                   const entry = entriesBySection[section.key]?.[day]?.[slot.slot_index];
                                                   if (!entry) {
@@ -382,7 +437,7 @@ export function RoutineViewerHTML(routineData = {}) {
                                                               .replace(/</g, '&lt;')
                                                               .replace(/>/g, '&gt;') + '"'
                                                           : '';
-                                                      return `<td class="px-2 py-2 text-center text-gray-300 border border-gray-200"${titleAttr}>-</td>`;
+                                                      return `<td class="px-2 py-2 text-center text-gray-300 border border-gray-200" data-slot-index="${slot.slot_index}"${titleAttr}>-</td>`;
                                                   }
                                                   const subjectName = entry.subject_name || subjects.find(s => s.id === entry.subject_id)?.subject_name || 'Subject';
                                                   const teacherName = entry.teacher_name || teachers.find(t => t.id === entry.teacher_id)?.full_name || 'Unassigned';
@@ -395,7 +450,7 @@ export function RoutineViewerHTML(routineData = {}) {
                                                           .replace(/>/g, '&gt;') + '"'
                                                       : '';
                                                   return `
-                                                      <td class="px-2 py-2 text-center border border-gray-200">
+                                                      <td class="px-2 py-2 text-center border border-gray-200" data-slot-index="${slot.slot_index}">
                                                           <div class="text-xs font-medium ${conflictClass}"${conflictTitle}>${subjectName}</div>
                                                           <div class="text-[11px] text-gray-500">${teacherName}</div>
                                                       </td>
@@ -426,11 +481,11 @@ export function RoutineViewerHTML(routineData = {}) {
                                       <th class="px-3 py-2 text-left text-gray-500 font-medium border border-gray-200">NAME</th>
                                       ${sortedSlots.map(slot => {
                                           if (slot.type === 'break') {
-                                              return `<th class="px-2 py-2 text-center text-gray-300 font-medium border border-gray-200"></th>`;
+                                              return `<th class="px-2 py-2 text-center text-gray-300 font-medium border border-gray-200" data-slot-index="${slot.slot_index}"></th>`;
                                           }
                                           const index = classSlots.findIndex(s => s.slot_index === slot.slot_index);
                                           const label = index >= 0 ? ordinal(index + 1) : '';
-                                          return `<th class="px-2 py-2 text-center text-gray-500 font-medium border border-gray-200">${label}</th>`;
+                                          return `<th class="px-2 py-2 text-center text-gray-500 font-medium border border-gray-200" data-slot-index="${slot.slot_index}">${label}</th>`;
                                       }).join('')}
                                       <th class="px-2 py-2 text-center text-gray-500 font-medium border border-gray-200">Total</th>
                                   </tr>
@@ -440,9 +495,9 @@ export function RoutineViewerHTML(routineData = {}) {
                                       <th class="px-3 py-2 text-left text-gray-400 font-medium border border-gray-200"></th>
                                       ${sortedSlots.map(slot => {
                                           if (slot.type === 'break') {
-                                              return `<th class="px-2 py-2 text-center text-gray-300 font-medium border border-gray-200"></th>`;
+                                              return `<th class="px-2 py-2 text-center text-gray-300 font-medium border border-gray-200" data-slot-index="${slot.slot_index}"></th>`;
                                           }
-                                          return `<th class="px-2 py-2 text-center text-gray-400 font-medium border border-gray-200">${slot.start_time}-${slot.end_time}</th>`;
+                                          return `<th class="px-2 py-2 text-center text-gray-400 font-medium border border-gray-200" data-slot-index="${slot.slot_index}">${slot.start_time}-${slot.end_time}</th>`;
                                       }).join('')}
                                       <th class="px-2 py-2 text-center text-gray-400 font-medium border border-gray-200"></th>
                                   </tr>
@@ -469,19 +524,19 @@ export function RoutineViewerHTML(routineData = {}) {
                                               </td>
                                               ${sortedSlots.map(slot => {
                                                   if (slot.type === 'break') {
-                                                      return `<td class="px-2 py-2 text-center text-gray-300 border border-gray-200"></td>`;
+                                                      return `<td class="px-2 py-2 text-center text-gray-300 border border-gray-200" data-slot-index="${slot.slot_index}"></td>`;
                                                   }
                                                   const items = teacherSchedule[teacher.id]?.[day]?.[slot.slot_index] || [];
-                                                  if (!items.length) {
-                                                      return `<td class="px-2 py-2 text-center text-gray-300 border border-gray-200">-</td>`;
-                                                  }
+                                                  const itemHtml = items.map(item => `<div class="text-[11px] text-gray-700 teacher-cell-item" data-shift="${item.shift || 'Full Day'}">${item.label}</div>`).join('');
+                                                  const emptyDisplay = items.length ? 'none' : 'block';
                                                   return `
-                                                      <td class="px-2 py-2 text-center border border-gray-200">
-                                                          ${items.map(item => `<div class="text-[11px] text-gray-700">${item}</div>`).join('')}
+                                                      <td class="px-2 py-2 text-center border border-gray-200 teacher-cell" data-slot-index="${slot.slot_index}">
+                                                          ${itemHtml}
+                                                          <div class="text-[11px] text-gray-300 teacher-cell-empty" style="display: ${emptyDisplay};">-</div>
                                                       </td>
                                                   `;
                                               }).join('')}
-                                              <td class="px-2 py-2 text-center text-gray-700 font-medium border border-gray-200">${dayTotal}</td>
+                                              <td class="px-2 py-2 text-center text-gray-700 font-medium border border-gray-200" data-teacher-total="${teacher.id}" data-total-all="${dayTotal}">${dayTotal}</td>
                                           </tr>
                                       `;
                                   }).join('')}
@@ -562,6 +617,80 @@ export function RoutineViewerHTML(routineData = {}) {
                             table.style.display = 'none';
                         }
                     });
+                },
+                filterByShift(shiftName) {
+                    const showAll = shiftName === 'all';
+                    const allowedSlots = showAll ? null : new Set((window.shiftSlotsMap[shiftName] || []));
+
+                    document.querySelectorAll('[data-section-table]').forEach(panel => {
+                        const panelShift = panel.dataset.shift || 'Full Day';
+                        if (showAll || panelShift === shiftName) {
+                            panel.style.display = '';
+                        } else {
+                            panel.style.display = 'none';
+                        }
+                    });
+
+                    document.querySelectorAll('[data-slot-index]').forEach(cell => {
+                        if (!allowedSlots) {
+                            cell.classList.remove('hidden');
+                            return;
+                        }
+                        const idx = Number(cell.dataset.slotIndex);
+                        if (allowedSlots.has(idx)) {
+                            cell.classList.remove('hidden');
+                        } else {
+                            cell.classList.add('hidden');
+                        }
+                    });
+
+                    document.querySelectorAll('.teacher-cell-item').forEach(item => {
+                        if (showAll || item.dataset.shift === shiftName) {
+                            item.classList.remove('hidden');
+                        } else {
+                            item.classList.add('hidden');
+                        }
+                    });
+
+                    document.querySelectorAll('.teacher-cell').forEach(cell => {
+                        const empty = cell.querySelector('.teacher-cell-empty');
+                        if (!empty) return;
+                        const visibleItems = cell.querySelectorAll('.teacher-cell-item:not(.hidden)');
+                        empty.style.display = visibleItems.length ? 'none' : 'block';
+                    });
+
+                    document.querySelectorAll('[data-teacher-total]').forEach(totalCell => {
+                        const row = totalCell.closest('tr[data-teacher-id]');
+                        if (!row) return;
+                        if (showAll) {
+                            totalCell.textContent = totalCell.dataset.totalAll || '0';
+                            return;
+                        }
+                        const visibleItems = row.querySelectorAll('.teacher-cell-item:not(.hidden)');
+                        totalCell.textContent = String(visibleItems.length);
+                    });
+
+                    const sectionSelect = document.getElementById('section-filter');
+                    if (sectionSelect) {
+                        const options = Array.from(sectionSelect.options);
+                        options.forEach(option => {
+                            if (option.value === 'all') {
+                                option.hidden = false;
+                                return;
+                            }
+                            const panel = document.querySelector('[data-section-table="' + option.value + '"]');
+                            if (!panel) return;
+                            const panelShift = panel.dataset.shift || 'Full Day';
+                            option.hidden = !showAll && panelShift !== shiftName;
+                        });
+                        if (sectionSelect.value !== 'all') {
+                            const selectedOption = sectionSelect.selectedOptions[0];
+                            if (selectedOption && selectedOption.hidden) {
+                                sectionSelect.value = 'all';
+                                this.filterBySection('all');
+                            }
+                        }
+                    }
                 }
             };
         };
@@ -575,10 +704,15 @@ export function RoutineViewerHTML(routineData = {}) {
                     if (daySelect) daySelect.value = defaultDay;
                     window.app.filterByDay(defaultDay);
                 }
+                window.shiftSlotsMap = ${JSON.stringify(shiftSlotMap)};
                 window.app.setView('section');
                 document.querySelectorAll('.view-toggle').forEach(btn => {
                     btn.addEventListener('click', () => window.app.setView(btn.dataset.view));
                 });
+                const shiftSelect = document.getElementById('shift-filter');
+                if (shiftSelect) {
+                    window.app.filterByShift(shiftSelect.value || 'all');
+                }
                 const entryTab = document.querySelector('[data-tab="entry"]');
                 const missingTab = document.querySelector('[data-tab="missing"]');
                 const gapsTab = document.querySelector('[data-tab="gaps"]');

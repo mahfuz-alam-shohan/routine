@@ -89,7 +89,74 @@ export async function handleAdminRequest(request, env) {
     const authId = url.searchParams.get('id');
     const school = await env.DB.prepare(`SELECT * FROM profiles_institution WHERE auth_id = ?`).bind(authId).first();
     if(school) school.email = (await env.DB.prepare("SELECT email FROM auth_accounts WHERE id=?").bind(authId).first()).email;
-    return htmlResponse(AdminLayout(SchoolDetailHTML(school), "Manage Client", companyName, {email}));
+    let shiftConfig = { enabled: false, shifts: ['Full Day'] };
+    try {
+      const scheduleConfig = await env.DB.prepare("SELECT shifts_json FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+      const shifts = parseShiftList(scheduleConfig?.shifts_json);
+      shiftConfig = { enabled: !!school.shifts_enabled, shifts };
+    } catch (e) {}
+    return htmlResponse(AdminLayout(SchoolDetailHTML(school, shiftConfig), "Manage Client", companyName, {email}));
+  }
+
+  
+  if (url.pathname === '/admin/school/shifts') {
+    if (request.method !== 'POST') {
+      return jsonResponse({ error: "Invalid method" }, 405);
+    }
+    try {
+      const body = await request.json();
+      const schoolId = body.school_id;
+      if (!schoolId) return jsonResponse({ error: "School ID required" }, 400);
+
+      if (body.action === 'set_enabled') {
+        const enabled = body.enabled ? 1 : 0;
+        await env.DB.prepare("UPDATE profiles_institution SET shifts_enabled = ? WHERE id = ?").bind(enabled, schoolId).run();
+        if (enabled) {
+          await ensureScheduleConfigWithShifts(env, schoolId);
+        }
+        return jsonResponse({ success: true });
+      }
+
+      const scheduleConfig = await ensureScheduleConfigWithShifts(env, schoolId);
+      let shiftList = parseShiftList(scheduleConfig?.shifts_json);
+
+      if (body.action === 'add_shift') {
+        const rawName = (body.shift_name || '').toString().trim();
+        if (!rawName) return jsonResponse({ error: "Shift name required" }, 400);
+        if (rawName.toLowerCase() === 'full day') return jsonResponse({ error: "Full Day is reserved" }, 400);
+        if (!shiftList.includes(rawName)) {
+          const previousShiftList = shiftList.slice();
+          shiftList.push(rawName);
+          await env.DB.prepare("UPDATE schedule_config SET shifts_json = ? WHERE school_id = ?")
+            .bind(JSON.stringify(shiftList), schoolId).run();
+          await addShiftToSlots(env, schoolId, rawName, previousShiftList);
+        }
+        return jsonResponse({ success: true, shifts: shiftList });
+      }
+
+      if (body.action === 'remove_shift') {
+        const rawName = (body.shift_name || '').toString().trim();
+        if (!rawName) return jsonResponse({ error: "Shift name required" }, 400);
+        if (rawName.toLowerCase() === 'full day') return jsonResponse({ error: "Full Day cannot be removed" }, 400);
+        shiftList = shiftList.filter(name => name !== rawName);
+        if (!shiftList.length) shiftList = ['Full Day'];
+        if (!shiftList.includes('Full Day')) shiftList.unshift('Full Day');
+        await env.DB.prepare("UPDATE schedule_config SET shifts_json = ? WHERE school_id = ?")
+          .bind(JSON.stringify(shiftList), schoolId).run();
+        await env.DB.prepare("UPDATE academic_classes SET shift_name = 'Full Day' WHERE school_id = ? AND shift_name = ?")
+          .bind(schoolId, rawName).run();
+        await removeShiftFromSlots(env, schoolId, rawName, shiftList);
+        return jsonResponse({ success: true, shifts: shiftList });
+      }
+
+      return jsonResponse({ error: "Invalid action" }, 400);
+    } catch (e) {
+      if (e.message && (e.message.includes("no such table") || e.message.includes("no such column"))) {
+        await syncDatabase(env);
+        return jsonResponse({ error: "Database updated. Please retry." }, 500);
+      }
+      return jsonResponse({ error: e.message }, 500);
+    }
   }
 
   
@@ -175,8 +242,19 @@ export async function handleAdminRequest(request, env) {
               
               if(body.action === 'create_class') {
                   
-                  await env.DB.prepare("INSERT INTO academic_classes (school_id, class_name, has_groups) VALUES (?, ?, ?)")
-                      .bind(body.school_id, body.class_name, body.has_groups ? 1 : 0).run();
+                  const shiftName = (body.shift_name || 'Full Day').toString().trim() || 'Full Day';
+                  try {
+                      await env.DB.prepare("INSERT INTO academic_classes (school_id, class_name, has_groups, shift_name) VALUES (?, ?, ?, ?)")
+                          .bind(body.school_id, body.class_name, body.has_groups ? 1 : 0, shiftName).run();
+                  } catch (e) {
+                      if (e.message && e.message.includes("no such column")) {
+                          await syncDatabase(env);
+                          await env.DB.prepare("INSERT INTO academic_classes (school_id, class_name, has_groups, shift_name) VALUES (?, ?, ?, ?)")
+                              .bind(body.school_id, body.class_name, body.has_groups ? 1 : 0, shiftName).run();
+                      } else {
+                          throw e;
+                      }
+                  }
                   return jsonResponse({success:true});
               }
               
@@ -254,13 +332,19 @@ export async function handleAdminRequest(request, env) {
       const classes = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ? ORDER BY class_name ASC").bind(school.id).all();
       const groups = await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ? ORDER BY class_id, group_name").bind(school.id).all();
       const sections = await env.DB.prepare("SELECT * FROM class_sections WHERE school_id = ? ORDER BY class_id, section_name").bind(school.id).all();
+      let shiftConfig = { enabled: !!school.shifts_enabled, shifts: ['Full Day'] };
+      try {
+          const scheduleConfig = await env.DB.prepare("SELECT shifts_json FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+          shiftConfig.shifts = parseShiftList(scheduleConfig?.shifts_json);
+      } catch (e) {}
       
       return htmlResponse(AdminLayout(
         SchoolClassesHTML(
           school, 
           classes.results, 
           groups.results, 
-          sections.results
+          sections.results,
+          shiftConfig
         ), 
         "Classes", 
         companyName, 
@@ -389,6 +473,88 @@ export async function handleAdminRequest(request, env) {
       await env.DB.prepare("DELETE FROM routine_entries WHERE section_id = ? AND school_id = ?").bind(sectionId, schoolId).run();
       await env.DB.prepare("DELETE FROM teacher_assignments WHERE section_id = ? AND school_id = ?").bind(sectionId, schoolId).run();
       await env.DB.prepare("DELETE FROM class_sections WHERE id = ? AND school_id = ?").bind(sectionId, schoolId).run();
+  }
+
+  function parseShiftList(raw) {
+      if (!raw) return ['Full Day'];
+      try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length) {
+              const cleaned = parsed
+                  .map(item => String(item).trim())
+                  .filter(Boolean)
+                  .filter(name => name.toLowerCase() !== 'standard');
+              if (!cleaned.includes('Full Day')) cleaned.unshift('Full Day');
+              return Array.from(new Set(cleaned));
+          }
+      } catch (e) {}
+      return ['Full Day'];
+  }
+
+  function parseApplicableShifts(raw, shiftList) {
+      if (!raw) return shiftList.slice();
+      let parsed = [];
+      if (Array.isArray(raw)) {
+          parsed = raw;
+      } else if (typeof raw === 'string') {
+          try {
+              parsed = JSON.parse(raw);
+          } catch (e) {
+              parsed = raw ? [raw] : [];
+          }
+      }
+      if (!Array.isArray(parsed)) parsed = [];
+      if (!parsed.length || parsed.includes('all')) return shiftList.slice();
+      const filtered = parsed.filter(name => shiftList.includes(name));
+      const result = filtered.length ? filtered : shiftList.slice();
+      const ordered = shiftList.filter(name => result.includes(name));
+      if (ordered.length) {
+          ordered.push(...result.filter(name => !ordered.includes(name)));
+      }
+      const finalList = ordered.length ? ordered : result.slice();
+      if (shiftList.includes('Full Day') && !finalList.includes('Full Day')) {
+          finalList.unshift('Full Day');
+      }
+      return finalList;
+  }
+
+  async function ensureScheduleConfigWithShifts(env, schoolId) {
+      let config = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(schoolId).first();
+      if (!config) {
+          await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days, shifts_json) VALUES (?, ?, ?, ?, ?, ?)")
+              .bind(schoolId, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]', '["Full Day"]').run();
+          config = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(schoolId).first();
+      } else {
+          const cleaned = parseShiftList(config.shifts_json);
+          const normalized = JSON.stringify(cleaned);
+          if (!config.shifts_json || config.shifts_json !== normalized) {
+              await env.DB.prepare("UPDATE schedule_config SET shifts_json = ? WHERE school_id = ?")
+                  .bind(normalized, schoolId).run();
+              config = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(schoolId).first();
+          }
+      }
+      return config;
+  }
+
+  async function addShiftToSlots(env, schoolId, shiftName, previousShiftList) {
+      const slots = await env.DB.prepare("SELECT id, applicable_shifts FROM schedule_slots WHERE school_id = ?").bind(schoolId).all();
+      for (const slot of slots.results || []) {
+          const shifts = parseApplicableShifts(slot.applicable_shifts, previousShiftList);
+          if (!shifts.includes(shiftName)) shifts.push(shiftName);
+          await env.DB.prepare("UPDATE schedule_slots SET applicable_shifts = ? WHERE id = ?")
+              .bind(JSON.stringify(shifts), slot.id).run();
+      }
+  }
+
+  async function removeShiftFromSlots(env, schoolId, shiftName, shiftList) {
+      const slots = await env.DB.prepare("SELECT id, applicable_shifts FROM schedule_slots WHERE school_id = ?").bind(schoolId).all();
+      for (const slot of slots.results || []) {
+          const shifts = parseApplicableShifts(slot.applicable_shifts, shiftList.concat([shiftName]));
+          const filtered = shifts.filter(name => name !== shiftName);
+          const updated = filtered.length ? filtered : shiftList.slice();
+          await env.DB.prepare("UPDATE schedule_slots SET applicable_shifts = ? WHERE id = ?")
+              .bind(JSON.stringify(updated), slot.id).run();
+      }
   }
 
   
