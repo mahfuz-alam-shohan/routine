@@ -77,7 +77,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                     + Add Subject
                 </button>
             </div>
-            <table border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+            <table id="subject-bank-table" border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
                 <thead>
                     <tr style="background-color: #f0f0f0;">
                         <th style="border: 1px solid #ccc; padding: 4px;">#</th>
@@ -86,10 +86,10 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                         <th style="border: 1px solid #ccc; padding: 4px;">Delete</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="subject-bank-body">
                     ${subjects.map((sub, index) => `
-                        <tr>
-                            <td style="border: 1px solid #ccc; padding: 4px; text-align: center;">${index + 1}</td>
+                        <tr data-subject-id="${sub.id}">
+                            <td data-subject-index style="border: 1px solid #ccc; padding: 4px; text-align: center;">${index + 1}</td>
                             <td style="border: 1px solid #ccc; padding: 4px;">
                                 <span id="name-${sub.id}">${sub.subject_name}</span>
                                 <form id="form-${sub.id}" onsubmit="updateSubject(event, ${sub.id})" style="display: none;">
@@ -106,7 +106,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                             </td>
                         </tr>
                     `).join('')}
-                    ${subjects.length === 0 ? '<tr><td colspan="4" style="border: 1px solid #ccc; padding: 4px; text-align: center;">No subjects added yet.</td></tr>' : ''}
+                    ${subjects.length === 0 ? '<tr data-empty="true"><td colspan="4" style="border: 1px solid #ccc; padding: 4px; text-align: center;">No subjects added yet.</td></tr>' : ''}
                 </tbody>
             </table>
         </div>
@@ -169,7 +169,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
     const classCurriculumContent = `
         <div>
             <h3 class="text-lg font-bold mb-4">Class Curriculum</h3>
-            <table border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+            <table id="curriculum-table" border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
                 <thead>
                     <tr style="background-color: #f0f0f0;">
                         <th style="border: 1px solid #ccc; padding: 4px;">Class/Group</th>
@@ -181,11 +181,11 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                         <th style="border: 1px solid #ccc; padding: 4px;">Remove</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="curriculum-body">
                     ${curriculumRows.map(row => {
                         if (row.type === 'class') {
                             return `
-                                <tr style="background-color: #f8f8f8; font-weight: bold;">
+                                <tr data-row="class" data-class-id="${row.class.id}" style="background-color: #f8f8f8; font-weight: bold;">
                                     <td style="border: 1px solid #ccc; padding: 4px; text-align: left;">${row.class.class_name} (${row.groups.length} groups)</td>
                                     <td style="border: 1px solid #ccc; padding: 4px;" colspan="4"></td>
                                     <td style="border: 1px solid #ccc; padding: 4px; text-align: center;">
@@ -196,7 +196,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                             `;
                         } else if (row.type === 'class-subject') {
                             return `
-                                <tr>
+                                <tr data-row="class-subject" data-class-id="${row.class.id}" data-class-subject-id="${row.subject.id}" data-subject-id="${row.subject.subject_id}">
                                     <td style="border: 1px solid #ccc; padding: 4px; padding-left: 20px;">&nbsp;</td>
                                     <td style="border: 1px solid #ccc; padding: 4px;">${row.subject.subject_name}</td>
                                     <td style="border: 1px solid #ccc; padding: 4px;">
@@ -215,10 +215,10 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                             `;
                         } else if (row.type === 'group') {
                             return `
-                                <tr style="background-color: #fafafa; font-weight: bold;">
+                                <tr data-row="group" data-class-id="${row.class.id}" data-group-id="${row.group.id}" style="background-color: #fafafa; font-weight: bold;">
                                     <td style="border: 1px solid #ccc; padding: 4px; padding-left: 20px; text-align: right;">${row.group.group_name} (${classSections[row.group.class_id]?.filter(s => s.group_id === row.group.id).length || 0} sections)</td>
                                     <td style="border: 1px solid #ccc; padding: 4px;" colspan="3"></td>
-                                    <td style="border: 1px solid #ccc; padding: 4px;">${row.capacity.current}/${row.capacity.max}</td>
+                                    <td data-capacity-cell="group-${row.group.id}" style="border: 1px solid #ccc; padding: 4px;">${row.capacity.current}/${row.capacity.max}</td>
                                     <td style="border: 1px solid #ccc; padding: 4px; text-align: center;">
                                         <button onclick="openAddGroupSubjectModal(${row.group.id}, '${row.group.group_name}', ${row.class.id}, '${row.class.class_name}')">+ Add</button>
                                     </td>
@@ -227,7 +227,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                             `;
                         } else if (row.type === 'group-subject') {
                             return `
-                                <tr>
+                                <tr data-row="group-subject" data-class-id="${row.class.id}" data-group-id="${row.group.id}" data-group-subject-id="${row.subject.id}" data-subject-id="${row.subject.subject_id}">
                                     <td style="border: 1px solid #ccc; padding: 4px; padding-left: 40px;">&nbsp;</td>
                                     <td style="border: 1px solid #ccc; padding: 4px;">${row.subject.subject_name}</td>
                                     <td style="border: 1px solid #ccc; padding: 4px;">
@@ -253,67 +253,21 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
     `;
 
     return `
+      
       <style>
-        /* Enhanced animations and transitions */
-        .btn-primary {
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-          transform: translateY(0);
-        }
-        .btn-primary:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-        .btn-primary:active {
-          transform: translateY(0);
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        
-        /* Tab styling */
         .tab-button {
-          transition: all 0.2s ease;
+          border-bottom: 1px solid #d1d5db;
+          padding-bottom: 6px;
         }
         .tab-button.active {
-          border-bottom: 2px solid #3b82f6;
-          color: #3b82f6;
+          border-bottom: 2px solid #111827;
+          color: #111827;
         }
-        
-        /* Mobile responsive design */
         @media (max-width: 768px) {
-          .tab-button {
-            font-size: 12px;
-            padding: 8px 4px;
-          }
-          
-          .capacity-indicator {
-            font-size: 10px;
-            padding: 2px 4px;
-          }
-          
-          .subject-item {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 8px;
-          }
-          
-          .subject-item button {
-            align-self: flex-end;
-          }
-          
-          .modal-content {
-            margin: 16px;
-            max-width: calc(100vw - 32px);
-          }
-          
-          .form-grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
-        
-        /* Prevent zoom on input focus */
-        input, select, textarea {
-          font-size: 16px !important;
+          .tab-button { font-size: 12px; }
         }
       </style>
+
       
       <div>
          <div class="flex items-center gap-2 text-sm text-gray-500 mb-6">
@@ -323,10 +277,10 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
          </div>
 
          <!-- Master Schedule Information (Read-only) -->
-         <div class="mb-6 bg-gray-50 p-4 border border-gray-300">
+         <div class="mb-6 ui-panel p-4">
              <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                  <div class="flex flex-col md:flex-row md:items-center gap-4">
-                     <span class="font-semibold text-sm md:text-base">📅 Master Schedule Configuration</span>
+                     <span class="font-semibold text-sm md:text-base"> Master Schedule Configuration</span>
                      <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                          <span class="text-sm">Working Days: <strong>${scheduleConfig.workingDaysCount || 5}</strong></span>
                          <span class="text-sm">Class Periods/Day: <strong>${scheduleConfig.actualClassPeriodsPerDay || 8}</strong></span>
@@ -335,12 +289,12 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                  <div class="text-sm text-gray-600">
                      <strong>Total Capacity:</strong> ${maxClassesPerSection} classes/week per section
                      <div class="text-xs text-gray-500 mt-1">
-                         (Calculated from master schedule: ${scheduleConfig.workingDaysCount || 5} days × ${scheduleConfig.actualClassPeriodsPerDay || 8} class periods)
+                         (Calculated from master schedule: ${scheduleConfig.workingDaysCount || 5} days x ${scheduleConfig.actualClassPeriodsPerDay || 8} class periods)
                      </div>
                  </div>
              </div>
              <div class="text-xs text-gray-500 mt-2">
-                 ⚠️ Schedule configuration is managed in Master Schedule. This ensures consistency with routine generation.
+                  Schedule configuration is managed in Master Schedule. This ensures consistency with routine generation.
              </div>
          </div>
 
@@ -348,10 +302,10 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
          <div class="border-b border-gray-300 mb-4">
              <div class="flex space-x-6">
                  <button onclick="switchTab('bank')" id="bank-tab" class="tab-button active pb-2 px-1 text-sm font-medium">
-                     📚 Subject Bank
+                      Subject Bank
                  </button>
                  <button onclick="switchTab('curriculum')" id="curriculum-tab" class="tab-button pb-2 px-1 text-sm font-medium text-gray-500">
-                     🎯 Class Curriculum
+                      Class Curriculum
                  </button>
              </div>
          </div>
@@ -364,7 +318,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
          <div id="curriculum-content" class="tab-content hidden">
              <div class="space-y-4">
                  ${classCurriculumContent.length > 0 ? classCurriculumContent : `
-                     <div class="bg-white border border-gray-200 rounded-lg p-8 text-center">
+                     <div class="ui-panel p-8 text-center">
                          <p class="text-gray-400">No classes found</p>
                      </div>
                  `}
@@ -374,7 +328,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
 
       <!-- Add Class Subject Modal -->
       <div id="addClassSubjectModal" class="fixed inset-0 bg-black/60 z-[9999] hidden flex items-center justify-center px-4">
-          <div class="bg-white border border-gray-300 w-full max-w-md p-4 relative modal-content">
+          <div class="bg-white border border-gray-300 w-full max-w-md p-4 relative">
               <h3 class="font-bold mb-3 text-sm md:text-base">Add Subject to Class</h3>
               <form onsubmit="addClassSubject(event)">
                   <input type="hidden" name="class_id" id="class_subject_class_id">
@@ -424,7 +378,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
 
       <!-- Add Group Subject Modal -->
       <div id="addGroupSubjectModal" class="fixed inset-0 bg-black/60 z-[9999] hidden flex items-center justify-center px-4">
-          <div class="bg-white border border-gray-300 w-full max-w-md p-4 relative modal-content">
+          <div class="bg-white border border-gray-300 w-full max-w-md p-4 relative">
               <h3 class="font-bold mb-3 text-sm md:text-base">Add Subject to Group</h3>
               <form onsubmit="addGroupSubject(event)">
                   <input type="hidden" name="group_id" id="group_subject_group_id">
@@ -475,7 +429,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
 
       <!-- Replace Subject Confirmation Modal -->
       <div id="replace-subject-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[9999] hidden flex items-center justify-center p-4">
-          <div class="bg-white rounded-lg max-w-md w-full">
+          <div class="bg-white border border-gray-300 max-w-md w-full">
               <div class="p-4 border-b">
                   <h3 class="font-semibold">Subject is Currently in Use</h3>
                   <p class="text-sm text-gray-600" id="replace-subject-details"></p>
@@ -487,15 +441,15 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                   
                   <div class="space-y-2">
                       <button type="button" onclick="replaceSubject()" 
-                              class="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                              class="ui-button ui-button--primary w-full">
                           Replace Subject
                       </button>
                       <button type="button" onclick="removeSubjectAndAssignments()" 
-                              class="w-full bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">
+                              class="ui-button ui-button--danger w-full">
                           Remove from Curriculum & Delete
                       </button>
                       <button type="button" onclick="closeReplaceModal()" 
-                              class="w-full bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">
+                              class="ui-button w-full">
                           Cancel
                       </button>
                   </div>
@@ -505,9 +459,9 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
 
       <!-- Delete Review Modal -->
       <div id="delete-review-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[9999] hidden flex items-center justify-center p-4">
-          <div class="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+          <div class="bg-white border border-gray-300 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
               <div class="p-4 border-b bg-red-50">
-                  <h3 class="font-semibold text-red-800">⚠️ Subject is Currently in Use</h3>
+                  <h3 class="font-semibold text-red-800"> Subject is Currently in Use</h3>
                   <p class="text-sm text-red-600 mt-1">This subject cannot be deleted because it's being used in the following places:</p>
               </div>
               <div class="p-4">
@@ -519,18 +473,18 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                       <div class="bg-yellow-50 p-3 rounded border border-yellow-200">
                           <p class="text-sm text-yellow-800"><strong>Options:</strong></p>
                           <ul class="text-sm text-yellow-700 mt-1 space-y-1">
-                              <li>• <strong>Keep Subject:</strong> Cancel this deletion and keep the subject as is</li>
-                              <li>• <strong>Force Delete:</strong> Remove from all locations and delete permanently (cannot be undone)</li>
+                              <li> <strong>Keep Subject:</strong> Cancel this deletion and keep the subject as is</li>
+                              <li> <strong>Force Delete:</strong> Remove from all locations and delete permanently (cannot be undone)</li>
                           </ul>
                       </div>
                       
                       <div class="flex gap-2">
                           <button type="button" onclick="forceDeleteSubject()" 
-                                  class="flex-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 font-medium">
-                              🗑️ Force Delete (Remove from All)
+                                  class="ui-button ui-button--danger flex-1">
+                               Force Delete (Remove from All)
                           </button>
                           <button type="button" onclick="closeDeleteReviewModal()" 
-                                  class="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300 font-medium">
+                                  class="ui-button flex-1">
                               Cancel (Keep Subject)
                           </button>
                       </div>
@@ -570,6 +524,175 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             activeTab.classList.remove('text-gray-500');
         }
 
+        function escapeHtmlClient(text) {
+            if (!text) return '';
+            return text.toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function getSubjectTableBody() {
+            return document.getElementById('subject-bank-body');
+        }
+
+        function reindexSubjectRows() {
+            const rows = document.querySelectorAll('tr[data-subject-id]');
+            rows.forEach((row, idx) => {
+                const cell = row.querySelector('[data-subject-index]');
+                if (cell) cell.textContent = String(idx + 1);
+            });
+        }
+
+        function buildSubjectRowHtml(id, name, index) {
+            const safeName = escapeHtmlClient(name);
+            return '<tr data-subject-id="' + id + '">' +
+                '<td data-subject-index style="border: 1px solid #ccc; padding: 4px; text-align: center;">' + index + '</td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px;">' +
+                    '<span id="name-' + id + '">' + safeName + '</span>' +
+                    '<form id="form-' + id + '" onsubmit="updateSubject(event, ' + id + ')" style="display: none;">' +
+                        '<input type="text" name="name" value="' + safeName + '" style="width: 100%;">' +
+                        '<button type="submit">Save</button>' +
+                        '<button type="button" onclick="toggleEdit(' + id + ')">Cancel</button>' +
+                    '</form>' +
+                '</td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px; text-align: center;">' +
+                    '<button onclick="toggleEdit(' + id + ')">Edit</button>' +
+                '</td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px; text-align: center;">' +
+                    '<button onclick="deleteSubject(' + id + ')">Delete</button>' +
+                '</td>' +
+            '</tr>';
+        }
+
+        function addSubjectOption(id, name) {
+            const selects = document.querySelectorAll('select[name="subject_id"]');
+            selects.forEach(select => {
+                if (select.querySelector('option[value="' + id + '"]')) return;
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = name;
+                select.appendChild(option);
+            });
+        }
+
+        function updateSubjectOption(id, name) {
+            const options = document.querySelectorAll('select[name="subject_id"] option[value="' + id + '"]');
+            options.forEach(option => {
+                option.textContent = name;
+            });
+        }
+
+        function removeSubjectOption(id) {
+            const options = document.querySelectorAll('select[name="subject_id"] option[value="' + id + '"]');
+            options.forEach(option => option.remove());
+        }
+
+        function removeEmptySubjectRow(tbody) {
+            const emptyRow = tbody.querySelector('tr[data-empty="true"]');
+            if (emptyRow) emptyRow.remove();
+        }
+
+        function getCurriculumBody() {
+            return document.getElementById('curriculum-body');
+        }
+
+        function getSubjectLoad(entry) {
+            if (!entry) return 0;
+            if (entry.is_fixed) return Number(entry.classes_per_week) || 0;
+            return Number(entry.max_classes) || 0;
+        }
+
+        function getClassSubjectLoad(classId) {
+            return CLASS_SUBJECTS.filter(cs => cs.class_id === classId).reduce((sum, cs) => sum + getSubjectLoad(cs), 0);
+        }
+
+        function getGroupSubjectLoad(groupId) {
+            return GROUP_SUBJECTS.filter(gs => gs.group_id === groupId).reduce((sum, gs) => sum + getSubjectLoad(gs), 0);
+        }
+
+        function updateGroupCapacityCell(groupId) {
+            const group = GROUPS.find(g => g.id === groupId);
+            if (!group) return;
+            const current = getClassSubjectLoad(group.class_id) + getGroupSubjectLoad(groupId);
+            const cell = document.querySelector('[data-capacity-cell="group-' + groupId + '"]');
+            if (cell) {
+                cell.textContent = current + '/' + MAX_CLASSES_PER_SECTION;
+            }
+        }
+
+        function updateGroupCapacitiesForClass(classId) {
+            GROUPS.filter(g => g.class_id === classId).forEach(g => updateGroupCapacityCell(g.id));
+        }
+
+        function buildClassSubjectRowHtml(entry) {
+            const subjectText = entry.is_fixed
+                ? (Number(entry.classes_per_week) || 0) + ' (fixed)'
+                : (Number(entry.min_classes) || 0) + '-' + (Number(entry.max_classes) || 0) + ' (flexible)';
+            const safeName = escapeHtmlClient(entry.subject_name || '');
+            return '<tr data-row="class-subject" data-class-id="' + entry.class_id + '" data-class-subject-id="' + entry.id + '" data-subject-id="' + entry.subject_id + '">' +
+                '<td style="border: 1px solid #ccc; padding: 4px; padding-left: 20px;">&nbsp;</td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px;">' + safeName + '</td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px;">' + subjectText + '</td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px;">Common</td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px;"></td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px;"></td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px; text-align: center;">' +
+                    '<button onclick="deleteClassSubject(' + entry.id + ')">Remove</button>' +
+                '</td>' +
+            '</tr>';
+        }
+
+        function buildGroupSubjectRowHtml(entry) {
+            const subjectText = entry.is_fixed
+                ? (Number(entry.classes_per_week) || 0) + ' (fixed)'
+                : (Number(entry.min_classes) || 0) + '-' + (Number(entry.max_classes) || 0) + ' (flexible)';
+            const safeName = escapeHtmlClient(entry.subject_name || '');
+            return '<tr data-row="group-subject" data-class-id="' + entry.class_id + '" data-group-id="' + entry.group_id + '" data-group-subject-id="' + entry.id + '" data-subject-id="' + entry.subject_id + '">' +
+                '<td style="border: 1px solid #ccc; padding: 4px; padding-left: 40px;">&nbsp;</td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px;">' + safeName + '</td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px;">' + subjectText + '</td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px;">Group</td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px;"></td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px;"></td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px; text-align: center;">' +
+                    '<button onclick="deleteGroupSubject(' + entry.id + ')">Remove</button>' +
+                '</td>' +
+            '</tr>';
+        }
+
+        function insertClassSubjectRow(entry) {
+            const tbody = getCurriculumBody();
+            if (!tbody) return false;
+            const header = tbody.querySelector('tr[data-row="class"][data-class-id="' + entry.class_id + '"]');
+            if (!header) return false;
+            let insertAfter = header;
+            let next = header.nextElementSibling;
+            while (next && next.dataset && next.dataset.row === 'class-subject' && next.dataset.classId === String(entry.class_id)) {
+                insertAfter = next;
+                next = next.nextElementSibling;
+            }
+            insertAfter.insertAdjacentHTML('afterend', buildClassSubjectRowHtml(entry));
+            return true;
+        }
+
+        function insertGroupSubjectRow(entry) {
+            const tbody = getCurriculumBody();
+            if (!tbody) return false;
+            const header = tbody.querySelector('tr[data-row="group"][data-group-id="' + entry.group_id + '"]');
+            if (!header) return false;
+            let insertAfter = header;
+            let next = header.nextElementSibling;
+            while (next && next.dataset && next.dataset.row === 'group-subject' && next.dataset.groupId === String(entry.group_id)) {
+                insertAfter = next;
+                next = next.nextElementSibling;
+            }
+            insertAfter.insertAdjacentHTML('afterend', buildGroupSubjectRowHtml(entry));
+            return true;
+        }
+
         // Subject Bank functions
         function createSubject() {
             const input = document.getElementById('new-subject');
@@ -582,14 +705,36 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                 body: JSON.stringify({action: 'create', name: name})
             }).then(res => res.json()).then(response => {
                 if(response.success) {
-                    window.location.reload();
+                    const tbody = getSubjectTableBody();
+                    if (!tbody || !response.id) {
+                        window.location.reload();
+                        return;
+                    }
+                    removeEmptySubjectRow(tbody);
+                    const index = tbody.querySelectorAll('tr[data-subject-id]').length + 1;
+                    tbody.insertAdjacentHTML('beforeend', buildSubjectRowHtml(response.id, name, index));
+                    reindexSubjectRows();
+                    addSubjectOption(response.id, name);
+                    input.value = '';
+                    input.focus();
                 }
             });
         }
 
         function toggleEdit(id) {
-            document.getElementById('name-'+id).classList.toggle('hidden');
-            document.getElementById('form-'+id).classList.toggle('hidden');
+            const nameEl = document.getElementById('name-' + id);
+            const formEl = document.getElementById('form-' + id);
+            if (!nameEl || !formEl) return;
+            const isEditing = !formEl.classList.contains('hidden') || formEl.style.display === 'block';
+            if (isEditing) {
+                nameEl.classList.remove('hidden');
+                formEl.classList.add('hidden');
+                formEl.style.display = 'none';
+            } else {
+                nameEl.classList.add('hidden');
+                formEl.classList.remove('hidden');
+                formEl.style.display = 'block';
+            }
         }
 
         function updateSubject(e, id) {
@@ -603,14 +748,26 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                 body: JSON.stringify({action: 'rename', id: id, name: name})
             }).then(res => res.json()).then(response => {
                 if(response.success) {
-                    window.location.reload();
+                    const nameEl = document.getElementById('name-' + id);
+                    const formEl = document.getElementById('form-' + id);
+                    if (nameEl) {
+                        nameEl.textContent = name;
+                        nameEl.classList.remove('hidden');
+                    }
+                    if (formEl) {
+                        const input = formEl.querySelector('input[name="name"]');
+                        if (input) input.value = name;
+                        formEl.classList.add('hidden');
+                        formEl.style.display = 'none';
+                    }
+                    updateSubjectOption(id, name);
                 }
             });
         }
 
         function deleteSubject(id) {
             // First check if subject is in use
-            fetch('/school/subjects/usage?id=' + id, {
+            fetch('/school/subjects/usagexid=' + id, {
                 method: 'GET',
                 headers: {'Content-Type': 'application/json'}
             }).then(res => {
@@ -624,14 +781,14 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                     showDeleteReviewModal(id, usage.data);
                 } else {
                     // Subject not in use, delete directly
-                    if(confirm("Delete this subject?")) {
+                    if(confirm("Delete this subjectx")) {
                         executeDelete(id);
                     }
                 }
             }).catch(error => {
                 console.error('Usage check error:', error);
                 // If usage check fails, ask user and try direct delete
-                if(confirm("Delete this subject? (Usage check failed, proceeding anyway)")) {
+                if(confirm("Delete this subjectx (Usage check failed, proceeding anyway)")) {
                     executeDelete(id);
                 }
             });
@@ -656,7 +813,14 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                 });
             }).then(response => {
                 if(response.success) {
-                    window.location.reload();
+                    const row = document.querySelector('tr[data-subject-id="' + id + '"]');
+                    if (row) row.remove();
+                    removeSubjectOption(id);
+                    const tbody = getSubjectTableBody();
+                    if (tbody && !tbody.querySelector('tr[data-subject-id]')) {
+                        tbody.innerHTML = '<tr data-empty="true"><td colspan="4" style="border: 1px solid #ccc; padding: 4px; text-align: center;">No subjects added yet.</td></tr>';
+                    }
+                    reindexSubjectRows();
                 } else {
                     alert('Error: ' + (response.error || 'Failed to delete subject'));
                 }
@@ -669,7 +833,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
         // Replace Modal Functions
         function showReplaceModal(subjectId, errorMessage) {
             // Fetch current usage data
-            fetch('/school/subjects/usage?id=' + subjectId, {
+            fetch('/school/subjects/usagexid=' + subjectId, {
                 method: 'GET',
                 headers: {'Content-Type': 'application/json'}
             }).then(res => res.json()).then(usage => {
@@ -733,25 +897,25 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             let usageHTML = '<div class="space-y-3">';
             
             if (usageData.classes && usageData.classes.length > 0) {
-                usageHTML += '<div class="bg-blue-50 p-3 rounded border border-blue-200"><strong class="text-blue-800">📚 Used in Classes:</strong><ul class="mt-2 space-y-1">';
+                usageHTML += '<div class="border border-gray-300 p-3"><strong class="text-gray-800"> Used in Classes:</strong><ul class="mt-2 space-y-1">';
                 usageData.classes.forEach(cls => {
-                    usageHTML += '<li class="text-sm ml-4">• ' + cls.class_name + ' - ' + (cls.classes_per_week || cls.min_classes + '-' + cls.max_classes) + ' classes/week</li>';
+                    usageHTML += '<li class="text-sm ml-4"> ' + cls.class_name + ' - ' + (cls.classes_per_week || cls.min_classes + '-' + cls.max_classes) + ' classes/week</li>';
                 });
                 usageHTML += '</ul></div>';
             }
             
             if (usageData.groups && usageData.groups.length > 0) {
-                usageHTML += '<div class="bg-purple-50 p-3 rounded border border-purple-200"><strong class="text-purple-800">🎯 Used in Groups:</strong><ul class="mt-2 space-y-1">';
+                usageHTML += '<div class="border border-gray-300 p-3"><strong class="text-gray-800"> Used in Groups:</strong><ul class="mt-2 space-y-1">';
                 usageData.groups.forEach(group => {
-                    usageHTML += '<li class="text-sm ml-4">• ' + group.group_name + ' - ' + (group.classes_per_week || group.min_classes + '-' + group.max_classes) + ' classes/week</li>';
+                    usageHTML += '<li class="text-sm ml-4"> ' + group.group_name + ' - ' + (group.classes_per_week || group.min_classes + '-' + group.max_classes) + ' classes/week</li>';
                 });
                 usageHTML += '</ul></div>';
             }
             
             if (usageData.teachers && usageData.teachers.length > 0) {
-                usageHTML += '<div class="bg-green-50 p-3 rounded border border-green-200"><strong class="text-green-800">👨‍🏫 Assigned to Teachers:</strong><ul class="mt-2 space-y-1">';
+                usageHTML += '<div class="border border-gray-300 p-3"><strong class="text-gray-800"> Assigned to Teachers:</strong><ul class="mt-2 space-y-1">';
                 usageData.teachers.forEach(teacher => {
-                    usageHTML += '<li class="text-sm ml-4">• ' + teacher.teacher_name + (teacher.subjects ? ' - ' + teacher.subjects : '') + '</li>';
+                    usageHTML += '<li class="text-sm ml-4"> ' + teacher.teacher_name + (teacher.subjects ? ' - ' + teacher.subjects : '') + '</li>';
                 });
                 usageHTML += '</ul></div>';
             }
@@ -780,7 +944,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
         function forceDeleteSubject() {
             const subjectId = window.deleteSubjectData.subjectId;
             
-            if (!confirm('⚠️ This will permanently remove the subject from ALL classes, groups, and teacher assignments. This action cannot be undone. Continue?')) {
+            if (!confirm(' This will permanently remove the subject from ALL classes, groups, and teacher assignments. This action cannot be undone. Continuex')) {
                 return;
             }
             
@@ -812,7 +976,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4';
             modal.innerHTML = 
-                '<div class="bg-white rounded-lg max-w-md w-full">' +
+                '<div class="bg-white border border-gray-300 max-w-md w-full">' +
                     '<div class="p-4 border-b">' +
                         '<h3 class="font-semibold">Select Replacement Subject</h3>' +
                         '<p class="text-sm text-gray-600">Choose a subject to replace the current one:</p>' +
@@ -823,8 +987,8 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                         '</select>' +
                     '</div>' +
                     '<div class="p-4 flex gap-2">' +
-                        '<button type="button" onclick="executeReplace()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Replace</button>' +
-                        '<button type="button" onclick="closeReplaceModal()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300">Cancel</button>' +
+                        '<button type="button" onclick="executeReplace()" class="ui-button ui-button--primary">Replace</button>' +
+                        '<button type="button" onclick="closeReplaceModal()" class="ui-button">Cancel</button>' +
                     '</div>' +
                 '</div>';
             
@@ -883,7 +1047,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
         function removeSubjectAndAssignments() {
             const subjectId = window.replaceSubjectData.subjectId;
             
-            if (!confirm('This will remove the subject from all classes/groups and then delete it permanently. Continue?')) {
+            if (!confirm('This will remove the subject from all classes/groups and then delete it permanently. Continuex')) {
                 return; // User cancelled, do nothing
             }
             
@@ -935,6 +1099,8 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             const data = Object.fromEntries(formData.entries());
             const classId = parseInt(data.class_id);
             const subjectId = parseInt(data.subject_id);
+            const subjectSelect = e.target.querySelector('select[name="subject_id"]');
+            const subjectName = subjectSelect && subjectSelect.selectedOptions.length ? subjectSelect.selectedOptions[0].textContent : '';
             
             // Check for duplicate using stored data
             const existingClassSubject = CLASS_SUBJECTS.find(cs => 
@@ -985,7 +1151,28 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                 body: JSON.stringify(data)
             }).then(res => res.json()).then(response => {
                 if(response.success) {
-                    window.location.reload();
+                    if (!response.id) {
+                        window.location.reload();
+                        return;
+                    }
+                    const newEntry = {
+                        id: response.id,
+                        class_id: classId,
+                        subject_id: subjectId,
+                        subject_name: subjectName,
+                        is_fixed: data.is_fixed ? 1 : 0,
+                        classes_per_week: data.is_fixed ? Number(data.classes_per_week) || 0 : null,
+                        min_classes: data.is_fixed ? null : Number(data.min_classes) || 0,
+                        max_classes: data.is_fixed ? null : Number(data.max_classes) || 0
+                    };
+                    CLASS_SUBJECTS.push(newEntry);
+                    const inserted = insertClassSubjectRow(newEntry);
+                    closeModal('addClassSubjectModal');
+                    if (!inserted) {
+                        window.location.reload();
+                        return;
+                    }
+                    updateGroupCapacitiesForClass(classId);
                 } else {
                     alert('Error adding subject: ' + (response.error || 'Unknown error'));
                     submitBtn.disabled = false;
@@ -1003,6 +1190,8 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             const data = Object.fromEntries(formData.entries());
             const groupId = parseInt(data.group_id);
             const subjectId = parseInt(data.subject_id);
+            const subjectSelect = e.target.querySelector('select[name="subject_id"]');
+            const subjectName = subjectSelect && subjectSelect.selectedOptions.length ? subjectSelect.selectedOptions[0].textContent : '';
             
             // Check for duplicate using stored data
             const existingGroupSubject = GROUP_SUBJECTS.find(gs => 
@@ -1058,7 +1247,29 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                 body: JSON.stringify(data)
             }).then(res => res.json()).then(response => {
                 if(response.success) {
-                    window.location.reload();
+                    if (!response.id) {
+                        window.location.reload();
+                        return;
+                    }
+                    const newEntry = {
+                        id: response.id,
+                        class_id: groupInfo.class_id,
+                        group_id: groupId,
+                        subject_id: subjectId,
+                        subject_name: subjectName,
+                        is_fixed: data.is_fixed ? 1 : 0,
+                        classes_per_week: data.is_fixed ? Number(data.classes_per_week) || 0 : null,
+                        min_classes: data.is_fixed ? null : Number(data.min_classes) || 0,
+                        max_classes: data.is_fixed ? null : Number(data.max_classes) || 0
+                    };
+                    GROUP_SUBJECTS.push(newEntry);
+                    const inserted = insertGroupSubjectRow(newEntry);
+                    closeModal('addGroupSubjectModal');
+                    if (!inserted) {
+                        window.location.reload();
+                        return;
+                    }
+                    updateGroupCapacityCell(groupId);
                 } else {
                     alert('Error adding subject: ' + (response.error || 'Unknown error'));
                     submitBtn.disabled = false;
@@ -1068,7 +1279,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
         }
 
         function deleteClassSubject(id) {
-            if(!confirm("Remove this subject from class?")) return;
+            if(!confirm("Remove this subject from classx")) return;
             
             fetch('/school/subjects', {
                 method: 'DELETE',
@@ -1076,13 +1287,20 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                 body: JSON.stringify({action: 'delete_class_subject', id: id})
             }).then(res => res.json()).then(response => {
                 if(response.success) {
-                    window.location.reload();
+                    const index = CLASS_SUBJECTS.findIndex(cs => cs.id == id);
+                    const classId = index >= 0 ? CLASS_SUBJECTS[index].class_id : null;
+                    if (index >= 0) CLASS_SUBJECTS.splice(index, 1);
+                    const row = document.querySelector('tr[data-class-subject-id="' + id + '"]');
+                    if (row && row.parentNode) {
+                        row.parentNode.removeChild(row);
+                    }
+                    if (classId) updateGroupCapacitiesForClass(classId);
                 }
             });
         }
 
         function deleteGroupSubject(id) {
-            if(!confirm("Remove this subject from group?")) return;
+            if(!confirm("Remove this subject from groupx")) return;
             
             fetch('/school/subjects', {
                 method: 'DELETE',
@@ -1090,7 +1308,14 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                 body: JSON.stringify({action: 'delete_group_subject', id: id})
             }).then(res => res.json()).then(response => {
                 if(response.success) {
-                    window.location.reload();
+                    const index = GROUP_SUBJECTS.findIndex(gs => gs.id == id);
+                    const groupId = index >= 0 ? GROUP_SUBJECTS[index].group_id : null;
+                    if (index >= 0) GROUP_SUBJECTS.splice(index, 1);
+                    const row = document.querySelector('tr[data-group-subject-id="' + id + '"]');
+                    if (row && row.parentNode) {
+                        row.parentNode.removeChild(row);
+                    }
+                    if (groupId) updateGroupCapacityCell(groupId);
                 }
             });
         }

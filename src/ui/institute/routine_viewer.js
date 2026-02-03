@@ -177,8 +177,8 @@ export function RoutineViewerHTML(routineData = {}) {
                       <p class="text-xs md:text-sm text-gray-500 mt-1">Generated ${routine.generated_at ? new Date(routine.generated_at).toLocaleDateString() : ''} - Version ${routine.version || 1}</p>
                   </div>
                   <div class="flex flex-wrap gap-2">
-                      <button onclick="app.printRoutine()" class="px-3 py-2 text-xs md:text-sm border border-gray-300 text-gray-700 rounded">Print</button>
-                      <button onclick="app.backToList()" class="px-3 py-2 text-xs md:text-sm bg-gray-900 text-white rounded">Back</button>
+                      <button onclick="app.printRoutine()" class="ui-button">Print</button>
+                      <button onclick="app.backToList()" class="ui-button ui-button--primary">Back</button>
                   </div>
               </div>
               <div class="pb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -189,12 +189,12 @@ export function RoutineViewerHTML(routineData = {}) {
                   </div>
                   <div class="flex flex-wrap items-center gap-2">
                       <div class="flex items-center gap-2">
-                          <button type="button" class="px-2 py-1 text-xs border border-gray-300 text-gray-700 rounded view-toggle" data-view="section">Section View</button>
-                          <button type="button" class="px-2 py-1 text-xs border border-gray-300 text-gray-700 rounded view-toggle" data-view="teacher">Teacher View</button>
+                          <button type="button" class="ui-button view-toggle" data-view="section">Section View</button>
+                          <button type="button" class="ui-button view-toggle" data-view="teacher">Teacher View</button>
                       </div>
                       <div class="flex items-center gap-2" id="section-filter-wrap">
                           <label class="text-xs text-gray-500">Section</label>
-                          <select id="section-filter" onchange="app.filterBySection(this.value)" class="text-xs md:text-sm border border-gray-300 rounded px-2 py-1">
+                          <select id="section-filter" onchange="app.filterBySection(this.value)" class="ui-select text-xs md:text-sm">
                               <option value="all">All Sections</option>
                               ${sectionsList.map(section => `
                                   <option value="${section.key}">${section.label}</option>
@@ -203,7 +203,7 @@ export function RoutineViewerHTML(routineData = {}) {
                       </div>
                       <div class="flex items-center gap-2 hidden" id="teacher-day-filter">
                           <label class="text-xs text-gray-500">Day</label>
-                          <select id="day-filter" onchange="app.filterByDay(this.value)" class="text-xs md:text-sm border border-gray-300 rounded px-2 py-1">
+                          <select id="day-filter" onchange="app.filterByDay(this.value)" class="ui-select text-xs md:text-sm">
                               ${activeDays.map(day => `
                                   <option value="${day}">${day.charAt(0).toUpperCase() + day.slice(1)}</option>
                               `).join('')}
@@ -211,7 +211,7 @@ export function RoutineViewerHTML(routineData = {}) {
                       </div>
                       <div class="flex items-center gap-2 hidden" id="teacher-filter-wrap">
                           <label class="text-xs text-gray-500">Teacher</label>
-                          <select id="teacher-filter" onchange="app.filterByTeacher(this.value)" class="text-xs md:text-sm border border-gray-300 rounded px-2 py-1">
+                          <select id="teacher-filter" onchange="app.filterByTeacher(this.value)" class="ui-select text-xs md:text-sm">
                               <option value="all">All Teachers</option>
                               ${teachers.map(teacher => `
                                   <option value="${teacher.id}">${teacher.full_name || 'Teacher'}</option>
@@ -223,18 +223,18 @@ export function RoutineViewerHTML(routineData = {}) {
           </div>
 
           <div class="mt-6 space-y-6">
-              <div class="border border-gray-200 rounded bg-white" id="conflicts-panel">
+              <div class="ui-panel" id="conflicts-panel">
                   <div class="px-4 py-3 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <div>
                           <h3 class="text-sm font-semibold text-gray-900">Conflicts</h3>
                           <p class="text-xs text-gray-500">
-                              ${conflictSummary.entryConflicts.length} entry conflicts • ${conflictSummary.missingRequirements.length} missing requirements • ${conflictSummary.gapReasons.length} empty slots
+                              ${conflictSummary.entryConflicts.length} entry conflicts  ${conflictSummary.missingRequirements.length} missing requirements  ${conflictSummary.gapReasons.length} empty slots
                           </p>
                       </div>
                       <div class="flex gap-2">
-                          <button type="button" class="px-2 py-1 text-xs border border-gray-300 text-gray-700 rounded conflict-tab" data-tab="entry">Entry Conflicts</button>
-                          <button type="button" class="px-2 py-1 text-xs border border-gray-300 text-gray-700 rounded conflict-tab" data-tab="missing">Missing Requirements</button>
-                          <button type="button" class="px-2 py-1 text-xs border border-gray-300 text-gray-700 rounded conflict-tab" data-tab="gaps">Empty Slots</button>
+                          <button type="button" class="ui-button conflict-tab" data-tab="entry">Entry Conflicts</button>
+                          <button type="button" class="ui-button conflict-tab" data-tab="missing">Missing Requirements</button>
+                          <button type="button" class="ui-button conflict-tab" data-tab="gaps">Empty Slots</button>
                       </div>
                   </div>
                   <div class="p-4 space-y-4">
@@ -342,7 +342,7 @@ export function RoutineViewerHTML(routineData = {}) {
 
           <div class="mt-6 space-y-6" id="section-view">
               ${sectionsList.map(section => `
-                  <div class="border border-gray-200 rounded" data-section-table="${section.key}">
+                  <div class="ui-panel" data-section-table="${section.key}">
                       <div class="px-4 py-3 border-b border-gray-200">
                           <h3 class="text-sm font-medium text-gray-900">${section.label}</h3>
                       </div>
@@ -413,7 +413,7 @@ export function RoutineViewerHTML(routineData = {}) {
 
           <div class="mt-6 space-y-6 hidden" id="teacher-view">
               ${activeDays.map(day => `
-                  <div class="border border-gray-200 rounded teacher-day" data-teacher-day="${day}">
+                  <div class="border border-gray-200 teacher-day" data-teacher-day="${day}">
                       <div class="px-4 py-3 border-b border-gray-200">
                           <h3 class="text-sm font-medium text-gray-900">${day.charAt(0).toUpperCase() + day.slice(1)}</h3>
                       </div>

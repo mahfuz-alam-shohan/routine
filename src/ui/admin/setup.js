@@ -4,8 +4,8 @@ export const ADMIN_SETUP_HTML = `
 <head>
   <title>Admin Setup</title>
   <style>
-    body { font-family: sans-serif; display: flex; justify-content: center; padding-top: 50px; background: #f4f4f4; }
-    form { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); width: 300px; }
+    body { font-family: sans-serif; display: flex; justify-content: center; padding-top: 50px; background: #ffffff; }
+    form { background: white; padding: 20px; border: 1px solid #d1d5db; width: 320px; }
     input { width: 100%; padding: 8px; margin: 10px 0; box-sizing: border-box; }
     button { width: 100%; padding: 10px; background: #007bff; color: white; border: none; cursor: pointer; }
     button:hover { background: #0056b3; }

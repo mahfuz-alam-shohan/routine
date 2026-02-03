@@ -14,23 +14,23 @@ export async function handleAdminRequest(request, env) {
   const url = new URL(request.url);
   const companyName = await getCompanyName(env);
 
-  // 1. AUTH CHECK
+  
   const email = getCookie(request, 'user_email');
   if (!email && url.pathname !== '/admin/setup') {
       return htmlResponse("<h1>Unauthorized</h1><p>Please log in.</p>", 401);
   }
 
-  // --- DASHBOARD ---
+  
   if (url.pathname === '/admin/dashboard') {
     const content = `
-    <div class="p-6 bg-white rounded-lg shadow-sm border border-gray-200">
-        <h3 class="text-lg font-bold text-gray-900 mb-2">Welcome to your Control Center</h3>
-        <p class="text-gray-500">Select an option from the sidebar to manage schools, settings, or view reports.</p>
+    <div class="p-4 bg-white border border-gray-300">
+        <h3 class="text-base font-bold text-gray-900 mb-2">Welcome to your Control Center</h3>
+        <p class="text-sm text-gray-600">Select an option from the sidebar to manage schools, settings, or view reports.</p>
     </div>`;
     return htmlResponse(AdminLayout(content, "Dashboard", companyName, {email}));
   }
 
-  // --- SETTINGS (The New Profile Page) ---
+  
   if (url.pathname === '/admin/settings') {
       const admin = await env.DB.prepare("SELECT * FROM auth_accounts WHERE email = ?").bind(email).first();
       
@@ -64,7 +64,7 @@ export async function handleAdminRequest(request, env) {
       return htmlResponse(AdminLayout(SettingsPageHTML(profile, email), "Settings", companyName, {email}));
   }
 
-  // --- MANAGE SCHOOLS ---
+  
   if (url.pathname === '/admin/schools') {
     if (request.method === 'POST') {
         try {
@@ -84,7 +84,7 @@ export async function handleAdminRequest(request, env) {
     return htmlResponse(AdminLayout(SchoolsPageHTML(result.results || []), "Schools", companyName, {email}));
   }
 
-  // --- SCHOOL MENU (The Settings List) ---
+  
   if (url.pathname === '/admin/school/view') {
     const authId = url.searchParams.get('id');
     const school = await env.DB.prepare(`SELECT * FROM profiles_institution WHERE auth_id = ?`).bind(authId).first();
@@ -92,7 +92,7 @@ export async function handleAdminRequest(request, env) {
     return htmlResponse(AdminLayout(SchoolDetailHTML(school), "Manage Client", companyName, {email}));
   }
 
-  // --- SCHOOL TEACHERS (Limits & List) ---
+  
   if (url.pathname === '/admin/school/teachers') {
       if(request.method === 'POST') {
           const body = await request.json();
@@ -104,59 +104,119 @@ export async function handleAdminRequest(request, env) {
       const authId = url.searchParams.get('id');
       const school = await env.DB.prepare(`SELECT * FROM profiles_institution WHERE auth_id = ?`).bind(authId).first();
       const teachers = await env.DB.prepare("SELECT * FROM profiles_teacher WHERE school_id = ?").bind(school.id).all();
-      return htmlResponse(AdminLayout(SchoolTeachersHTML(school, teachers.results), "Teachers", companyName, {email}));
+      const teacherSubjects = await env.DB.prepare(`
+          SELECT ts.teacher_id, ts.is_primary, sub.subject_name
+          FROM teacher_subjects ts
+          JOIN academic_subjects sub ON ts.subject_id = sub.id
+          WHERE ts.school_id = ?
+          ORDER BY ts.is_primary DESC, sub.subject_name ASC
+      `).bind(school.id).all();
+      const teacherAssignmentSubjects = await env.DB.prepare(`
+          SELECT DISTINCT ta.teacher_id, sub.subject_name
+          FROM teacher_assignments ta
+          JOIN academic_subjects sub ON ta.subject_id = sub.id
+          WHERE ta.school_id = ? AND ta.teacher_id IS NOT NULL
+          ORDER BY sub.subject_name ASC
+      `).bind(school.id).all();
+      
+      const subjectsByTeacher = {};
+      (teacherSubjects.results || []).forEach(ts => {
+          if (!subjectsByTeacher[ts.teacher_id]) {
+              subjectsByTeacher[ts.teacher_id] = { primary: [], additional: [] };
+          }
+          if (ts.is_primary === 1) subjectsByTeacher[ts.teacher_id].primary.push(ts.subject_name);
+          else subjectsByTeacher[ts.teacher_id].additional.push(ts.subject_name);
+      });
+      const assignmentSubjectsByTeacher = {};
+      (teacherAssignmentSubjects.results || []).forEach(row => {
+          if (!assignmentSubjectsByTeacher[row.teacher_id]) {
+              assignmentSubjectsByTeacher[row.teacher_id] = [];
+          }
+          assignmentSubjectsByTeacher[row.teacher_id].push(row.subject_name);
+      });
+      
+      const teachersWithSubjects = (teachers.results || []).map(t => {
+          const entry = subjectsByTeacher[t.id];
+          const assignmentList = assignmentSubjectsByTeacher[t.id] || [];
+          const subjectSet = new Set();
+          const ordered = [];
+          if (entry) {
+              entry.primary.forEach(name => {
+                  if (!subjectSet.has(name)) {
+                      subjectSet.add(name);
+                      ordered.push(name);
+                  }
+              });
+              entry.additional.forEach(name => {
+                  if (!subjectSet.has(name)) {
+                      subjectSet.add(name);
+                      ordered.push(name);
+                  }
+              });
+          }
+          assignmentList.forEach(name => {
+              if (!subjectSet.has(name)) {
+                  subjectSet.add(name);
+                  ordered.push(name);
+              }
+          });
+          const subjectText = ordered.length ? ordered.join(', ') : '-';
+          return { ...t, subject: subjectText };
+      });
+      
+      return htmlResponse(AdminLayout(SchoolTeachersHTML(school, teachersWithSubjects), "Teachers", companyName, {email}));
   }
 
-  // --- SCHOOL CLASSES (New Logic) ---
+  
   if (url.pathname === '/admin/school/classes') {
       if(request.method === 'POST') {
           try {
               const body = await request.json();
               
               if(body.action === 'create_class') {
-                  // Create new class
+                  
                   await env.DB.prepare("INSERT INTO academic_classes (school_id, class_name, has_groups) VALUES (?, ?, ?)")
                       .bind(body.school_id, body.class_name, body.has_groups ? 1 : 0).run();
                   return jsonResponse({success:true});
               }
               
               if(body.action === 'edit_class') {
-                  // Edit class name
+                  
                   await env.DB.prepare("UPDATE academic_classes SET class_name = ? WHERE id = ? AND school_id = ?")
                       .bind(body.class_name, body.class_id, body.school_id).run();
                   return jsonResponse({success:true});
               }
               
               if(body.action === 'add_group') {
-                  // Add group to existing class
+                  
                   await env.DB.prepare("INSERT INTO class_groups (school_id, class_id, group_name) VALUES (?, ?, ?)")
                       .bind(body.school_id, body.class_id, body.group_name).run();
                   return jsonResponse({success:true});
               }
               
               if(body.action === 'edit_group') {
-                  // Edit group name
+                  
                   await env.DB.prepare("UPDATE class_groups SET group_name = ? WHERE id = ? AND school_id = ?")
                       .bind(body.group_name, body.group_id, body.school_id).run();
                   return jsonResponse({success:true});
               }
               
               if(body.action === 'add_section') {
-                  // Add section to class (with optional group) - single shift only
+                  
                   await env.DB.prepare("INSERT INTO class_sections (school_id, class_id, group_id, section_name) VALUES (?, ?, ?, ?)")
                       .bind(body.school_id, body.class_id, body.group_id || null, body.section_name).run();
                   return jsonResponse({success:true});
               }
               
               if(body.action === 'edit_section') {
-                  // Edit section name
+                  
                   await env.DB.prepare("UPDATE class_sections SET section_name = ? WHERE id = ? AND school_id = ?")
                       .bind(body.section_name, body.section_id, body.school_id).run();
                   return jsonResponse({success:true});
               }
           } catch(e) {
               console.error('Classes API Error:', e);
-              // If tables don't exist, try to sync database
+              
               if(e.message.includes("no such table")) {
                   await syncDatabase(env);
                   return jsonResponse({error: "Database tables are being created. Please try again in a moment."}, 500);
@@ -169,19 +229,19 @@ export async function handleAdminRequest(request, env) {
           const body = await request.json();
           
           if(body.action === 'delete_class') {
-              // Always force delete - remove all dependencies then delete
+              
               await forceDeleteClass(env, body.id, body.school_id);
               return jsonResponse({success:true});
           }
           
           if(body.action === 'delete_group') {
-              // Always force delete - remove all dependencies then delete
+              
               await forceDeleteGroup(env, body.id, body.school_id);
               return jsonResponse({success:true});
           }
           
           if(body.action === 'delete_section') {
-              // Always force delete - remove all dependencies then delete
+              
               await forceDeleteSection(env, body.id, body.school_id);
               return jsonResponse({success:true});
           }
@@ -190,7 +250,7 @@ export async function handleAdminRequest(request, env) {
       const authId = url.searchParams.get('id');
       const school = await env.DB.prepare(`SELECT * FROM profiles_institution WHERE auth_id = ?`).bind(authId).first();
       
-      // Get all data (MAIN ADMIN: Only classes, groups, sections)
+      
       const classes = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ? ORDER BY class_name ASC").bind(school.id).all();
       const groups = await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ? ORDER BY class_id, group_name").bind(school.id).all();
       const sections = await env.DB.prepare("SELECT * FROM class_sections WHERE school_id = ? ORDER BY class_id, section_name").bind(school.id).all();
@@ -208,40 +268,40 @@ export async function handleAdminRequest(request, env) {
       ));
   }
 
-  // Helper functions for dependency checking
+  
   async function checkClassDependencies(env, classId, schoolId) {
       const details = [];
       let hasDependencies = false;
       
-      // Check for sections
+      
       const sections = await env.DB.prepare("SELECT COUNT(*) as count FROM class_sections WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).first();
       if(sections.count > 0) {
           details.push({type: 'sections', count: sections.count, message: `${sections.count} section(s)`});
           hasDependencies = true;
       }
       
-      // Check for groups
+      
       const groups = await env.DB.prepare("SELECT COUNT(*) as count FROM class_groups WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).first();
       if(groups.count > 0) {
           details.push({type: 'groups', count: groups.count, message: `${groups.count} group(s)`});
           hasDependencies = true;
       }
       
-      // Check for subject assignments
+      
       const subjects = await env.DB.prepare("SELECT COUNT(*) as count FROM class_subjects WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).first();
       if(subjects.count > 0) {
           details.push({type: 'subjects', count: subjects.count, message: `${subjects.count} subject assignment(s)`});
           hasDependencies = true;
       }
       
-      // Check for teacher assignments
+      
       const teachers = await env.DB.prepare("SELECT COUNT(*) as count FROM teacher_assignments WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).first();
       if(teachers.count > 0) {
           details.push({type: 'teachers', count: teachers.count, message: `${teachers.count} teacher assignment(s)`});
           hasDependencies = true;
       }
       
-      // Check for routine entries
+      
       const routines = await env.DB.prepare("SELECT COUNT(*) as count FROM routine_entries WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).first();
       if(routines.count > 0) {
           details.push({type: 'routines', count: routines.count, message: `${routines.count} routine entrie(s)`});
@@ -255,28 +315,28 @@ export async function handleAdminRequest(request, env) {
       const details = [];
       let hasDependencies = false;
       
-      // Check for sections
+      
       const sections = await env.DB.prepare("SELECT COUNT(*) as count FROM class_sections WHERE group_id = ? AND school_id = ?").bind(groupId, schoolId).first();
       if(sections.count > 0) {
           details.push({type: 'sections', count: sections.count, message: `${sections.count} section(s)`});
           hasDependencies = true;
       }
       
-      // Check for subject assignments
+      
       const subjects = await env.DB.prepare("SELECT COUNT(*) as count FROM group_subjects WHERE group_id = ? AND school_id = ?").bind(groupId, schoolId).first();
       if(subjects.count > 0) {
           details.push({type: 'subjects', count: subjects.count, message: `${subjects.count} subject assignment(s)`});
           hasDependencies = true;
       }
       
-      // Check for teacher assignments
+      
       const teachers = await env.DB.prepare("SELECT COUNT(*) as count FROM teacher_assignments WHERE group_id = ? AND school_id = ?").bind(groupId, schoolId).first();
       if(teachers.count > 0) {
           details.push({type: 'teachers', count: teachers.count, message: `${teachers.count} teacher assignment(s)`});
           hasDependencies = true;
       }
       
-      // Check for routine entries
+      
       const routines = await env.DB.prepare("SELECT COUNT(*) as count FROM routine_entries WHERE group_id = ? AND school_id = ?").bind(groupId, schoolId).first();
       if(routines.count > 0) {
           details.push({type: 'routines', count: routines.count, message: `${routines.count} routine entrie(s)`});
@@ -290,14 +350,14 @@ export async function handleAdminRequest(request, env) {
       const details = [];
       let hasDependencies = false;
       
-      // Check for teacher assignments
+      
       const teachers = await env.DB.prepare("SELECT COUNT(*) as count FROM teacher_assignments WHERE section_id = ? AND school_id = ?").bind(sectionId, schoolId).first();
       if(teachers.count > 0) {
           details.push({type: 'teachers', count: teachers.count, message: `${teachers.count} teacher assignment(s)`});
           hasDependencies = true;
       }
       
-      // Check for routine entries
+      
       const routines = await env.DB.prepare("SELECT COUNT(*) as count FROM routine_entries WHERE section_id = ? AND school_id = ?").bind(sectionId, schoolId).first();
       if(routines.count > 0) {
           details.push({type: 'routines', count: routines.count, message: `${routines.count} routine entrie(s)`});
@@ -308,7 +368,7 @@ export async function handleAdminRequest(request, env) {
   }
   
   async function forceDeleteClass(env, classId, schoolId) {
-      // Delete all dependent records
+      
       await env.DB.prepare("DELETE FROM routine_entries WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).run();
       await env.DB.prepare("DELETE FROM teacher_assignments WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).run();
       await env.DB.prepare("DELETE FROM class_subjects WHERE class_id = ? AND school_id = ?").bind(classId, schoolId).run();
@@ -331,7 +391,7 @@ export async function handleAdminRequest(request, env) {
       await env.DB.prepare("DELETE FROM class_sections WHERE id = ? AND school_id = ?").bind(sectionId, schoolId).run();
   }
 
-  // --- SETUP ---
+  
   if (url.pathname === '/admin/setup') {
     try { await syncDatabase(env); } catch (e) {}
     if (request.method === 'POST') {

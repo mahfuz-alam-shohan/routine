@@ -1,6 +1,6 @@
-// src/core/auth.js
 
-// 1. Hash a new password (for Setup/Registration)
+
+
 export async function hashPassword(password) {
   const encoder = new TextEncoder();
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -13,8 +13,8 @@ export async function hashPassword(password) {
   return { hash: hashHex, salt: saltHex };
 }
 
-// 2. Verify a password (for Login)
-// We take the input password, mix it with the STORED salt, and see if it matches the STORED hash.
+
+
 export async function verifyPassword(inputPassword, storedHash, storedSalt) {
   const encoder = new TextEncoder();
   const data = encoder.encode(inputPassword + storedSalt);

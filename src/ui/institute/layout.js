@@ -15,27 +15,142 @@ export function InstituteLayout(content, title, schoolName) {
         <style>
             :root {
                 color-scheme: light;
+                --ui-bg: #ffffff;
+                --ui-line: #d1d5db;
+                --ui-line-soft: #e5e7eb;
+                --ui-ink: #111827;
+                --ui-muted: #6b7280;
+                --ui-accent: #111827;
+                --ui-accent-soft: #374151;
+                --ui-header: #f3f4f6;
+            }
+            body {
+                background: var(--ui-bg);
+                color: var(--ui-ink);
+                font-family: 'Inter', sans-serif;
             }
             .nav-link {
                 border-left: 2px solid transparent;
                 border-radius: 0;
                 transition: color 0.15s ease, border-color 0.15s ease;
-                border-bottom: 1px solid #f1f5f9;
+                border-bottom: 1px solid var(--ui-line-soft);
             }
             .nav-link:hover {
                 background: transparent;
-                color: #111827;
-                border-left-color: #e5e7eb;
+                color: var(--ui-ink);
+                border-left-color: var(--ui-line);
             }
             .nav-link.nav-active {
-                color: #0f172a;
-                border-left-color: #0f172a;
+                color: var(--ui-ink);
+                border-left-color: var(--ui-accent);
                 font-weight: 600;
                 background: transparent;
             }
+            table {
+                border-collapse: collapse;
+                width: 100%;
+            }
+            th, td {
+                border: 1px solid var(--ui-line);
+                padding: 6px 8px;
+                font-size: 12px;
+                vertical-align: top;
+            }
+            thead th {
+                background: var(--ui-header);
+                color: var(--ui-muted);
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+            }
+            .ui-panel {
+                background: #ffffff;
+                border: 1px solid var(--ui-line);
+            }
+            .ui-header {
+                background: #ffffff;
+                border-bottom: 1px solid var(--ui-line);
+            }
+            .ui-button {
+                border: 1px solid var(--ui-line);
+                background: #ffffff;
+                color: var(--ui-ink);
+                padding: 6px 10px;
+                font-size: 12px;
+                font-weight: 600;
+                border-radius: 0;
+            }
+            .ui-button--primary {
+                background: var(--ui-accent);
+                border-color: var(--ui-accent);
+                color: #ffffff;
+            }
+            .ui-button--danger {
+                background: #b91c1c;
+                border-color: #b91c1c;
+                color: #ffffff;
+            }
+            .ui-button--ghost {
+                background: #ffffff;
+                color: var(--ui-muted);
+                border-color: var(--ui-line-soft);
+            }
+            .ui-input,
+            .ui-select,
+            input,
+            select,
+            textarea {
+                border: 1px solid var(--ui-line);
+                border-radius: 0;
+                padding: 6px 8px;
+                font-size: 12px;
+                background: #ffffff;
+                color: var(--ui-ink);
+            }
+            .ui-muted {
+                color: var(--ui-muted);
+                font-size: 12px;
+            }
+            .ui-title {
+                font-size: 18px;
+                font-weight: 700;
+                color: var(--ui-ink);
+            }
+            .ui-subtitle {
+                font-size: 12px;
+                color: var(--ui-muted);
+            }
+            .ui-chip {
+                border: 1px solid var(--ui-line);
+                background: #ffffff;
+                color: var(--ui-muted);
+                font-size: 10px;
+                padding: 2px 6px;
+                border-radius: 0;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+            }
+            .rounded,
+            .rounded-sm,
+            .rounded-md,
+            .rounded-lg,
+            .rounded-xl,
+            .rounded-2xl,
+            .rounded-full {
+                border-radius: 0 !important;
+            }
+            .shadow,
+            .shadow-sm,
+            .shadow-md,
+            .shadow-lg,
+            .shadow-xl,
+            .shadow-2xl {
+                box-shadow: none !important;
+            }
         </style>
     </head>
-    <body class="bg-gray-50 text-gray-800 antialiased h-screen flex flex-col md:flex-row overflow-hidden relative">
+    <body class="bg-white text-gray-800 antialiased h-screen flex flex-col md:flex-row overflow-hidden relative">
 
         <header class="md:hidden min-h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 py-3 z-30 flex-shrink-0 relative">
             <div class="flex items-center gap-3">
@@ -72,29 +187,13 @@ export function InstituteLayout(content, title, schoolName) {
             </nav>
         </aside>
 
-        <main class="page-shell flex-1 flex flex-col min-w-0 bg-gray-50 overflow-hidden relative z-10">
+        <main class="page-shell flex-1 flex flex-col min-w-0 bg-white overflow-hidden relative z-10">
             <div class="flex-1 overflow-auto p-4 pb-20 md:pb-6">
                 ${content}
             </div>
         </main>
 
         <script>
-            const enablePageTransitions = () => {
-                if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-                document.addEventListener('click', (event) => {
-                    const link = event.target.closest('a');
-                    if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
-                    const href = link.getAttribute('href') || '';
-                    if (href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
-                    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
-                    const url = new URL(link.href, window.location.href);
-                    if (url.origin !== window.location.origin) return;
-                    event.preventDefault();
-                    document.body.classList.add('page-leave');
-                    setTimeout(() => { window.location.href = link.href; }, 180);
-                });
-            };
-
             const enableAutoRefresh = () => {
                 let lastInteraction = Date.now();
                 const mark = () => { lastInteraction = Date.now(); };
@@ -143,7 +242,6 @@ export function InstituteLayout(content, title, schoolName) {
             }
 
             window.addEventListener('DOMContentLoaded', () => {
-                enablePageTransitions();
                 enableAutoRefresh();
                 setActiveNav();
             });

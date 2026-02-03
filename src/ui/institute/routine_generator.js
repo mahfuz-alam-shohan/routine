@@ -2,166 +2,101 @@ export function RoutineGeneratorHTML(existingRoutines = [], generationSettings =
     const { classes = [], teachers = [], subjects = [], slots = [] } = schoolData;
     
     return `
+      
       <style>
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
-
         #routine-generator-app {
-          --rg-bg: #f8fafc;
-          --rg-surface: #ffffff;
-          --rg-line: #e2e8f0;
-          --rg-ink: #0f172a;
-          --rg-subtle: #64748b;
-          --rg-accent: #0f766e;
-          --rg-accent-strong: #115e59;
-          font-family: 'IBM Plex Sans', sans-serif;
-          color: var(--rg-ink);
-          background: var(--rg-bg);
-          background-image:
-            linear-gradient(to right, rgba(15, 23, 42, 0.03) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(15, 23, 42, 0.03) 1px, transparent 1px);
-          background-size: 24px 24px;
+          background: #ffffff;
+          color: #111827;
         }
-
-        #routine-generator-app h2,
-        #routine-generator-app h3,
-        #routine-generator-app h4 {
-          font-family: 'Space Grotesk', sans-serif;
-          letter-spacing: -0.02em;
-        }
-
         .rg-header {
-          background: var(--rg-surface);
-          border-bottom: 1px solid var(--rg-line);
+          background: #ffffff;
+          border-bottom: 1px solid #d1d5db;
         }
-
         .rg-card {
-          background: var(--rg-surface);
-          border: 1px solid var(--rg-line);
-          border-radius: 12px;
-          padding: 20px;
+          background: #ffffff;
+          border: 1px solid #d1d5db;
+          border-radius: 0;
+          padding: 16px;
         }
-
         .rg-row {
-          border: 1px solid var(--rg-line);
-          border-radius: 10px;
-          padding: 12px 14px;
-          background: var(--rg-surface);
-          transition: background 0.2s ease, border-color 0.2s ease;
+          border: 1px solid #d1d5db;
+          border-radius: 0;
+          padding: 10px 12px;
+          background: #ffffff;
         }
-
-        .rg-row:hover {
-          background: #f8fafc;
-          border-color: #cbd5e1;
-        }
-
         .rg-tag {
-          border: 1px solid var(--rg-line);
-          background: #f8fafc;
-          color: var(--rg-subtle);
-          font-size: 11px;
-          padding: 2px 8px;
-          border-radius: 999px;
+          border: 1px solid #d1d5db;
+          background: #ffffff;
+          color: #6b7280;
+          font-size: 10px;
+          padding: 2px 6px;
+          border-radius: 0;
           font-weight: 600;
         }
-
         .rg-btn {
-          border: 1px solid var(--rg-line);
-          background: var(--rg-surface);
-          color: var(--rg-ink);
-          padding: 10px 16px;
-          border-radius: 8px;
+          border: 1px solid #d1d5db;
+          background: #ffffff;
+          color: #111827;
+          padding: 6px 10px;
+          border-radius: 0;
           font-weight: 600;
-          font-size: 14px;
-          transition: transform 0.15s ease, border-color 0.2s ease, background 0.2s ease;
+          font-size: 12px;
         }
-
-        .rg-btn:hover {
-          border-color: #cbd5e1;
-          transform: translateY(-1px);
-        }
-
         .rg-btn-primary {
-          background: var(--rg-accent);
-          border-color: var(--rg-accent);
+          background: #111827;
+          border-color: #111827;
           color: #ffffff;
         }
-
-        .rg-btn-primary:hover {
-          background: var(--rg-accent-strong);
-          border-color: var(--rg-accent-strong);
-        }
-
         .rg-btn-mini {
-          border: 1px solid var(--rg-line);
+          border: 1px solid #d1d5db;
           background: #ffffff;
-          color: var(--rg-ink);
-          padding: 6px 10px;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 500;
+          color: #111827;
+          padding: 4px 8px;
+          border-radius: 0;
+          font-size: 11px;
+          font-weight: 600;
         }
-
         .rg-metric {
-          border: 1px solid var(--rg-line);
-          border-radius: 10px;
+          border: 1px solid #d1d5db;
+          border-radius: 0;
+          padding: 10px;
+          background: #ffffff;
+        }
+        .rg-metric--ok {
+          border-color: #d1d5db;
+          background: #ffffff;
+        }
+        .rg-metric--bad {
+          border-color: #d1d5db;
+          background: #ffffff;
+        }
+        .rg-note {
+          border: 1px dashed #d1d5db;
+          border-radius: 0;
           padding: 12px;
           background: #ffffff;
         }
-
-        .rg-metric--ok {
-          background: #f0fdf4;
-          border-color: #bbf7d0;
-        }
-
-        .rg-metric--bad {
-          background: #fff1f2;
-          border-color: #fecdd3;
-        }
-
-        .rg-note {
-          border: 1px dashed var(--rg-line);
-          border-radius: 10px;
-          padding: 14px;
-          background: #ffffff;
-        }
-
         .rg-warning {
-          border-left: 4px solid #f59e0b;
-          background: #fffbeb;
+          border-left: 3px solid #9ca3af;
+          background: #ffffff;
         }
-
         .rg-input {
-          border: 1px solid var(--rg-line);
+          border: 1px solid #d1d5db;
           background: #ffffff;
-          border-radius: 8px;
-          padding: 10px 12px;
+          border-radius: 0;
+          padding: 8px 10px;
         }
-
-        .rg-input:focus {
-          outline: none;
-          border-color: var(--rg-accent);
-          box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
-        }
-
         .rg-modal {
-          border-radius: 14px;
-          border: 1px solid var(--rg-line);
+          border-radius: 0;
+          border: 1px solid #d1d5db;
           background: #ffffff;
         }
-
-        .rg-animate {
-          animation: rgFade 0.35s ease;
-        }
-
-        @keyframes rgFade {
-          from { opacity: 0; transform: translateY(6px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
+        .rg-animate { }
         @media (max-width: 768px) {
           .rg-btn { width: 100%; }
         }
       </style>
+
 
       <div class="rg-shell max-w-7xl xl:max-w-8xl mx-auto pb-24 md:pb-10 select-none" id="routine-generator-app">
           
@@ -205,7 +140,7 @@ export function RoutineGeneratorHTML(existingRoutines = [], generationSettings =
                                           <span>Version ${routine.version}</span>
                                           <span>${routine.total_periods} periods</span>
                                           <span>Generated ${new Date(routine.generated_at).toLocaleDateString()}</span>
-                                          ${routine.conflicts_resolved > 0 ? `<span class="text-amber-600">${routine.conflicts_resolved} conflicts</span>` : ''}
+                                          ${routine.conflicts_resolved > 0 ? `<span class="text-gray-600">${routine.conflicts_resolved} conflicts</span>` : ''}
                                       </div>
                                   </div>
                                   <div class="flex items-center gap-2">
@@ -232,7 +167,7 @@ export function RoutineGeneratorHTML(existingRoutines = [], generationSettings =
                                   <p class="text-sm font-medium text-gray-900">Classes</p>
                                   <p class="text-2xl font-bold text-gray-900">${classes.length}</p>
                               </div>
-                              <div class="${classes.length > 0 ? 'text-green-500' : 'text-red-500'}">
+                              <div class="${classes.length > 0 ? 'text-gray-700' : 'text-gray-700'}">
                                   ${classes.length > 0 ? 
                                       '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' :
                                       '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
@@ -248,7 +183,7 @@ export function RoutineGeneratorHTML(existingRoutines = [], generationSettings =
                                   <p class="text-sm font-medium text-gray-900">Teachers</p>
                                   <p class="text-2xl font-bold text-gray-900">${teachers.length}</p>
                               </div>
-                              <div class="${teachers.length > 0 ? 'text-green-500' : 'text-red-500'}">
+                              <div class="${teachers.length > 0 ? 'text-gray-700' : 'text-gray-700'}">
                                   ${teachers.length > 0 ? 
                                       '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' :
                                       '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
@@ -264,7 +199,7 @@ export function RoutineGeneratorHTML(existingRoutines = [], generationSettings =
                                   <p class="text-sm font-medium text-gray-900">Subjects</p>
                                   <p class="text-2xl font-bold text-gray-900">${subjects.length}</p>
                               </div>
-                              <div class="${subjects.length > 0 ? 'text-green-500' : 'text-red-500'}">
+                              <div class="${subjects.length > 0 ? 'text-gray-700' : 'text-gray-700'}">
                                   ${subjects.length > 0 ? 
                                       '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' :
                                       '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
@@ -280,7 +215,7 @@ export function RoutineGeneratorHTML(existingRoutines = [], generationSettings =
                                   <p class="text-sm font-medium text-gray-900">Time Slots</p>
                                   <p class="text-2xl font-bold text-gray-900">${slots.length}</p>
                               </div>
-                              <div class="${slots.length > 0 ? 'text-green-500' : 'text-red-500'}">
+                              <div class="${slots.length > 0 ? 'text-gray-700' : 'text-gray-700'}">
                                   ${slots.length > 0 ? 
                                       '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' :
                                       '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
@@ -1616,7 +1551,7 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                 
                 showNotification(message, type = 'info') {
                     const notification = document.createElement('div');
-                    notification.className = \`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full\`;
+                    notification.className = \`fixed top-4 right-4 z-50 p-4 border border-gray-300 transform transition-all duration-300 \`;
                     
                     if (type === 'success') {
                         notification.classList.add('bg-green-500', 'text-white');
@@ -1640,12 +1575,12 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                     document.body.appendChild(notification);
                     
                     setTimeout(() => {
-                        notification.classList.remove('translate-x-full');
-                        notification.classList.add('translate-x-0');
+                        notification.classList.remove('');
+                        notification.classList.add('');
                     }, 100);
                     
                     setTimeout(() => {
-                        notification.classList.add('translate-x-full');
+                        notification.classList.add('');
                         setTimeout(() => {
                             if (notification.parentElement) {
                                 notification.remove();

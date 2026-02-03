@@ -1,5 +1,3 @@
-// src/ui/institute/teachers.js - Clean Minimal Teacher Management
-
 function escapeHtml(text) {
     if (!text) return '';
     return text.toString()
@@ -12,35 +10,33 @@ function escapeHtml(text) {
 
 export function TeachersPageHTML(school, teachers = [], allSubjects = [], teacherSubjects = []) {
     
-    // Group subjects by teacher
     const subjectsByTeacher = {};
     teacherSubjects.forEach(ts => {
         if (!subjectsByTeacher[ts.teacher_id]) subjectsByTeacher[ts.teacher_id] = [];
         subjectsByTeacher[ts.teacher_id].push(ts);
     });
 
-    // Build table rows
     const teacherRows = teachers.map(t => {
         const teacherSubjectsList = subjectsByTeacher[t.id] || [];
         const primarySubject = teacherSubjectsList.find(ts => ts.is_primary === 1);
         const additionalSubjects = teacherSubjectsList.filter(ts => ts.is_primary === 0);
         
         return `
-            <tr class="border-b">
+            <tr class="border-b" data-teacher-id="${t.id}">
                 <td class="p-3">${escapeHtml(t.full_name)}</td>
                 <td class="p-3 break-words">${escapeHtml(t.email)}</td>
                 <td class="p-3">${escapeHtml(t.phone || '')}</td>
-                <td class="p-3 break-words">
+                <td class="p-3 break-words" data-subject-cell="${t.id}">
                     ${primarySubject ? escapeHtml(primarySubject.subject_name) : 'Not assigned'}
                     ${additionalSubjects.length > 0 ? ', ' + additionalSubjects.map(s => escapeHtml(s.subject_name)).join(', ') : ''}
                 </td>
                 <td class="p-3 whitespace-nowrap">
-                    <button type="button" onclick="editSubjects(${t.id}, '${escapeHtml(t.full_name)}')" 
-                            class="text-blue-600 hover:text-blue-800 text-sm">
+                    <button type="button" onclick="editSubjects(${t.id})" 
+                            class="text-gray-700 text-sm">
                         Edit
                     </button>
                     <button type="button" onclick="removeTeacher(${t.id})" 
-                            class="text-red-600 hover:text-red-800 text-sm ml-3">
+                            class="text-gray-700 text-sm ml-3">
                         Remove
                     </button>
                 </td>
@@ -51,24 +47,21 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
     return `
       <div class="p-4 sm:p-6">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-              <h1 class="text-xl font-bold">Teachers Management</h1>
+              <h1 class="ui-title">Teachers Management</h1>
               <div class="flex flex-col sm:flex-row gap-2">
-                  <button type="button" onclick="toggleBulkUpload()" class="w-full sm:w-auto bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">
-                      📁 Bulk Upload
-                  </button>
-                  <button type="button" onclick="toggleAddForm()" class="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
-                      + Add Teacher
+                  <button type="button" onclick="toggleBulkUpload()" class="ui-button w-full sm:w-auto">Bulk Upload</button>
+                  <button type="button" onclick="toggleAddForm()" class="ui-button ui-button--primary w-full sm:w-auto">
+                      Add Teacher
                   </button>
               </div>
           </div>
 
-          <!-- Bulk Upload Section -->
-          <div id="bulk-upload-section" class="hidden mb-6 border p-4 rounded-lg bg-white">
-              <h3 class="font-semibold mb-4">Bulk Upload Teachers</h3>
+          <div id="bulk-upload-section" class="hidden mb-6 ui-panel p-4">
+              <h3 class="text-sm font-semibold mb-4">Bulk Upload Teachers</h3>
               
-              <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h4 class="font-medium text-blue-900 mb-2">Instructions:</h4>
-                  <ol class="text-sm text-blue-800 list-decimal list-inside space-y-1">
+              <div class="mb-4 p-3 border border-gray-300">
+                  <h4 class="text-xs font-semibold text-gray-800 mb-2">Instructions</h4>
+                  <ol class="text-xs text-gray-600 list-decimal list-inside space-y-1">
                       <li>Download the JSON template file below</li>
                       <li>Edit the file with your teacher data</li>
                       <li>Upload the filled JSON file</li>
@@ -77,22 +70,18 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
               </div>
 
               <div class="flex flex-col sm:flex-row gap-3 mb-4">
-                  <button type="button" onclick="downloadTemplate()" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition">
-                      📥 Download JSON Template
+                  <button type="button" onclick="downloadTemplate()" class="ui-button ui-button--primary">Download JSON Template
                   </button>
-                  <label class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition cursor-pointer">
-                      📤 Upload JSON File
+                  <label class="ui-button cursor-pointer">Upload JSON File
                       <input type="file" id="jsonFileInput" accept=".json" onchange="handleFileUpload()" class="hidden">
                   </label>
               </div>
 
-              <!-- File Upload Status -->
-              <div id="upload-status" class="hidden mb-4 p-3 rounded-lg"></div>
+              <div id="upload-status" class="hidden mb-4 p-3 border border-gray-300 text-xs"></div>
 
-              <!-- Preview Table -->
               <div id="preview-section" class="hidden">
-                  <h4 class="font-medium mb-3">Preview Teachers to Upload:</h4>
-                  <div class="border rounded-lg overflow-x-auto bg-gray-50 max-h-64 overflow-y-auto">
+                  <h4 class="text-sm font-semibold mb-3">Preview Teachers to Upload</h4>
+                  <div class="border border-gray-300 overflow-x-auto bg-white max-h-64 overflow-y-auto">
                       <table class="w-full text-sm">
                           <thead class="bg-gray-100 sticky top-0">
                               <tr>
@@ -106,50 +95,45 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                       </table>
                   </div>
                   <div class="flex gap-2 mt-3">
-                      <button type="button" onclick="confirmBulkUpload()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">
-                          ✓ Confirm Upload
+                      <button type="button" onclick="confirmBulkUpload()" class="ui-button ui-button--primary">Confirm Upload
                       </button>
-                      <button type="button" onclick="cancelBulkUpload()" class="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300 transition">
-                      ✗ Cancel
+                      <button type="button" onclick="cancelBulkUpload()" class="ui-button">Cancel
                   </button>
                   </div>
               </div>
           </div>
 
-          <!-- Add Teacher Form -->
-          <div id="add-form" class="hidden mb-6 border p-4 rounded-lg bg-white">
-              <h3 class="font-semibold mb-4">Add New Teacher</h3>
+          <div id="add-form" class="hidden mb-6 ui-panel p-4">
+              <h3 class="text-sm font-semibold mb-4">Add New Teacher</h3>
               <form onsubmit="addTeacher(event)" class="space-y-4">
                   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <div>
                           <label class="block text-sm font-medium mb-1">Full Name *</label>
                           <input type="text" name="full_name" placeholder="e.g. John Smith" required 
-                                 class="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                 class="w-full border border-gray-300 px-3 py-2">
                       </div>
                       <div>
                           <label class="block text-sm font-medium mb-1">Email *</label>
                           <input type="text" name="email" placeholder="e.g. john@school.com" required 
-                                 class="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                 class="w-full border border-gray-300 px-3 py-2">
                       </div>
                       <div>
                           <label class="block text-sm font-medium mb-1">Phone Number</label>
                           <input type="text" name="phone" placeholder="e.g. +1234567890"
-                                   class="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                   class="w-full border border-gray-300 px-3 py-2">
                       </div>
                   </div>
                   <div class="flex flex-col sm:flex-row gap-2">
-                      <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                      <button type="submit" class="ui-button ui-button--primary w-full sm:w-auto">
                           Add Teacher
                       </button>
-                      <button type="button" onclick="toggleAddForm()" class="w-full sm:w-auto bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300 transition">
-                          Cancel
+                      <button type="button" onclick="toggleAddForm()" class="ui-button w-full sm:w-auto">Cancel
                       </button>
                   </div>
               </form>
           </div>
 
-          <!-- Teachers Table -->
-          <div class="border rounded-lg overflow-x-auto bg-white">
+          <div class="ui-panel overflow-x-auto">
               <table class="w-full min-w-[720px] border-collapse text-sm">
                   <thead class="bg-gray-100">
                       <tr>
@@ -160,7 +144,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                           <th class="border p-3 text-left">Actions</th>
                       </tr>
                   </thead>
-                  <tbody>
+                  <tbody id="teachers-tbody">
                       ${teacherRows.length > 0 ? teacherRows : `
                           <tr>
                               <td colspan="5" class="border p-8 text-center text-gray-500">
@@ -173,13 +157,11 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
           </div>
       </div>
 
-      <!-- Subject Modal -->
       <div id="subject-modal" class="fixed inset-0 bg-black bg-opacity-50 z-[9999] hidden flex items-center justify-center p-4">
-          <div class="bg-white rounded max-w-md w-full">
-              <!-- Step 1: Primary Subject Selection -->
+          <div class="bg-white border border-gray-300 max-w-md w-full">
               <div id="primary-step" class="p-4">
                   <div class="p-4 border-b">
-                      <h3 class="font-semibold">Assign Primary Subject</h3>
+                      <h3 class="text-sm font-semibold">Assign Primary Subject</h3>
                       <p class="text-sm text-gray-600">For <span id="teacher-name"></span></p>
                   </div>
                   <div class="p-4">
@@ -193,19 +175,18 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                               </select>
                           </div>
                           <div class="flex gap-2 pt-2 border-t">
-                              <button type="submit" class="bg-blue-600 text-white px-4 py-2">Continue</button>
-                              <button type="button" onclick="closeModal()" class="bg-gray-200 text-gray-800 px-4 py-2">Cancel</button>
+                              <button type="submit" class="ui-button ui-button--primary">Continue</button>
+                              <button type="button" onclick="closeModal()" class="ui-button">Cancel</button>
                           </div>
                       </form>
                   </div>
               </div>
 
-              <!-- Step 2: Optional Subjects Selection -->
               <div id="optional-step" class="p-4 hidden">
                   <div class="p-4 border-b">
-                      <h3 class="font-semibold">Assign Optional Subjects</h3>
+                      <h3 class="text-sm font-semibold">Assign Optional Subjects</h3>
                       <p class="text-sm text-gray-600">For <span id="teacher-name-optional"></span></p>
-                      <p class="text-xs text-blue-600 mt-1">Primary: <span id="selected-primary-name"></span></p>
+                      <p class="text-xs text-gray-600 mt-1">Primary: <span id="selected-primary-name"></span></p>
                   </div>
                   <div class="p-4">
                       <form onsubmit="saveSubjects(event)" class="space-y-4">
@@ -221,11 +202,11 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                                       </label>
                                   `).join('')}
                               </div>
-                              <p class="text-xs text-gray-500 mt-1">Select additional subjects (optional)</p>
+                              <p class="text-xs text-gray-600 mt-1">Select additional subjects (optional)</p>
                           </div>
                           <div class="flex gap-2 pt-2 border-t">
-                              <button type="button" onclick="goBackToPrimary()" class="bg-gray-200 text-gray-800 px-4 py-2">Back</button>
-                              <button type="submit" class="bg-blue-600 text-white px-4 py-2">Confirm</button>
+                              <button type="button" onclick="goBackToPrimary()" class="ui-button">Back</button>
+                              <button type="submit" class="ui-button ui-button--primary">Confirm</button>
                           </div>
                       </form>
                   </div>
@@ -233,15 +214,17 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
           </div>
       </div>
 
+      <div id="sync-indicator" class="fixed bottom-4 right-4 z-[10000] hidden bg-gray-900 text-white text-xs font-semibold px-3 py-2">Syncing...</div>
+      <div id="toast-container" class="fixed bottom-4 left-4 z-[10000] space-y-2"></div>
+
       <script>
-        // Data storage
         window.teachersData = {
             teachers: ${JSON.stringify(teachers)},
             allSubjects: ${JSON.stringify(allSubjects)},
             teacherSubjects: ${JSON.stringify(teacherSubjects)}
         };
+        window.nextTeacherId = -1;
 
-        // Helper function for HTML escaping
         function escapeHtml(text) {
             if (!text) return '';
             return text.toString()
@@ -252,6 +235,112 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 .replace(/'/g, '&#39;');
         }
 
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function showSyncIndicator(message) {
+            const el = document.getElementById('sync-indicator');
+            if (!el) return;
+            el.textContent = message || 'Syncing...';
+            el.classList.remove('hidden');
+        }
+
+        function hideSyncIndicator() {
+            const el = document.getElementById('sync-indicator');
+            if (!el) return;
+            el.classList.add('hidden');
+        }
+
+        function showToast(message, type) {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            const bg = type === 'error' ? 'bg-red-600' : 'bg-green-600';
+            toast.className = bg + ' text-white text-xs font-semibold px-3 py-2 transition-opacity';
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; }, 2200);
+            setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 2600);
+        }
+
+        function buildSubjectText(teacherId) {
+            const list = window.teachersData.teacherSubjects.filter(ts => ts.teacher_id == teacherId);
+            const primary = list.find(ts => ts.is_primary === 1);
+            const additional = list.filter(ts => ts.is_primary === 0);
+            let text = primary ? primary.subject_name : 'Not assigned';
+            if (additional.length > 0) {
+                text += ', ' + additional.map(s => s.subject_name).join(', ');
+            }
+            return text;
+        }
+
+        function updateSubjectCell(teacherId) {
+            const cell = document.querySelector('[data-subject-cell="' + teacherId + '"]');
+            if (!cell) return false;
+            cell.textContent = buildSubjectText(teacherId);
+            return true;
+        }
+
+        function updateTeacherSubjectsData(teacherId, primaryId, additionalIds) {
+            window.teachersData.teacherSubjects = window.teachersData.teacherSubjects.filter(ts => ts.teacher_id != teacherId);
+            const primarySubject = window.teachersData.allSubjects.find(s => s.id == primaryId);
+            if (primarySubject) {
+                window.teachersData.teacherSubjects.push({
+                    teacher_id: Number(teacherId),
+                    subject_id: Number(primaryId),
+                    is_primary: 1,
+                    subject_name: primarySubject.subject_name
+                });
+            }
+            additionalIds.forEach(subjectId => {
+                const subj = window.teachersData.allSubjects.find(s => s.id == subjectId);
+                if (subj) {
+                    window.teachersData.teacherSubjects.push({
+                        teacher_id: Number(teacherId),
+                        subject_id: Number(subjectId),
+                        is_primary: 0,
+                        subject_name: subj.subject_name
+                    });
+                }
+            });
+        }
+
+        function buildTeacherSubjectsText(teacherSubjectsList) {
+            const primary = teacherSubjectsList.find(ts => ts.is_primary === 1);
+            const additional = teacherSubjectsList.filter(ts => ts.is_primary === 0);
+            let text = primary ? primary.subject_name : 'Not assigned';
+            if (additional.length > 0) {
+                text += ', ' + additional.map(s => s.subject_name).join(', ');
+            }
+            return text;
+        }
+
+        function addTeacherRow(teacher) {
+            const tbody = document.getElementById('teachers-tbody');
+            if (!tbody) return false;
+            const currentSubjects = window.teachersData.teacherSubjects.filter(ts => ts.teacher_id == teacher.id);
+            const subjectsText = buildTeacherSubjectsText(currentSubjects);
+            const rowHtml = '<tr class="border-b" data-teacher-id="' + teacher.id + '">' +
+                '<td class="p-3">' + escapeHtml(teacher.full_name) + '</td>' +
+                '<td class="p-3 break-words">' + escapeHtml(teacher.email) + '</td>' +
+                '<td class="p-3">' + escapeHtml(teacher.phone || '') + '</td>' +
+                '<td class="p-3 break-words" data-subject-cell="' + teacher.id + '">' + escapeHtml(subjectsText) + '</td>' +
+                '<td class="p-3 whitespace-nowrap">' +
+                    '<button type="button" onclick="editSubjects(' + teacher.id + ')" class="text-gray-700 text-sm">Edit</button>' +
+                    '<button type="button" onclick="removeTeacher(' + teacher.id + ')" class="text-gray-700 text-sm ml-3">Remove</button>' +
+                '</td>' +
+            '</tr>';
+
+            const emptyRow = tbody.querySelector('td[colspan="5"]');
+            if (emptyRow) {
+                tbody.innerHTML = rowHtml;
+            } else {
+                tbody.insertAdjacentHTML('beforeend', rowHtml);
+            }
+            return true;
+        }
+
         function toggleAddForm() {
             document.getElementById('add-form').classList.toggle('hidden');
         }
@@ -260,7 +349,6 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             const section = document.getElementById('bulk-upload-section');
             section.classList.toggle('hidden');
             if (!section.classList.contains('hidden')) {
-                // Hide add form when opening bulk upload
                 document.getElementById('add-form').classList.add('hidden');
             }
         }
@@ -352,7 +440,6 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             const statusDiv = document.getElementById('upload-status');
             const previewSection = document.getElementById('preview-section');
             
-            // Show loading status
             statusDiv.className = 'mb-4 p-3 rounded-lg bg-yellow-100 border border-yellow-300 text-yellow-800';
             statusDiv.textContent = 'Reading file...';
             statusDiv.classList.remove('hidden');
@@ -362,12 +449,10 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 try {
                     const data = JSON.parse(e.target.result);
                     
-                    // Validate structure
                     if (!data.teachers || !Array.isArray(data.teachers)) {
                         throw new Error('Invalid format: File must contain a "teachers" array');
                     }
                     
-                    // Validate each teacher
                     const validTeachers = [];
                     const errors = [];
                     
@@ -398,14 +483,11 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                         return;
                     }
                     
-                    // Store teachers for upload
                     window.uploadedTeachers = validTeachers;
                     
-                    // Show success and preview
                     statusDiv.className = 'mb-4 p-3 rounded-lg bg-green-100 border border-green-300 text-green-800';
-                    statusDiv.textContent = '✓ Successfully loaded ' + validTeachers.length + ' teacher(s)';
+                    statusDiv.textContent = 'Loaded ' + validTeachers.length + ' teacher(s)';
                     
-                    // Show preview table
                     const tbody = document.getElementById('preview-tbody');
                     tbody.innerHTML = validTeachers.map(function(teacher) {
                         return '<tr class="border-b">' +
@@ -433,24 +515,24 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             const statusDiv = document.getElementById('upload-status');
             statusDiv.className = 'mb-4 p-3 rounded-lg bg-blue-100 border border-blue-300 text-blue-800';
             statusDiv.textContent = 'Uploading teachers...';
+            showSyncIndicator('Uploading...');
             
-            // Upload teachers one by one to avoid hitting limits
             let successCount = 0;
             let errorCount = 0;
             const errors = [];
             
             async function uploadNext(index) {
                 if (index >= window.uploadedTeachers.length) {
-                    // All done
                     if (errorCount === 0) {
                         statusDiv.className = 'mb-4 p-3 rounded-lg bg-green-100 border border-green-300 text-green-800';
-                        statusDiv.textContent = '✓ Successfully uploaded ' + successCount + ' teacher(s)!';
-                        setTimeout(function() {
-                            location.reload();
-                        }, 2000);
+                        statusDiv.textContent = 'Uploaded ' + successCount + ' teacher(s)!';
+                        hideSyncIndicator();
+                        showToast('Bulk upload complete', 'success');
                     } else {
                         statusDiv.className = 'mb-4 p-3 rounded-lg bg-yellow-100 border border-yellow-300 text-yellow-800';
                         statusDiv.innerHTML = '<strong>Upload Complete:</strong> ' + successCount + ' uploaded, ' + errorCount + ' failed<br><small>' + errors.join(', ') + '</small>';
+                        hideSyncIndicator();
+                        showToast('Bulk upload finished with errors', 'error');
                     }
                     return;
                 }
@@ -468,6 +550,14 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                     
                     if (result.success) {
                         successCount++;
+                        const newTeacher = {
+                            id: result.id ? result.id : window.nextTeacherId--,
+                            full_name: teacher.full_name,
+                            email: teacher.email,
+                            phone: teacher.phone || ''
+                        };
+                        window.teachersData.teachers.push(newTeacher);
+                        addTeacherRow(newTeacher);
                     } else {
                         errorCount++;
                         errors.push(teacher.full_name + ': ' + (result.error || 'Unknown error'));
@@ -477,7 +567,6 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                     errors.push(teacher.full_name + ': Network error');
                 }
                 
-                // Update progress and continue
                 statusDiv.textContent = 'Uploading teachers... ' + (index + 1) + '/' + window.uploadedTeachers.length + ' (' + successCount + ' success, ' + errorCount + ' errors)';
                 uploadNext(index + 1);
             }
@@ -496,6 +585,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
+            showSyncIndicator('Adding...');
             
             fetch('/school/teachers-list', {
                 method: 'POST',
@@ -503,16 +593,31 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 body: JSON.stringify(data)
             }).then(r => r.json()).then(result => {
                 if (result.success) {
-                    location.reload();
+                    const newTeacher = {
+                        id: result.id ? result.id : window.nextTeacherId--,
+                        full_name: data.full_name,
+                        email: data.email,
+                        phone: data.phone || ''
+                    };
+                    window.teachersData.teachers.push(newTeacher);
+                    addTeacherRow(newTeacher);
+                    e.target.reset();
+                    toggleAddForm();
+                    hideSyncIndicator();
+                    showToast('Teacher added', 'success');
                 } else {
+                    hideSyncIndicator();
                     alert('Error: ' + (result.error || 'Unknown error'));
                 }
             }).catch(err => {
+                hideSyncIndicator();
                 alert('Network error. Please try again.');
             });
         }
 
-        function editSubjects(teacherId, teacherName) {
+        function editSubjects(teacherId) {
+            const teacher = window.teachersData.teachers.find(t => t.id == teacherId);
+            const teacherName = teacher ? teacher.full_name : 'Teacher';
             document.getElementById('modal-teacher-id').value = teacherId;
             document.getElementById('teacher-name').textContent = teacherName;
             document.getElementById('subject-modal').classList.remove('hidden');
@@ -613,6 +718,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 action: 'assign_subjects'
             };
             
+            showSyncIndicator('Saving...');
             fetch('/school/teachers-list', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -620,11 +726,19 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             }).then(r => r.json()).then(result => {
                 if (result.success) {
                     closeModal();
-                    location.reload();
+                    updateTeacherSubjectsData(data.teacher_id, data.primary_subject, additional);
+                    const updated = updateSubjectCell(data.teacher_id);
+                    hideSyncIndicator();
+                    showToast('Updated', 'success');
+                    if (!updated) {
+                        location.reload();
+                    }
                 } else {
+                    hideSyncIndicator();
                     alert('Error: ' + (result.error || 'Unknown error'));
                 }
             }).catch(err => {
+                hideSyncIndicator();
                 alert('Network error. Please try again.');
             });
         }
@@ -632,17 +746,33 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
         function removeTeacher(teacherId) {
             if (!confirm('Remove this teacher? This will delete all their assignments, subjects, and routine data permanently.')) return;
             
+            showSyncIndicator('Removing...');
             fetch('/school/teachers-list', {
                 method: 'DELETE',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({id: teacherId})
             }).then(r => r.json()).then(result => {
                 if (result.success) {
-                    location.reload();
+                    window.teachersData.teachers = window.teachersData.teachers.filter(t => t.id != teacherId);
+                    window.teachersData.teacherSubjects = window.teachersData.teacherSubjects.filter(ts => ts.teacher_id != teacherId);
+                    const row = document.querySelector('[data-teacher-id="' + teacherId + '"]');
+                    if (row && row.parentNode) {
+                        row.parentNode.removeChild(row);
+                        const tbody = document.getElementById('teachers-tbody');
+                        if (tbody && document.querySelectorAll('[data-teacher-id]').length === 0) {
+                            tbody.innerHTML = '<tr><td colspan="5" class="border p-8 text-center text-gray-500">No teachers added yet</td></tr>';
+                        }
+                        hideSyncIndicator();
+                        showToast('Removed', 'success');
+                    } else {
+                        location.reload();
+                    }
                 } else {
+                    hideSyncIndicator();
                     alert('Error: ' + (result.error || 'Unknown error'));
                 }
             }).catch(err => {
+                hideSyncIndicator();
                 alert('Network error. Please try again.');
             });
         }
@@ -754,7 +884,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                     
                     uploadedTeachers = validTeachers;
                     statusDiv.className = 'mb-4 p-3 rounded-lg bg-green-100 border border-green-300 text-green-800';
-                    statusDiv.textContent = '✓ Successfully loaded ' + validTeachers.length + ' teacher(s)';
+                    statusDiv.textContent = 'Loaded ' + validTeachers.length + ' teacher(s)';
                     
                     var tbody = document.getElementById('preview-tbody');
                     tbody.innerHTML = validTeachers.map(function(teacher) {
@@ -783,6 +913,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             const statusDiv = document.getElementById('upload-status');
             statusDiv.className = 'mb-4 p-3 rounded-lg bg-blue-100 border border-blue-300 text-blue-800';
             statusDiv.textContent = 'Uploading teachers...';
+            showSyncIndicator('Uploading...');
             
             let successCount = 0;
             let errorCount = 0;
@@ -792,13 +923,14 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 if (index >= uploadedTeachers.length) {
                     if (errorCount === 0) {
                         statusDiv.className = 'mb-4 p-3 rounded-lg bg-green-100 border border-green-300 text-green-800';
-                        statusDiv.textContent = '✓ Successfully uploaded ' + successCount + ' teacher(s)!';
-                        setTimeout(function() {
-                            location.reload();
-                        }, 2000);
+                        statusDiv.textContent = 'Uploaded ' + successCount + ' teacher(s)!';
+                        hideSyncIndicator();
+                        showToast('Bulk upload complete', 'success');
                     } else {
                         statusDiv.className = 'mb-4 p-3 rounded-lg bg-yellow-100 border border-yellow-300 text-yellow-800';
                         statusDiv.innerHTML = '<strong>Upload Complete:</strong> ' + successCount + ' uploaded, ' + errorCount + ' failed<br><small>' + errors.join(', ') + '</small>';
+                        hideSyncIndicator();
+                        showToast('Bulk upload finished with errors', 'error');
                     }
                     return;
                 }
@@ -816,6 +948,14 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                     
                     if (result.success) {
                         successCount++;
+                        const newTeacher = {
+                            id: result.id ? result.id : window.nextTeacherId--,
+                            full_name: teacher.full_name,
+                            email: teacher.email,
+                            phone: teacher.phone || ''
+                        };
+                        window.teachersData.teachers.push(newTeacher);
+                        addTeacherRow(newTeacher);
                     } else {
                         errorCount++;
                         errors.push(teacher.full_name + ': ' + (result.error || 'Unknown error'));
@@ -841,3 +981,5 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
       </script>
     `;
 }
+
+

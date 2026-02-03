@@ -147,7 +147,7 @@ window.RoutineGeneratorApp = function() {
         showNotification(message, type = 'info') {
             // Create notification element
             const notification = document.createElement('div');
-            notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full`;
+            notification.className = `fixed top-4 right-4 z-50 p-4 border border-gray-300 transform transition-all duration-300 `;
             
             // Set color based on type
             if (type === 'success') {
@@ -173,13 +173,13 @@ window.RoutineGeneratorApp = function() {
             
             // Animate in
             setTimeout(() => {
-                notification.classList.remove('translate-x-full');
-                notification.classList.add('translate-x-0');
+                notification.classList.remove('');
+                notification.classList.add('');
             }, 100);
             
             // Auto remove after 5 seconds
             setTimeout(() => {
-                notification.classList.add('translate-x-full');
+                notification.classList.add('');
                 setTimeout(() => {
                     if (notification.parentElement) {
                         notification.remove();

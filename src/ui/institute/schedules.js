@@ -12,8 +12,8 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
                     <p class="text-[11px] md:text-xs text-gray-500 mt-0.5">Configure your school's daily routine</p>
                   </div>
                   <div class="flex flex-col sm:flex-row gap-2 md:gap-3">
-                       <button onclick="app.save()" class="w-full sm:w-auto bg-gray-900 text-white px-3 py-1.5 text-xs font-semibold border border-gray-900 rounded-none">Save</button>
-                       <button onclick="app.reset()" class="w-full sm:w-auto text-gray-600 bg-white px-3 py-1.5 text-xs font-semibold border border-gray-300 rounded-none">Reset</button>
+                       <button id="save-btn" onclick="app.save()" class="w-full sm:w-auto bg-gray-900 text-white px-3 py-1.5 text-xs font-semibold border border-gray-900 rounded-none">Save</button>
+                       <button id="reset-btn" onclick="app.reset()" class="w-full sm:w-auto text-gray-600 bg-white px-3 py-1.5 text-xs font-semibold border border-gray-300 rounded-none">Reset</button>
                   </div>
               </div>
           </div>
@@ -94,6 +94,7 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
               <button onclick="document.getElementById('tutorial-popup').classList.add('hidden')" class="w-full bg-gray-900 text-white py-1.5 rounded-none text-xs font-bold">Okay, Got it</button>
           </div>
       </div>
+      <div id="schedule-toast" class="fixed bottom-4 right-4 z-[10000] hidden bg-gray-900 text-white text-xs font-semibold px-3 py-2">Saved</div>
 
       <script>
         const AppState = {
@@ -101,6 +102,7 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
             startTime: "${initialSchoolStart}",
             workingDays: ${config?.working_days ? JSON.stringify(config.working_days) : '["monday","tuesday","wednesday","thursday","friday"]'}
         };
+        let toastTimer = null;
 
         // --- HELPER FUNCTIONS ---
         const Time = {
@@ -126,6 +128,16 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
                 // Set working days checkboxes
                 this.setWorkingDaysCheckboxes();
                 this.updateWorkingDaysCount();
+            },
+            showToast: function(message) {
+                const toast = document.getElementById('schedule-toast');
+                if (!toast) return;
+                toast.textContent = message;
+                toast.classList.remove('hidden');
+                if (toastTimer) clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => {
+                    toast.classList.add('hidden');
+                }, 2200);
             },
 
             setWorkingDaysCheckboxes: function() {
@@ -219,7 +231,12 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
             },
 
             save: async function() {
+                const saveBtn = document.getElementById('save-btn');
                 try {
+                    if (saveBtn) {
+                        saveBtn.disabled = true;
+                        saveBtn.textContent = 'Saving...';
+                    }
                     await fetch('/school/schedules', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
@@ -229,14 +246,43 @@ export function SchedulesPageHTML(config = null, existingSlots = []) {
                             working_days: AppState.workingDays
                         })
                     });
-                    window.location.reload();
-                } catch(e) { alert("Save failed"); }
+                    this.showToast('Saved');
+                } catch(e) {
+                    alert("Save failed");
+                } finally {
+                    if (saveBtn) {
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = 'Save';
+                    }
+                }
             },
 
             reset: async function() {
                 if(confirm("Reset entire schedule?")) {
-                    await fetch('/school/schedules', { method: 'DELETE' });
-                    window.location.reload();
+                    const resetBtn = document.getElementById('reset-btn');
+                    try {
+                        if (resetBtn) {
+                            resetBtn.disabled = true;
+                            resetBtn.textContent = 'Resetting...';
+                        }
+                        await fetch('/school/schedules', { method: 'DELETE' });
+                        AppState.slots = [];
+                        AppState.startTime = "08:00";
+                        AppState.workingDays = ["monday","tuesday","wednesday","thursday","friday"];
+                        this.addPeriod(false);
+                        this.recalculateChain();
+                        this.render();
+                        this.setWorkingDaysCheckboxes();
+                        this.updateWorkingDaysCount();
+                        this.showToast('Reset complete');
+                    } catch (e) {
+                        alert('Reset failed');
+                    } finally {
+                        if (resetBtn) {
+                            resetBtn.disabled = false;
+                            resetBtn.textContent = 'Reset';
+                        }
+                    }
                 }
             },
 

@@ -6,7 +6,7 @@ export async function handlePublicRequest(request, env) {
   const url = new URL(request.url);
   const companyName = await getCompanyName(env);
 
-  // AUTH STATUS CHECK
+  
   let email = getCookie(request, 'user_email');
   let role = getCookie(request, 'user_role');
   if (role) role = role.replace(/['"]+/g, '').trim(); 
@@ -15,16 +15,13 @@ export async function handlePublicRequest(request, env) {
   const isLoggedIn = !!(email && role);
   const currentUser = isLoggedIn ? { email, role } : null;
 
-  // --- HOME PAGE ---
   if (url.pathname === '/') {
     const { HomeHTML } = await import('../ui/public/home.js');
     return htmlResponse(PublicLayout(HomeHTML(companyName), "Home", companyName, currentUser));
   }
   
-  // --- LOGIN PAGE ---
   if (url.pathname === '/login') {
     
-    // STRICT REDIRECT: If logged in, go to dashboard
     if (isLoggedIn) {
         if (role === 'admin') return Response.redirect(url.origin + '/admin/dashboard', 302);
         if (role === 'institute') return Response.redirect(url.origin + '/school/dashboard', 302);
@@ -46,7 +43,6 @@ export async function handlePublicRequest(request, env) {
             const safeRole = user.role || 'unknown'; 
             const isSecure = url.protocol === 'https:';
             const secureFlag = isSecure ? 'Secure;' : ''; 
-            // 7-Day Persistence
             const cookieSettings = `Path=/; HttpOnly; ${secureFlag} SameSite=Lax; Max-Age=604800`;
 
             headers.set('Content-Type', 'application/json');
@@ -63,7 +59,6 @@ export async function handlePublicRequest(request, env) {
     return htmlResponse(PublicLayout(LOGIN_HTML(companyName), "Sign In", companyName, null));
   }
 
-  // --- LOGOUT ---
   if (url.pathname === '/logout') {
     const headers = new Headers();
     headers.append("Set-Cookie", "user_role=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");

@@ -1,60 +1,58 @@
-// src/ui/admin/settings.js
-
 export function SettingsPageHTML(profile = {}, email = '') {
     const p = profile || {};
     
     return `
-      <div class="max-w-2xl mx-auto space-y-8">
+      <div class="max-w-2xl mx-auto space-y-6">
           
-          <div class="text-center mb-8">
-              <h1 class="text-2xl font-bold text-gray-900">Account Settings</h1>
+          <div class="text-center">
+              <h1 class="text-xl font-bold text-gray-900">Account Settings</h1>
               <p class="text-sm text-gray-500 mt-1">Manage your profile information and security.</p>
           </div>
 
-          <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div class="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+          <div class="bg-white border border-gray-300">
+              <div class="p-4 border-b border-gray-300 bg-gray-50 flex justify-between items-center">
                   <h2 class="text-sm font-bold text-gray-800 uppercase tracking-wide">Personal Information</h2>
                   <span class="text-xs text-gray-400">Admin ID: ${p.auth_id || '-'}</span>
               </div>
               
-              <div class="p-8">
-                  <div class="flex flex-col items-center mb-8">
-                      <div class="w-24 h-24 rounded-full bg-gray-900 text-white flex items-center justify-center text-3xl font-bold mb-4 ring-4 ring-gray-100">
+              <div class="p-6">
+                  <div class="flex flex-col items-center mb-6">
+                      <div class="w-20 h-20 border border-gray-300 text-gray-900 flex items-center justify-center text-xl font-bold mb-2">
                           ${(p.full_name || email || 'A').charAt(0).toUpperCase()}
                       </div>
-                      <h3 class="text-lg font-bold text-gray-900">${p.full_name || 'Admin User'}</h3>
+                      <h3 class="text-base font-bold text-gray-900">${p.full_name || 'Admin User'}</h3>
                       <p class="text-sm text-gray-500">${email}</p>
                   </div>
 
-                  <form onsubmit="updateProfile(event)" class="space-y-5">
-                      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <form onsubmit="updateProfile(event)" class="space-y-4">
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                              <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Full Name</label>
+                              <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Full Name</label>
                               <input type="text" name="full_name" value="${p.full_name || ''}" placeholder="Enter your name" 
-                                     class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none transition-all">
+                                     class="w-full border border-gray-300 px-3 py-2 text-sm outline-none">
                           </div>
                           <div>
-                              <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Phone Number</label>
+                              <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Phone Number</label>
                               <input type="text" name="phone" value="${p.phone || ''}" placeholder="+880..." 
-                                     class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none transition-all">
+                                     class="w-full border border-gray-300 px-3 py-2 text-sm outline-none">
                           </div>
                       </div>
 
-                      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                              <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Date of Birth</label>
+                              <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Date of Birth</label>
                               <input type="date" name="dob" value="${p.dob || ''}" 
-                                     class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-gray-900 focus:border-gray-900 outline-none transition-all">
+                                     class="w-full border border-gray-300 px-3 py-2 text-sm outline-none">
                           </div>
                           <div>
-                              <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Email (Read Only)</label>
+                              <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Email (Read Only)</label>
                               <input type="text" value="${email}" disabled 
-                                     class="w-full border border-gray-200 bg-gray-50 text-gray-500 rounded-lg px-3 py-2.5 text-sm cursor-not-allowed">
+                                     class="w-full border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-sm cursor-not-allowed">
                           </div>
                       </div>
 
-                      <div class="pt-4 flex justify-end">
-                          <button type="submit" class="bg-gray-900 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-black transition-transform active:scale-95 shadow-sm">
+                      <div class="pt-2 flex justify-end">
+                          <button type="submit" class="border border-gray-900 text-gray-900 px-6 py-2 text-sm font-semibold">
                               Save Changes
                           </button>
                       </div>
@@ -62,19 +60,19 @@ export function SettingsPageHTML(profile = {}, email = '') {
               </div>
           </div>
 
-          <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div class="p-6 border-b border-gray-100 bg-gray-50/50">
+          <div class="bg-white border border-gray-300">
+              <div class="p-4 border-b border-gray-300 bg-gray-50">
                   <h2 class="text-sm font-bold text-red-600 uppercase tracking-wide">Security</h2>
               </div>
-              <div class="p-8">
-                  <form onsubmit="changePassword(event)" class="space-y-5">
+              <div class="p-6">
+                  <form onsubmit="changePassword(event)" class="space-y-4">
                       <div>
-                          <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">New Password</label>
-                          <input type="password" name="password" required placeholder="••••••••" 
-                                 class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none">
+                          <label class="block text-xs font-bold text-gray-500 uppercase mb-1">New Password</label>
+                          <input type="password" name="password" required placeholder="********" 
+                                 class="w-full border border-gray-300 px-3 py-2 text-sm outline-none">
                       </div>
                       <div class="flex justify-end">
-                          <button type="submit" class="bg-white border border-gray-300 text-gray-700 px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-gray-50 transition-colors">
+                          <button type="submit" class="border border-gray-300 text-gray-700 px-6 py-2 text-sm font-semibold">
                               Update Password
                           </button>
                       </div>

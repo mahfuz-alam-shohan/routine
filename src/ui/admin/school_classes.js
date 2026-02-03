@@ -1,8 +1,6 @@
-// src/ui/admin/school_classes.js - MAIN ADMIN: Classes, Groups & Sections ONLY
 
 export function SchoolClassesHTML(school, classesData = [], groupsData = [], sectionsData = []) {
     
-    // Group data for easier access
     const classGroups = {};
     groupsData.forEach(g => {
         if (!classGroups[g.class_id]) classGroups[g.class_id] = [];
@@ -15,12 +13,10 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
         classSections[s.class_id].push(s);
     });
 
-    // Build hierarchical display
     const classHierarchy = classesData.map(cls => {
         const groups = classGroups[cls.id] || [];
         const sections = classSections[cls.id] || [];
         
-        // Group sections by their group
         const sectionsByGroup = {};
         groups.forEach(g => {
             sectionsByGroup[g.id] = {
@@ -29,12 +25,10 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
             };
         });
         
-        // Sections without groups
         const sectionsWithoutGroup = sections.filter(s => !s.group_id);
 
         return `
             <div class="mb-4 border border-gray-300">
-                <!-- Class Header -->
                 <div class="bg-gray-100 px-3 py-2 border-b">
                     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                         <div class="flex items-center gap-2">
@@ -42,18 +36,18 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                             <span class="text-xs text-gray-500">(${groups.length} groups, ${sections.length} sections)</span>
                         </div>
                         <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                            <button onclick="openEditClassModal(${cls.id}, '${cls.class_name}', ${cls.has_groups})" class="text-xs bg-yellow-600 text-white px-2 py-1 hover-lift">
+                            <button onclick="openEditClassModal(${cls.id}, '${cls.class_name}', ${cls.has_groups})" class="text-xs bg-yellow-600 text-white px-2 py-1">
                                 Edit
                             </button>
-                            <button onclick="deleteClass(${cls.id})" class="text-xs bg-red-600 text-white px-2 py-1 hover-lift">
+                            <button onclick="deleteClass(${cls.id})" class="text-xs bg-red-600 text-white px-2 py-1">
                                 Delete
                             </button>
                             ${cls.has_groups ? `
-                                <button onclick="openAddGroupModal(${cls.id}, '${cls.class_name}')" class="text-xs bg-green-600 text-white px-2 py-1 hover-lift">
+                                <button onclick="openAddGroupModal(${cls.id}, '${cls.class_name}')" class="text-xs bg-green-600 text-white px-2 py-1">
                                     + Add Group
                                 </button>
                             ` : `
-                                <button onclick="openAddSectionModal(${cls.id}, '${cls.class_name}', ${cls.has_groups})" class="text-xs bg-blue-600 text-white px-2 py-1 hover-lift">
+                                <button onclick="openAddSectionModal(${cls.id}, '${cls.class_name}', ${cls.has_groups})" class="text-xs bg-blue-600 text-white px-2 py-1">
                                     + Add Section
                                 </button>
                             `}
@@ -61,7 +55,6 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                     </div>
                 </div>
 
-                <!-- Groups and Sections -->
                 <div class="p-2">
                     ${groups.length > 0 ? `
                         <div class="space-y-2">
@@ -131,102 +124,7 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
     }).join('');
 
     return `
-      <style>
-        /* Enhanced animations and transitions */
-        .btn-primary {
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-          transform: translateY(0);
-        }
-        .btn-primary:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-        .btn-primary:active {
-          transform: translateY(0);
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        
-        .section-badge {
-          transition: all 0.2s ease;
-        }
-        .section-badge:hover {
-          transform: scale(1.05);
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-        
-        /* Loading skeleton */
-        @keyframes shimmer {
-          0% { background-position: -200% 0; }
-          100% { background-position: 200% 0; }
-        }
-        .skeleton {
-          background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-          background-size: 200% 100%;
-          animation: shimmer 1.5s infinite;
-        }
-        
-        /* Success animations */
-        @keyframes slideInSuccess {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .success-message {
-          animation: slideInSuccess 0.3s ease-out;
-        }
-        
-        /* Smooth focus states */
-        input:focus, select:focus, textarea:focus {
-          outline: none;
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-          transition: all 0.2s ease;
-        }
-        
-        /* Hover states for interactive elements */
-        .hover-lift {
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        .hover-lift:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-        
-        /* Mobile responsive design */
-        @media (max-width: 768px) {
-          .class-header {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 8px;
-          }
-          
-          .class-header button {
-            width: 100%;
-            justify-content: center;
-          }
-          
-          .group-header {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 8px;
-          }
-          
-          .group-header button {
-            width: 100%;
-            justify-content: center;
-          }
-        }
-        
-        /* Prevent zoom on input focus */
-        input, select, textarea {
-          font-size: 16px !important;
-        }
-      </style>
+      
       
       <div>
          <div class="flex items-center gap-2 text-sm text-gray-500 mb-6">
@@ -254,14 +152,13 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
 
          <div class="space-y-4">
              ${classHierarchy.length > 0 ? classHierarchy : `
-                 <div class="bg-white border border-gray-200 rounded-lg p-8 text-center">
+                 <div class="bg-white border border-gray-200 p-8 text-center">
                      <p class="text-gray-400">No classes found</p>
                  </div>
              `}
          </div>
       </div>
 
-      <!-- Add Group Modal -->
       <div id="addGroupModal" class="fixed inset-0 bg-black/60 z-[9999] hidden flex items-center justify-center px-4">
           <div class="bg-white border border-gray-300 w-full max-w-md p-4 relative">
               <h3 class="font-bold mb-3">Add Group</h3>
@@ -278,7 +175,6 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
           </div>
       </div>
 
-      <!-- Add Section Modal -->
       <div id="addSectionModal" class="fixed inset-0 bg-black/60 z-[9999] hidden flex items-center justify-center px-4">
           <div class="bg-white border border-gray-300 w-full max-w-md p-4 relative">
               <h3 class="font-bold mb-3">Add Section</h3>
@@ -298,7 +194,6 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
           </div>
       </div>
 
-      <!-- Edit Class Modal -->
       <div id="editClassModal" class="fixed inset-0 bg-black/60 z-[9999] hidden flex items-center justify-center px-4">
           <div class="bg-white border border-gray-300 w-full max-w-md p-4 relative">
               <h3 class="font-bold mb-3">Edit Class</h3>
@@ -320,7 +215,6 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
           </div>
       </div>
 
-      <!-- Edit Group Modal -->
       <div id="editGroupModal" class="fixed inset-0 bg-black/60 z-[9999] hidden flex items-center justify-center px-4">
           <div class="bg-white border border-gray-300 w-full max-w-md p-4 relative">
               <h3 class="font-bold mb-3">Edit Group</h3>
@@ -338,7 +232,6 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
           </div>
       </div>
 
-      <!-- Edit Section Modal -->
       <div id="editSectionModal" class="fixed inset-0 bg-black/60 z-[9999] hidden flex items-center justify-center px-4">
           <div class="bg-white border border-gray-300 w-full max-w-md p-4 relative">
               <h3 class="font-bold mb-3">Edit Section</h3>
@@ -356,12 +249,10 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
           </div>
       </div>
 
-      <!-- Dependency Warning Modal -->
       <div id="dependencyModal" class="fixed inset-0 bg-black/60 z-[9999] hidden flex items-center justify-center px-4">
           <div class="bg-white border border-gray-300 w-full max-w-lg p-4 relative">
               <h3 class="font-bold mb-3 text-red-600">⚠️ Dependency Warning</h3>
               <div id="dependencyDetails" class="mb-4">
-                  <!-- Dependency details will be populated here -->
               </div>
               <div class="flex gap-2">
                   <button onclick="forceDelete()" class="bg-red-600 text-white px-3 py-1 text-sm" id="forceDeleteBtn">Force Delete</button>
@@ -377,7 +268,7 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
         function createClass(e) {
             e.preventDefault();
             const submitBtn = e.target.querySelector('button[type="submit"]');
-            if (submitBtn.disabled) return; // Prevent multiple submissions
+            if (submitBtn.disabled) return;
             
             submitBtn.disabled = true;
             submitBtn.textContent = 'Creating...';
@@ -437,7 +328,7 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
         function addGroup(e) {
             e.preventDefault();
             const submitBtn = document.getElementById('addGroupBtn');
-            if (submitBtn.disabled) return; // Prevent multiple submissions
+            if (submitBtn.disabled) return;
             
             submitBtn.disabled = true;
             submitBtn.textContent = 'Adding...';
@@ -470,7 +361,7 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
         function addSection(e) {
             e.preventDefault();
             const submitBtn = document.getElementById('addSectionBtn');
-            if (submitBtn.disabled) return; // Prevent multiple submissions
+            if (submitBtn.disabled) return;
             
             submitBtn.disabled = true;
             submitBtn.textContent = 'Adding...';
@@ -570,7 +461,6 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                 '</ul>' +
                 '<p class="text-sm text-red-600 font-medium">⚠️ Force deleting will permanently remove all dependent data!</p>';
             
-            // Store action and id for force delete
             window.pendingDelete = { action: action, id: id };
             
             openModal('dependencyModal');
@@ -732,7 +622,6 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
             });
         }
 
-        // Modal management
         function openModal(modalId) {
             document.getElementById(modalId).classList.remove('hidden');
             document.body.style.overflow = 'hidden';
@@ -750,7 +639,6 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
             modal.querySelector('form').reset();
         }
 
-        // Close modal on Escape key
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 const modals = document.querySelectorAll('.fixed.inset-0');
@@ -762,21 +650,19 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
             }
         });
 
-        // Close modal on background click
         document.addEventListener('click', function(e) {
             if (e.target.classList.contains('fixed') && e.target.classList.contains('inset-0')) {
                 closeModal(e.target.id);
             }
         });
 
-        // Toast notification system
         function showToast(message, type = 'success') {
             const toast = document.createElement('div');
             const bgColor = type === 'success' ? 'bg-green-600' : 
                           type === 'error' ? 'bg-red-600' : 
                           type === 'info' ? 'bg-blue-600' : 'bg-gray-600';
             
-            toast.className = 'fixed top-4 right-4 px-4 py-2 rounded-lg text-white z-[10000] success-message ' + bgColor;
+            toast.className = 'fixed top-4 right-4 px-4 py-2 text-white z-[10000] success-message ' + bgColor;
             toast.textContent = message;
             document.body.appendChild(toast);
             
@@ -786,7 +672,6 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
             }, 3000);
         }
 
-        // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {
             if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
                 e.preventDefault();
@@ -796,3 +681,5 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
       </script>
     `;
 }
+
+

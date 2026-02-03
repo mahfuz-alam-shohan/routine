@@ -98,7 +98,7 @@ export function ClassesPageHTML(school, classes = [], groups = [], sections = []
                                             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                                                 <span class="font-semibold text-sm md:text-base">${g.group_name}</span>
                                                 <span class="text-xs text-gray-500">(${groupSections.length} sections)</span>
-                                                <div class="text-xs px-2 py-1 rounded capacity-indicator ${capacity.percentage >= 90 ? 'bg-red-100 text-red-700' : capacity.percentage >= 70 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}">
+                                                <div class="text-xs px-2 py-1 border border-gray-300 text-gray-700">
                                                     ${capacity.current}/${capacity.max} classes
                                                 </div>
                                             </div>
@@ -121,7 +121,7 @@ export function ClassesPageHTML(school, classes = [], groups = [], sections = []
                             <div class="mb-1">
                                 <span class="font-semibold">No Group</span>
                                 <span class="text-xs text-gray-500 ml-2">(${sectionsWithoutGroup.length} sections)</span>
-                                <div class="text-xs px-2 py-1 rounded bg-green-100 text-green-700 inline-block ml-2">
+                                <div class="text-xs px-2 py-1 border border-gray-300 text-gray-700 inline-block ml-2">
                                     ${calculateSectionCapacity(cls.id, null).current}/${maxClassesPerSection} classes
                                 </div>
                             </div>
@@ -169,10 +169,10 @@ export function ClassesPageHTML(school, classes = [], groups = [], sections = []
          </div>
 
          <!-- Master Schedule Information (Read-only) -->
-         <div class="mb-6 bg-gray-50 p-4 border border-gray-300">
+         <div class="mb-6 ui-panel p-4">
              <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                  <div class="flex flex-col md:flex-row md:items-center gap-4">
-                     <span class="font-semibold text-sm md:text-base">📅 Master Schedule Configuration</span>
+                     <span class="font-semibold text-sm md:text-base"> Master Schedule Configuration</span>
                      <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                          <span class="text-sm">Working Days: <strong>${scheduleConfig.workingDaysCount || 5}</strong></span>
                          <span class="text-sm">Class Periods/Day: <strong>${scheduleConfig.actualClassPeriodsPerDay || 8}</strong></span>
@@ -181,19 +181,19 @@ export function ClassesPageHTML(school, classes = [], groups = [], sections = []
                  <div class="text-sm text-gray-600">
                      <strong>Total Capacity:</strong> ${maxClassesPerSection} classes/week per section
                      <div class="text-xs text-gray-500 mt-1">
-                         (Calculated from master schedule: ${scheduleConfig.workingDaysCount || 5} days × ${scheduleConfig.actualClassPeriodsPerDay || 8} class periods)
+                         (Calculated from master schedule: ${scheduleConfig.workingDaysCount || 5} days  ${scheduleConfig.actualClassPeriodsPerDay || 8} class periods)
                      </div>
                  </div>
              </div>
              <div class="text-xs text-gray-500 mt-2">
-                 ⚠️ Schedule configuration is managed in Master Schedule. This ensures consistency with routine generation.
+                  Schedule configuration is managed in Master Schedule. This ensures consistency with routine generation.
              </div>
          </div>
 
          <!-- Classes Hierarchy (Read-only) -->
          <div class="space-y-4">
              ${classesTabContent.length > 0 ? classesTabContent : `
-                 <div class="bg-white border border-gray-200 rounded-lg p-8 text-center">
+                 <div class="ui-panel p-8 text-center">
                      <p class="text-gray-400">No classes found</p>
                  </div>
              `}
