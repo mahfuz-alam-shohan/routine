@@ -8,7 +8,7 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
     return `
       
       
-      <div>
+      <div class="px-3 sm:px-4">
          <div class="flex items-center gap-1 text-sm text-gray-500 mb-6">
             <a href="/admin/school/view?id=${school.auth_id}" class="hover:text-blue-600">Back to Menu</a>
             <span>/</span>
@@ -93,10 +93,18 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                       <label class="block text-sm font-medium mb-1">Class Name</label>
                       <input type="text" name="class_name" required class="w-full border border-gray-300 px-2 py-1" placeholder="e.g. Class 10">
                   </div>
-                  <div class="flex items-center gap-1 mb-3">
+                  <div class="flex items-center gap-1 mb-2">
                       <input type="checkbox" name="has_groups" id="edit_has_groups">
                       <label for="edit_has_groups" class="text-sm">Has Groups</label>
                   </div>
+                  ${shiftsEnabled ? `
+                  <div class="mb-3">
+                      <label class="block text-xs text-gray-600 mb-1">Shift</label>
+                      <select name="shift_name" id="edit_shift_name" class="w-full border border-gray-300 px-2 py-1 text-sm">
+                          ${shifts.map(shift => `<option value="${shift}">${shift}</option>`).join('')}
+                      </select>
+                  </div>
+                  ` : `<input type="hidden" name="shift_name" value="Full Day">`}
                   <div class="flex gap-1">
                       <button type="submit" class="bg-yellow-600 text-white px-3 py-1 text-sm" id="editClassBtn" data-default="Save Changes">Save Changes</button>
                       <button type="button" onclick="closeModal('editClassModal')" class="bg-gray-200 text-gray-800 px-3 py-1 text-sm">Cancel</button>
@@ -209,6 +217,8 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                 const sectionsWithoutGroup = sections.filter(s => !s.group_id);
                 const className = escapeHtmlClient(cls.class_name);
                 const classNameJs = escapeJsString(cls.class_name);
+                const shiftLabel = escapeHtmlClient(cls.shift_name || 'Full Day');
+                const shiftNameJs = escapeJsString(cls.shift_name || 'Full Day');
                 const hasGroups = Number(cls.has_groups) === 1;
 
                 const groupBlocks = groups.map(g => {
@@ -273,18 +283,24 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
                 return '<div class="mb-3 border border-gray-300">' +
                     '<div class="bg-gray-100 px-2 py-2 border-b">' +
                         '<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-1">' +
-                            '<div class="flex items-center gap-1">' +
+                            '<div class="grid grid-cols-1 sm:auto-cols-max sm:grid-flow-col gap-px bg-gray-300 p-px">' +
                                 '<span class="font-bold text-sm md:text-base">' + className + '</span>' +
-                                '<span class="text-xs text-gray-500">(' + groups.length + ' groups, ' + sections.length + ' sections)</span>' +
+                                '<span class="text-[11px] text-gray-500">(' + groups.length + ' groups, ' + sections.length + ' sections)</span>' +
+                                '<span class="inline-flex items-center gap-1 border border-gray-300 px-1 py-0.5 text-[10px] text-gray-600 bg-white">' +
+                                    '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10h10M7 14h10M5 6h14M5 18h14" />' +
+                                    '</svg>' +
+                                    'Shift: ' + shiftLabel +
+                                '</span>' +
                             '</div>' +
-                            '<div class="flex flex-col sm:flex-row sm:items-center gap-1">' +
-                                '<button onclick="openEditClassModal(' + cls.id + ', \\''
-                                + classNameJs + '\\', ' + (hasGroups ? 1 : 0) + ')" class="text-[11px] bg-yellow-600 text-white px-2 py-1 leading-tight w-full sm:w-auto text-center">Edit</button>' +
+                            '<div class="grid grid-cols-1 sm:auto-cols-max sm:grid-flow-col gap-px bg-gray-300 p-px">' +
+                                '<button onclick="openEditClassModal(' + cls.id + ', \\'' 
+                                + classNameJs + '\\', ' + (hasGroups ? 1 : 0) + ', \\'' + shiftNameJs + '\\')" class="text-[11px] bg-yellow-600 text-white px-2 py-1 leading-tight w-full sm:w-auto text-center">Edit</button>' +
                                 '<button onclick="deleteClass(' + cls.id + ')" class="text-[11px] bg-red-600 text-white px-2 py-1 leading-tight w-full sm:w-auto text-center">Delete</button>' +
                                 (hasGroups
-                                    ? '<button onclick="openAddGroupModal(' + cls.id + ', \\''
+                                    ? '<button onclick="openAddGroupModal(' + cls.id + ', \\'' 
                                       + classNameJs + '\\')" class="text-[11px] bg-green-600 text-white px-2 py-1 leading-tight w-full sm:w-auto text-center">+ Add Group</button>'
-                                    : '<button onclick="openAddSectionModal(' + cls.id + ', \\''
+                                    : '<button onclick="openAddSectionModal(' + cls.id + ', \\'' 
                                       + classNameJs + '\\', ' + (hasGroups ? 1 : 0) + ')" class="text-[11px] bg-blue-600 text-white px-2 py-1 leading-tight w-full sm:w-auto text-center">+ Add Section</button>'
                                   ) +
                             '</div>' +
@@ -656,10 +672,14 @@ export function SchoolClassesHTML(school, classesData = [], groupsData = [], sec
             });
         }
 
-        function openEditClassModal(classId, className, hasGroups) {
+        function openEditClassModal(classId, className, hasGroups, shiftName) {
             document.getElementById('edit_class_id').value = classId;
             document.querySelector('#editClassModal input[name="class_name"]').value = className;
             document.getElementById('edit_has_groups').checked = Boolean(Number(hasGroups));
+            const shiftSelect = document.getElementById('edit_shift_name');
+            if (shiftSelect && shiftName) {
+                shiftSelect.value = shiftName;
+            }
             openModal('editClassModal');
             setTimeout(() => {
                 document.querySelector('#editClassModal input[name="class_name"]').focus();

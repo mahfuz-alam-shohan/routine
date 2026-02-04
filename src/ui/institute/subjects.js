@@ -2,6 +2,13 @@
 
 export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [], sections = [], classSubjects = [], groupSubjects = [], scheduleConfig = {}) {
     
+    const escapeHtml = (value) => String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
     // Group data for easier access
     const classGroups = {};
     groups.forEach(g => {
@@ -79,6 +86,27 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
     // Build Subject Bank Tab Content
     const subjectBankContent = `
         <div>
+            <style>
+                .table-wrap {
+                    border: 1px solid var(--ui-line, #cbd5e1);
+                    background: #ffffff;
+                    overflow-x: auto;
+                    -webkit-overflow-scrolling: touch;
+                }
+                .table-wrap table {
+                    width: 100%;
+                    min-width: 520px;
+                    border-collapse: collapse;
+                }
+                .table-wrap--wide table {
+                    min-width: 720px;
+                }
+                @media (max-width: 640px) {
+                    .table-wrap table {
+                        min-width: 640px;
+                    }
+                }
+            </style>
             <h3 class="text-lg font-bold mb-4">Subject Bank</h3>
             <div class="mb-4">
                 <input type="text" id="new-subject" placeholder="New Subject Name..." 
@@ -87,38 +115,40 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                     + Add Subject
                 </button>
             </div>
-            <table id="subject-bank-table" border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
-                <thead>
-                    <tr style="background-color: #f0f0f0;">
-                        <th style="border: 1px solid #ccc; padding: 4px;">#</th>
-                        <th style="border: 1px solid #ccc; padding: 4px;">Subject Name</th>
-                        <th style="border: 1px solid #ccc; padding: 4px;">Edit</th>
-                        <th style="border: 1px solid #ccc; padding: 4px;">Delete</th>
-                    </tr>
-                </thead>
-                <tbody id="subject-bank-body">
-                    ${subjects.map((sub, index) => `
-                        <tr data-subject-id="${sub.id}">
-                            <td data-subject-index style="border: 1px solid #ccc; padding: 4px; text-align: center;">${index + 1}</td>
-                            <td style="border: 1px solid #ccc; padding: 4px;">
-                                <span id="name-${sub.id}">${sub.subject_name}</span>
-                                <form id="form-${sub.id}" onsubmit="updateSubject(event, ${sub.id})" style="display: none;">
-                                    <input type="text" name="name" value="${sub.subject_name}" style="width: 100%;">
-                                    <button type="submit">Save</button>
-                                    <button type="button" onclick="toggleEdit(${sub.id})">Cancel</button>
-                                </form>
-                            </td>
-                            <td style="border: 1px solid #ccc; padding: 4px; text-align: center;">
-                                <button onclick="toggleEdit(${sub.id})">Edit</button>
-                            </td>
-                            <td style="border: 1px solid #ccc; padding: 4px; text-align: center;">
-                                <button onclick="deleteSubject(${sub.id})">Delete</button>
-                            </td>
+            <div class="table-wrap">
+                <table id="subject-bank-table" border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+                    <thead>
+                        <tr style="background-color: #f0f0f0;">
+                            <th style="border: 1px solid #ccc; padding: 4px;">#</th>
+                            <th style="border: 1px solid #ccc; padding: 4px;">Subject Name</th>
+                            <th style="border: 1px solid #ccc; padding: 4px;">Edit</th>
+                            <th style="border: 1px solid #ccc; padding: 4px;">Delete</th>
                         </tr>
-                    `).join('')}
-                    ${subjects.length === 0 ? '<tr data-empty="true"><td colspan="4" style="border: 1px solid #ccc; padding: 4px; text-align: center;">No subjects added yet.</td></tr>' : ''}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody id="subject-bank-body">
+                        ${subjects.map((sub, index) => `
+                            <tr data-subject-id="${sub.id}">
+                                <td data-subject-index style="border: 1px solid #ccc; padding: 4px; text-align: center;">${index + 1}</td>
+                                <td style="border: 1px solid #ccc; padding: 4px;">
+                                    <span id="name-${sub.id}">${sub.subject_name}</span>
+                                    <form id="form-${sub.id}" onsubmit="updateSubject(event, ${sub.id})" style="display: none;">
+                                        <input type="text" name="name" value="${sub.subject_name}" style="width: 100%;">
+                                        <button type="submit">Save</button>
+                                        <button type="button" onclick="toggleEdit(${sub.id})">Cancel</button>
+                                    </form>
+                                </td>
+                                <td style="border: 1px solid #ccc; padding: 4px; text-align: center;">
+                                    <button onclick="toggleEdit(${sub.id})">Edit</button>
+                                </td>
+                                <td style="border: 1px solid #ccc; padding: 4px; text-align: center;">
+                                    <button onclick="deleteSubject(${sub.id})">Delete</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                        ${subjects.length === 0 ? '<tr data-empty="true"><td colspan="4" style="border: 1px solid #ccc; padding: 4px; text-align: center;">No subjects added yet.</td></tr>' : ''}
+                    </tbody>
+                </table>
+            </div>
         </div>
     `;
 
@@ -179,24 +209,28 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
     const classCurriculumContent = `
         <div>
             <h3 class="text-lg font-bold mb-4">Class Curriculum</h3>
-            <table id="curriculum-table" border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
-                <thead>
-                    <tr style="background-color: #f0f0f0;">
-                        <th style="border: 1px solid #ccc; padding: 4px;">Class/Group</th>
-                        <th style="border: 1px solid #ccc; padding: 4px;">Subject</th>
-                        <th style="border: 1px solid #ccc; padding: 4px;">Classes/Week</th>
-                        <th style="border: 1px solid #ccc; padding: 4px;">Type</th>
-                        <th style="border: 1px solid #ccc; padding: 4px;">Capacity</th>
-                        <th style="border: 1px solid #ccc; padding: 4px;">Add Subject</th>
-                        <th style="border: 1px solid #ccc; padding: 4px;">Remove</th>
-                    </tr>
-                </thead>
-                <tbody id="curriculum-body">
-                    ${curriculumRows.map(row => {
+            <div class="table-wrap table-wrap--wide">
+                <table id="curriculum-table" border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+                    <thead>
+                        <tr style="background-color: #f0f0f0;">
+                            <th style="border: 1px solid #ccc; padding: 4px;">Class/Group</th>
+                            <th style="border: 1px solid #ccc; padding: 4px;">Subject</th>
+                            <th style="border: 1px solid #ccc; padding: 4px;">Classes/Week</th>
+                            <th style="border: 1px solid #ccc; padding: 4px;">Type</th>
+                            <th style="border: 1px solid #ccc; padding: 4px;">Capacity</th>
+                            <th style="border: 1px solid #ccc; padding: 4px;">Add Subject</th>
+                            <th style="border: 1px solid #ccc; padding: 4px;">Remove</th>
+                        </tr>
+                    </thead>
+                    <tbody id="curriculum-body">
+                        ${curriculumRows.map(row => {
                         if (row.type === 'class') {
                             return `
                                 <tr data-row="class" data-class-id="${row.class.id}" style="background-color: #f8f8f8; font-weight: bold;">
-                                    <td style="border: 1px solid #ccc; padding: 4px; text-align: left;">${row.class.class_name} (${row.groups.length} groups)</td>
+                                    <td style="border: 1px solid #ccc; padding: 4px; text-align: left;">
+                                        ${row.class.class_name} (${row.groups.length} groups)
+                                        <span style="font-size: 11px; color: #555; margin-left: 6px; border: 1px solid #ccc; padding: 1px 4px; background: #fff;">Shift: ${escapeHtml(row.class.shift_name || 'Full Day')}</span>
+                                    </td>
                                     <td style="border: 1px solid #ccc; padding: 4px;" colspan="4"></td>
                                     <td style="border: 1px solid #ccc; padding: 4px; text-align: center;">
                                         <button onclick="openAddClassSubjectModal(${row.class.id}, '${row.class.class_name}')">+ Add</button>
@@ -255,10 +289,11 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                                 </tr>
                             `;
                         }
-                    }).join('')}
-                    ${curriculumRows.length === 0 ? '<tr><td colspan="7" style="border: 1px solid #ccc; padding: 4px; text-align: center;">No classes found</td></tr>' : ''}
-                </tbody>
-            </table>
+                        }).join('')}
+                        ${curriculumRows.length === 0 ? '<tr><td colspan="7" style="border: 1px solid #ccc; padding: 4px; text-align: center;">No classes found</td></tr>' : ''}
+                    </tbody>
+                </table>
+            </div>
         </div>
     `;
 
@@ -279,7 +314,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
       </style>
 
       
-      <div>
+      <div class="px-3 sm:px-4">
          <div class="flex items-center gap-2 text-sm text-gray-500 mb-6">
             <a href="/school/dashboard" class="hover:text-blue-600">Back to Dashboard</a>
             <span>/</span>
@@ -516,15 +551,15 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
       <script>
         const SCHOOL_ID = ${school.id};
         const DEFAULT_MAX_CLASSES_PER_SECTION = ${defaultMaxClassesPerSection};
-        const CLASS_CAPACITY_MAP = ${JSON.stringify(classCapacityMap)};
+        const CLASS_CAPACITY_MAP = ${JSON.stringify(classCapacityMap).replace(/</g, '\\u003c')};
         
         // Store subjects data for validation
-        const SUBJECTS = ${JSON.stringify(subjects)};
-        const CLASSES = ${JSON.stringify(classes)};
-        const SECTIONS = ${JSON.stringify(sections)};
-        const CLASS_SUBJECTS = ${JSON.stringify(classSubjects)};
-        const GROUP_SUBJECTS = ${JSON.stringify(groupSubjects)};
-        const GROUPS = ${JSON.stringify(groups)};
+        const SUBJECTS = ${JSON.stringify(subjects).replace(/</g, '\\u003c')};
+        const CLASSES = ${JSON.stringify(classes).replace(/</g, '\\u003c')};
+        const SECTIONS = ${JSON.stringify(sections).replace(/</g, '\\u003c')};
+        const CLASS_SUBJECTS = ${JSON.stringify(classSubjects).replace(/</g, '\\u003c')};
+        const GROUP_SUBJECTS = ${JSON.stringify(groupSubjects).replace(/</g, '\\u003c')};
+        const GROUPS = ${JSON.stringify(groups).replace(/</g, '\\u003c')};
 
         // Tab switching
         function switchTab(tabName) {
@@ -549,20 +584,22 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
         }
 
         function escapeHtmlClient(text) {
-            if (!text) return '';
-            return text.toString()
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
+            if (text === null || text === undefined) return '';
+            let value = String(text);
+            value = value.split('&').join('&amp;');
+            value = value.split('<').join('&lt;');
+            value = value.split('>').join('&gt;');
+            value = value.split('"').join('&quot;');
+            value = value.split("'").join('&#39;');
+            return value;
         }
 
         function escapeJsString(text) {
-            if (!text) return '';
-            return text.toString()
-                .replace(/\\/g, '\\\\')
-                .replace(/'/g, "\\'");
+            if (text === null || text === undefined) return '';
+            let value = String(text);
+            value = value.split('\\\\').join('\\\\\\\\');
+            value = value.split("'").join("\\'");
+            return value;
         }
 
         function sortSubjectsByName(list) {
@@ -742,7 +779,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                 '<td style="border: 1px solid #ccc; padding: 4px; text-align: left;">' + safeName + ' (' + groupCount + ' groups)</td>' +
                 '<td style="border: 1px solid #ccc; padding: 4px;" colspan="4"></td>' +
                 '<td style="border: 1px solid #ccc; padding: 4px; text-align: center;">' +
-                    '<button onclick="openAddClassSubjectModal(' + cls.id + ', \'' + jsName + '\')">+ Add</button>' +
+                    '<button onclick="openAddClassSubjectModal(' + cls.id + ', \\\'' + jsName + '\\\')">+ Add</button>' +
                 '</td>' +
                 '<td style="border: 1px solid #ccc; padding: 4px;"></td>' +
             '</tr>';
@@ -758,7 +795,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                 '<td style="border: 1px solid #ccc; padding: 4px;" colspan="3"></td>' +
                 '<td data-capacity-cell="group-' + group.id + '" style="border: 1px solid #ccc; padding: 4px;">' + capacity.current + '/' + capacity.max + '</td>' +
                 '<td style="border: 1px solid #ccc; padding: 4px; text-align: center;">' +
-                    '<button onclick="openAddGroupSubjectModal(' + group.id + ', \'' + groupJs + '\', ' + cls.id + ', \'' + classJs + '\')">+ Add</button>' +
+                    '<button onclick="openAddGroupSubjectModal(' + group.id + ', \\\'' + groupJs + '\\\', ' + cls.id + ', \\\'' + classJs + '\\\')">+ Add</button>' +
                 '</td>' +
                 '<td style="border: 1px solid #ccc; padding: 4px;"></td>' +
             '</tr>';
@@ -946,7 +983,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
 
         function deleteSubject(id) {
             // First check if subject is in use
-            fetch('/school/subjects/usagexid=' + id, {
+            fetch('/school/subjects/usage?id=' + id, {
                 method: 'GET',
                 headers: {'Content-Type': 'application/json'}
             }).then(res => {
@@ -960,14 +997,14 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                     showDeleteReviewModal(id, usage.data);
                 } else {
                     // Subject not in use, delete directly
-                    if(confirm("Delete this subjectx")) {
+                    if(confirm("Delete this subject?")) {
                         executeDelete(id);
                     }
                 }
             }).catch(error => {
                 console.error('Usage check error:', error);
                 // If usage check fails, ask user and try direct delete
-                if(confirm("Delete this subjectx (Usage check failed, proceeding anyway)")) {
+                if(confirm("Delete this subject? (Usage check failed, proceeding anyway)")) {
                     executeDelete(id);
                 }
             });
@@ -1024,7 +1061,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
         // Replace Modal Functions
         function showReplaceModal(subjectId, errorMessage) {
             // Fetch current usage data
-            fetch('/school/subjects/usagexid=' + subjectId, {
+            fetch('/school/subjects/usage?id=' + subjectId, {
                 method: 'GET',
                 headers: {'Content-Type': 'application/json'}
             }).then(res => res.json()).then(usage => {

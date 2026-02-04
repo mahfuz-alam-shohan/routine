@@ -21,6 +21,14 @@ const DEFINED_SCHEMA = {
     address: "TEXT", 
     max_teachers: "INTEGER DEFAULT 10", 
     shifts_enabled: "BOOLEAN DEFAULT 0",
+    plan_id: "INTEGER",
+    plan_name: "TEXT",
+    plan_billing_cycle: "TEXT",
+    plan_price_taka: "INTEGER",
+    max_subjects: "INTEGER",
+    max_routines_yearly: "INTEGER",
+    max_shifts: "INTEGER",
+    allow_teacher_dashboard: "BOOLEAN DEFAULT 0",
     "FOREIGN KEY(auth_id)": "REFERENCES auth_accounts(id)" 
   },
 
@@ -152,6 +160,47 @@ const DEFINED_SCHEMA = {
     value: "TEXT"
   },
 
+  pricing_plans: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    name: "TEXT",
+    billing_cycle: "TEXT",
+    price_taka: "INTEGER",
+    is_published: "BOOLEAN DEFAULT 0",
+    max_teachers: "INTEGER",
+    max_subjects: "INTEGER",
+    max_routines_yearly: "INTEGER",
+    max_shifts: "INTEGER",
+    allow_teacher_dashboard: "BOOLEAN DEFAULT 0",
+    created_at: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+  },
+
+  pricing_features: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    plan_id: "INTEGER",
+    feature_text: "TEXT",
+    is_highlight: "BOOLEAN DEFAULT 0",
+    is_auto: "BOOLEAN DEFAULT 0",
+    "FOREIGN KEY(plan_id)": "REFERENCES pricing_plans(id)"
+  },
+
+  pricing_orders: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    plan_id: "INTEGER",
+    plan_name: "TEXT",
+    billing_cycle: "TEXT",
+    price_taka: "INTEGER",
+    requester_name: "TEXT",
+    requester_email: "TEXT",
+    requester_phone: "TEXT",
+    institution_name: "TEXT",
+    status: "TEXT DEFAULT 'new'",
+    school_id: "INTEGER",
+    auth_id: "INTEGER",
+    processed_at: "TIMESTAMP",
+    created_at: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+    "FOREIGN KEY(plan_id)": "REFERENCES pricing_plans(id)"
+  },
+
   teacher_assignments: {
     id: "INTEGER PRIMARY KEY AUTOINCREMENT",
     school_id: "INTEGER",
@@ -182,6 +231,14 @@ const DEFINED_SCHEMA = {
     generated_by: "TEXT", 
     total_periods: "INTEGER DEFAULT 0",
     conflicts_resolved: "INTEGER DEFAULT 0",
+    "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)"
+  },
+
+  routine_generation_tokens: {
+    id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+    school_id: "INTEGER",
+    routine_id: "INTEGER",
+    generated_at: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "FOREIGN KEY(school_id)": "REFERENCES profiles_institution(id)"
   },
 

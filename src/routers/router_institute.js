@@ -1,6 +1,7 @@
 import { htmlResponse, jsonResponse, getCookie } from '../core/utils.js';
 import { InstituteLayout } from '../ui/institute/layout.js';
 import { InstituteDashboardHTML } from '../ui/institute/dashboard.js';
+import { InstituteInactiveHTML } from '../ui/institute/inactive.js';
 import { TeachersPageHTML } from '../ui/institute/teachers_list.js'; 
 import { ClassesPageHTML } from '../ui/institute/classes.js'; 
 import { SubjectsPageHTML } from '../ui/institute/subjects.js'; 
@@ -18,12 +19,45 @@ export async function handleInstituteRequest(request, env) {
   const school = await env.DB.prepare(`SELECT p.* FROM profiles_institution p JOIN auth_accounts a ON p.auth_id = a.id WHERE a.email = ?`).bind(email).first();
   if(!school) return new Response("Error", {status: 404});
 
+  const membershipId = Number(school.plan_id);
+  const hasMembership = Number.isFinite(membershipId) && membershipId > 0;
+  if (!hasMembership) {
+    return htmlResponse(
+      InstituteLayout(InstituteInactiveHTML(school), "Membership Required", school.school_name)
+    );
+  }
+
   
   if (url.pathname === '/school/dashboard') {
     const tCount = await env.DB.prepare("SELECT count(*) as count FROM profiles_teacher WHERE school_id = ?").bind(school.id).first();
     const cCount = await env.DB.prepare("SELECT count(*) as count FROM academic_classes WHERE school_id = ?").bind(school.id).first();
     const rCount = await env.DB.prepare("SELECT count(*) as count FROM generated_routines WHERE school_id = ?").bind(school.id).first();
-    return htmlResponse(InstituteLayout(InstituteDashboardHTML({teachers: tCount.count, classes: cCount.count, routines: rCount.count}), "Dashboard", school.school_name));
+    const sCount = await env.DB.prepare("SELECT count(*) as count FROM academic_subjects WHERE school_id = ?").bind(school.id).first();
+    const routineYearCount = await getRoutineCountThisYear(env, school.id);
+    let shiftCount = 1;
+    try {
+      const scheduleConfig = await env.DB.prepare("SELECT shifts_json FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+      const shifts = parseShiftList(scheduleConfig?.shifts_json);
+      shiftCount = shifts.length || 1;
+    } catch (e) {}
+
+    return htmlResponse(InstituteLayout(InstituteDashboardHTML({
+        teachers: tCount.count,
+        classes: cCount.count,
+        routines: rCount.count,
+        subjects: sCount.count,
+        routineYearCount,
+        shiftCount,
+        limits: {
+          max_teachers: school.max_teachers,
+          max_subjects: school.max_subjects,
+          max_routines_yearly: school.max_routines_yearly,
+          max_shifts: school.max_shifts,
+          plan_name: school.plan_name,
+          plan_billing_cycle: school.plan_billing_cycle,
+          plan_price_taka: school.plan_price_taka
+        }
+    }), "Dashboard", school.school_name));
   }
 
   
@@ -300,6 +334,12 @@ export async function handleInstituteRequest(request, env) {
               
               
               if(body.action === 'create') {
+                  if (school.max_subjects !== null && school.max_subjects !== undefined) {
+                      const subjectCount = await env.DB.prepare("SELECT COUNT(*) as count FROM academic_subjects WHERE school_id = ?").bind(school.id).first();
+                      if (subjectCount && subjectCount.count >= Number(school.max_subjects)) {
+                          return jsonResponse({ error: "Subject limit reached. Upgrade membership to add more subjects." }, 403);
+                      }
+                  }
                   const created = await env.DB.prepare("INSERT INTO academic_subjects (school_id, subject_name) VALUES (?, ?) RETURNING id")
                       .bind(school.id, body.name)
                       .first();
@@ -600,10 +640,23 @@ export async function handleInstituteRequest(request, env) {
           
           if (body.full_name && body.email && body.phone) {
               const current = await env.DB.prepare("SELECT count(*) as count FROM profiles_teacher WHERE school_id = ?").bind(school.id).first();
-              if (current.count >= (school.max_teachers || 10)) return jsonResponse({ error: "Teacher limit reached" }, 403);
+              if (school.max_teachers !== null && school.max_teachers !== undefined) {
+                  if (current.count >= Number(school.max_teachers)) {
+                      return jsonResponse({ error: "Teacher limit reached. Upgrade membership to add more teachers." }, 403);
+                  }
+              }
               
               await env.DB.prepare("INSERT INTO profiles_teacher (school_id, full_name, email, phone) VALUES (?, ?, ?, ?)")
                   .bind(school.id, body.full_name, body.email, body.phone).run();
+              return jsonResponse({ success: true });
+          }
+
+          if (body.action === 'update_name') {
+              const teacherId = Number(body.teacher_id);
+              const fullName = (body.full_name || '').toString().trim();
+              if (!teacherId || !fullName) return jsonResponse({ error: "Teacher name required" }, 400);
+              await env.DB.prepare("UPDATE profiles_teacher SET full_name = ? WHERE id = ? AND school_id = ?")
+                  .bind(fullName, teacherId, school.id).run();
               return jsonResponse({ success: true });
           }
           
@@ -1193,6 +1246,7 @@ export async function handleInstituteRequest(request, env) {
     try {
       const existingRoutines = (await env.DB.prepare("SELECT * FROM generated_routines WHERE school_id = ? ORDER BY generated_at DESC").bind(school.id).all()).results;
       const generationSettings = await env.DB.prepare("SELECT * FROM routine_generation_settings WHERE school_id = ?").bind(school.id).first();
+      const routineYearCount = await getRoutineCountThisYear(env, school.id);
       const classes = (await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ?").bind(school.id).all()).results;
       const groups = (await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ?").bind(school.id).all()).results;
       const sections = (await env.DB.prepare("SELECT * FROM class_sections WHERE school_id = ?").bind(school.id).all()).results;
@@ -1227,8 +1281,12 @@ export async function handleInstituteRequest(request, env) {
         console.error('Generation warnings failed:', error);
       }
       const schoolData = { classes, teachers, subjects, slots: normalizedSlots };
+      const routineLimitInfo = {
+        used: routineYearCount,
+        max_routines_yearly: school.max_routines_yearly
+      };
       return htmlResponse(InstituteLayout(
-        RoutineGeneratorHTML(existingRoutines, generationSettings, schoolData, generationWarnings), 
+        RoutineGeneratorHTML(existingRoutines, generationSettings, schoolData, generationWarnings, routineLimitInfo), 
         "Routine Generator", 
         school.school_name
       ));
@@ -1238,6 +1296,7 @@ export async function handleInstituteRequest(request, env) {
         await syncDatabase(env);
         const existingRoutines = (await env.DB.prepare("SELECT * FROM generated_routines WHERE school_id = ? ORDER BY generated_at DESC").bind(school.id).all()).results;
         const generationSettings = await env.DB.prepare("SELECT * FROM routine_generation_settings WHERE school_id = ?").bind(school.id).first();
+        const routineYearCount = await getRoutineCountThisYear(env, school.id);
         const classes = (await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ?").bind(school.id).all()).results;
         const groups = (await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ?").bind(school.id).all()).results;
         const sections = (await env.DB.prepare("SELECT * FROM class_sections WHERE school_id = ?").bind(school.id).all()).results;
@@ -1272,8 +1331,12 @@ export async function handleInstituteRequest(request, env) {
         console.error('Generation warnings failed:', error);
       }
         const schoolData = { classes, teachers, subjects, slots: normalizedSlots };
+        const routineLimitInfo = {
+          used: routineYearCount,
+          max_routines_yearly: school.max_routines_yearly
+        };
         return htmlResponse(InstituteLayout(
-          RoutineGeneratorHTML(existingRoutines, generationSettings, schoolData, generationWarnings), 
+          RoutineGeneratorHTML(existingRoutines, generationSettings, schoolData, generationWarnings, routineLimitInfo), 
           "Routine Generator", 
           school.school_name
         ));
@@ -1402,6 +1465,12 @@ export async function handleInstituteRequest(request, env) {
   
   if (url.pathname === '/school/api/generate-routine' && request.method === 'POST') {
     try {
+      if (school.max_routines_yearly !== null && school.max_routines_yearly !== undefined) {
+        const routineCount = await getRoutineCountThisYear(env, school.id);
+        if (routineCount >= Number(school.max_routines_yearly)) {
+          return jsonResponse({ error: "Routine generation limit reached. Upgrade membership to generate more routines." }, 403);
+        }
+      }
       const body = await request.json();
 
       const classes = (await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ?").bind(school.id).all()).results;
@@ -1457,6 +1526,21 @@ export async function handleInstituteRequest(request, env) {
           entry.subject_id, entry.teacher_id, entry.is_conflict || 0, entry.conflict_reason || null
         ).run();
       }
+
+      try {
+        await env.DB.prepare(`
+          INSERT INTO routine_generation_tokens (school_id, routine_id)
+          VALUES (?, ?)
+        `).bind(school.id, routineId).run();
+      } catch (e) {
+        if (e.message && (e.message.includes("no such table") || e.message.includes("no such column"))) {
+          await syncDatabase(env);
+          await env.DB.prepare(`
+            INSERT INTO routine_generation_tokens (school_id, routine_id)
+            VALUES (?, ?)
+          `).bind(school.id, routineId).run();
+        }
+      }
       
       return jsonResponse({ 
         success: true, 
@@ -1472,6 +1556,12 @@ export async function handleInstituteRequest(request, env) {
   
   if (url.pathname === '/school/api/routine/save-generated' && request.method === 'POST') {
     try {
+      if (school.max_routines_yearly !== null && school.max_routines_yearly !== undefined) {
+        const routineCount = await getRoutineCountThisYear(env, school.id);
+        if (routineCount >= Number(school.max_routines_yearly)) {
+          return jsonResponse({ error: "Routine generation limit reached. Upgrade membership to generate more routines." }, 403);
+        }
+      }
       const body = await request.json();
       const entries = Array.isArray(body.entries) ? body.entries : [];
       if (!entries.length) return jsonResponse({ error: "No routine entries provided." }, 400);
@@ -1537,6 +1627,21 @@ export async function handleInstituteRequest(request, env) {
           0,
           null
         ).run();
+      }
+
+      try {
+        await env.DB.prepare(`
+          INSERT INTO routine_generation_tokens (school_id, routine_id)
+          VALUES (?, ?)
+        `).bind(school.id, routineId).run();
+      } catch (e) {
+        if (e.message && (e.message.includes("no such table") || e.message.includes("no such column"))) {
+          await syncDatabase(env);
+          await env.DB.prepare(`
+            INSERT INTO routine_generation_tokens (school_id, routine_id)
+            VALUES (?, ?)
+          `).bind(school.id, routineId).run();
+        }
       }
 
       return jsonResponse({
@@ -1646,6 +1751,58 @@ export async function handleInstituteRequest(request, env) {
       finalList.unshift('Full Day');
     }
     return finalList;
+  }
+
+  async function getRoutineCountThisYear(env, schoolId) {
+      try {
+        const yearlyRow = await env.DB.prepare(`
+          SELECT COUNT(*) as count
+          FROM routine_generation_tokens
+          WHERE school_id = ? AND strftime('%Y', generated_at) = strftime('%Y', 'now')
+        `).bind(schoolId).first();
+
+        const totalRow = await env.DB.prepare(`
+          SELECT COUNT(*) as count
+          FROM routine_generation_tokens
+          WHERE school_id = ?
+        `).bind(schoolId).first();
+
+        if ((totalRow?.count || 0) === 0) {
+          const routines = await env.DB.prepare(`
+            SELECT id, generated_at
+            FROM generated_routines
+            WHERE school_id = ?
+          `).bind(schoolId).all();
+          const routineRows = routines?.results || [];
+          if (routineRows.length) {
+            for (const routine of routineRows) {
+              const generatedAt = routine.generated_at || new Date().toISOString();
+              await env.DB.prepare(`
+                INSERT INTO routine_generation_tokens (school_id, routine_id, generated_at)
+                VALUES (?, ?, ?)
+              `).bind(schoolId, routine.id, generatedAt).run();
+            }
+            const refreshed = await env.DB.prepare(`
+              SELECT COUNT(*) as count
+              FROM routine_generation_tokens
+              WHERE school_id = ? AND strftime('%Y', generated_at) = strftime('%Y', 'now')
+            `).bind(schoolId).first();
+            return refreshed?.count || 0;
+          }
+        }
+
+        return yearlyRow?.count || 0;
+      } catch (e) {
+        if (e.message && (e.message.includes("no such table") || e.message.includes("no such column"))) {
+          try { await syncDatabase(env); } catch (err) {}
+        }
+        const fallback = await env.DB.prepare(`
+          SELECT COUNT(*) as count
+          FROM generated_routines
+          WHERE school_id = ? AND strftime('%Y', generated_at) = strftime('%Y', 'now')
+        `).bind(schoolId).first();
+        return fallback?.count || 0;
+      }
   }
 
   function normalizeSlotsForShifts(slots, shiftList) {

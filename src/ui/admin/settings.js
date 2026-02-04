@@ -2,7 +2,7 @@ export function SettingsPageHTML(profile = {}, email = '') {
     const p = profile || {};
     
     return `
-      <div class="max-w-2xl mx-auto space-y-6">
+      <div class="max-w-2xl mx-auto space-y-6 px-3 sm:px-4">
           
           <div class="text-center">
               <h1 class="text-xl font-bold text-gray-900">Account Settings</h1>

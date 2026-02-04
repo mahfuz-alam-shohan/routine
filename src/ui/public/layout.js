@@ -16,16 +16,18 @@ export function PublicLayout(contentHTML, title = "Home", companyName = "Routine
   <html lang="en">
   <head>
       <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
       <title>${title} - ${companyName}</title>
       <script>
           // Suppress production warning - must be set before Tailwind loads
           window.TAILWIND_DISABLE_PRODUCTION_WARNING = true;
+          window.TAILWIND_DISABLE_WARNINGS = true;
       </script>
       <script src="https://cdn.tailwindcss.com"></script>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
       <style>
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        html { -webkit-text-size-adjust: 100%; }
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
         .smooth-scroll { -webkit-overflow-scrolling: touch; }
         .page-shell { animation: pageFadeIn 320ms ease-out both; }
         .page-leave .page-shell { opacity: 0; transform: translateY(6px); transition: opacity 180ms ease, transform 180ms ease; }
@@ -49,13 +51,37 @@ export function PublicLayout(contentHTML, title = "Home", companyName = "Routine
           .page-shell { animation: none; }
           .page-leave .page-shell { transition: none; }
         }
+        button,
+        .ui-button {
+          transition: transform 120ms ease, background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+          will-change: transform;
+        }
+        button:active,
+        .ui-button:active {
+          transform: translateY(1px);
+        }
+        button:disabled,
+        .ui-button:disabled {
+          transform: none;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          button,
+          .ui-button { transition: none; }
+        }
+        @media (max-width: 640px) {
+          input,
+          select,
+          textarea {
+            font-size: 16px;
+          }
+        }
       </style>
   </head>
   <body class="ui-glow bg-slate-50 text-gray-900 flex flex-col min-h-screen relative overflow-x-hidden">
 
       <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 transition-all">
           <div class="h-0.5 w-full bg-gradient-to-r from-blue-500 via-purple-500 to-emerald-400"></div>
-          <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="max-w-7xl mx-auto px-0 sm:px-4 lg:px-8">
               <div class="flex justify-between items-center h-16">
                   
                   <div class="flex items-center">
@@ -91,12 +117,12 @@ export function PublicLayout(contentHTML, title = "Home", companyName = "Routine
           </div>
       </nav>
 
-      <main class="page-shell flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 smooth-scroll relative z-10">
+      <main class="page-shell flex-grow w-full max-w-7xl mx-auto px-0 sm:px-4 lg:px-8 py-8 smooth-scroll relative z-10">
           ${contentHTML}
       </main>
 
       <footer class="bg-gray-50 border-t border-gray-200 mt-auto">
-          <div class="max-w-7xl mx-auto py-10 px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div class="max-w-7xl mx-auto py-10 px-0 sm:px-4 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
               <p class="text-sm text-gray-500">© ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>
               <div class="flex gap-6 text-sm text-gray-500">
                   <a href="#" class="hover:text-gray-900 transition-colors">Privacy Policy</a>
@@ -112,6 +138,7 @@ export function PublicLayout(contentHTML, title = "Home", companyName = "Routine
           document.addEventListener('click', (event) => {
             const link = event.target.closest('a');
             if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
+            if (link.hasAttribute('data-no-transition') || link.hasAttribute('data-no-prefetch')) return;
             const href = link.getAttribute('href') || '';
             if (href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
             if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
@@ -139,9 +166,34 @@ export function PublicLayout(contentHTML, title = "Home", companyName = "Routine
           }, intervalMs);
         };
 
+        const setupPrefetch = () => {
+          const prefetched = new Set();
+          const shouldPrefetch = (link) => {
+            if (!link || !link.href) return false;
+            if (link.hasAttribute('data-no-prefetch')) return false;
+            if (link.target && link.target !== '_self') return false;
+            const url = new URL(link.href, window.location.origin);
+            if (url.origin !== window.location.origin) return false;
+            if (url.pathname === '/logout') return false;
+            if (url.pathname === window.location.pathname && url.search === window.location.search) return false;
+            return true;
+          };
+          const prefetch = (href) => {
+            if (!href || prefetched.has(href)) return;
+            prefetched.add(href);
+            fetch(href, { credentials: 'include', cache: 'force-cache' }).catch(() => {});
+          };
+          document.addEventListener('pointerover', (event) => {
+            const link = event.target.closest('a');
+            if (!shouldPrefetch(link)) return;
+            prefetch(link.href);
+          });
+        };
+
         window.addEventListener('DOMContentLoaded', () => {
           enablePageTransitions();
           enableAutoRefresh();
+          setupPrefetch();
         });
       </script>
   </body>

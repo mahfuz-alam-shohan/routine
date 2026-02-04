@@ -1,31 +1,46 @@
-export function RoutineGeneratorHTML(existingRoutines = [], generationSettings = null, schoolData = {}, generationWarnings = { items: [] }) {
+export function RoutineGeneratorHTML(existingRoutines = [], generationSettings = null, schoolData = {}, generationWarnings = { items: [] }, limitInfo = {}) {
     const { classes = [], teachers = [], subjects = [], slots = [] } = schoolData;
+    const usedTokens = Number(limitInfo?.used) || 0;
+    const maxTokensRaw = limitInfo?.max_routines_yearly;
+    const hasLimit = maxTokensRaw !== null && maxTokensRaw !== undefined && maxTokensRaw !== '';
+    const maxTokens = hasLimit ? Number(maxTokensRaw) : null;
+    const remainingTokens = hasLimit ? Math.max(0, maxTokens - usedTokens) : null;
+    const tokenLabel = hasLimit
+        ? `Tokens left: ${remainingTokens} / ${maxTokens}`
+        : 'Tokens: Unlimited';
     
     return `
       
       <style>
         #routine-generator-app {
           background: #ffffff;
-          color: #111827;
+          color: var(--ui-ink, #111827);
+          overflow-x: hidden;
         }
         .rg-header {
           background: #ffffff;
-          border-bottom: 1px solid #d1d5db;
+          border-bottom: 1px solid var(--ui-line, #d1d5db);
         }
         .rg-card {
           background: #ffffff;
-          border: 1px solid #d1d5db;
+          border: 1px solid var(--ui-line, #d1d5db);
           border-radius: 0;
           padding: 16px;
         }
         .rg-row {
-          border: 1px solid #d1d5db;
+          border: 1px solid var(--ui-line, #d1d5db);
           border-radius: 0;
           padding: 10px 12px;
           background: #ffffff;
+          min-width: 0;
+          word-break: break-word;
+        }
+        .rg-row-title {
+          min-width: 0;
+          word-break: break-word;
         }
         .rg-tag {
-          border: 1px solid #d1d5db;
+          border: 1px solid var(--ui-line, #d1d5db);
           background: #ffffff;
           color: #6b7280;
           font-size: 10px;
@@ -34,44 +49,44 @@ export function RoutineGeneratorHTML(existingRoutines = [], generationSettings =
           font-weight: 600;
         }
         .rg-btn {
-          border: 1px solid #d1d5db;
+          border: 1px solid var(--ui-line, #d1d5db);
           background: #ffffff;
-          color: #111827;
+          color: var(--ui-ink, #111827);
           padding: 6px 10px;
           border-radius: 0;
           font-weight: 600;
           font-size: 12px;
         }
         .rg-btn-primary {
-          background: #111827;
-          border-color: #111827;
+          background: var(--ui-accent, #111827);
+          border-color: var(--ui-accent, #111827);
           color: #ffffff;
         }
         .rg-btn-mini {
-          border: 1px solid #d1d5db;
+          border: 1px solid var(--ui-line, #d1d5db);
           background: #ffffff;
-          color: #111827;
+          color: var(--ui-ink, #111827);
           padding: 4px 8px;
           border-radius: 0;
           font-size: 11px;
           font-weight: 600;
         }
         .rg-metric {
-          border: 1px solid #d1d5db;
+          border: 1px solid var(--ui-line, #d1d5db);
           border-radius: 0;
           padding: 10px;
           background: #ffffff;
         }
         .rg-metric--ok {
-          border-color: #d1d5db;
+          border-color: var(--ui-line, #d1d5db);
           background: #ffffff;
         }
         .rg-metric--bad {
-          border-color: #d1d5db;
+          border-color: var(--ui-line, #d1d5db);
           background: #ffffff;
         }
         .rg-note {
-          border: 1px dashed #d1d5db;
+          border: 1px dashed var(--ui-line, #d1d5db);
           border-radius: 0;
           padding: 12px;
           background: #ffffff;
@@ -95,6 +110,16 @@ export function RoutineGeneratorHTML(existingRoutines = [], generationSettings =
         @media (max-width: 768px) {
           .rg-btn { width: 100%; }
         }
+        @media (max-width: 640px) {
+          .rg-shell { max-width: 100%; padding-bottom: 96px; }
+          .rg-card { padding: 12px; }
+          .rg-header .rg-title { font-size: 16px; }
+          .rg-header .rg-subtitle { font-size: 12px; }
+          .rg-row { padding: 8px; }
+          .rg-row-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; font-size: 11px; }
+          .rg-row-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; width: 100%; }
+          .rg-btn-mini { width: 100%; text-align: center; }
+        }
       </style>
 
 
@@ -103,10 +128,11 @@ export function RoutineGeneratorHTML(existingRoutines = [], generationSettings =
           <div class="rg-header sticky top-0 z-30">
               <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 px-4 py-3 md:px-6 md:py-4">
                   <div>
-                    <h2 class="text-lg md:text-2xl font-semibold text-gray-900">Routine Generator</h2>
-                    <p class="text-sm md:text-base text-gray-500 mt-1">Generate class schedules with strict constraints and smart distribution.</p>
+                    <h2 class="rg-title text-lg md:text-2xl font-semibold text-gray-900">Routine Generator</h2>
+                    <p class="rg-subtitle text-sm md:text-base text-gray-500 mt-1">Generate class schedules with strict constraints and smart distribution.</p>
                   </div>
-                  <div class="flex flex-col sm:flex-row gap-2 md:gap-4">
+                  <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 md:gap-4">
+                       <div class="text-xs text-gray-500 border border-gray-200 px-2 py-1">${tokenLabel}</div>
                        <button onclick="app.generateRoutine()" class="rg-btn rg-btn-primary w-full sm:w-auto flex items-center justify-center gap-2">
                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                            Generate Routine
@@ -117,7 +143,7 @@ export function RoutineGeneratorHTML(existingRoutines = [], generationSettings =
           </div>
 
           <!-- Existing Routines Section -->
-          <div class="mx-4 md:mx-6 mt-6">
+          <div class="mx-3 sm:mx-4 md:mx-6 mt-6">
               <div class="rg-card rg-animate">
                   <h3 class="text-lg font-semibold text-gray-900 mb-4">Generated Routines</h3>
                   <div id="routine-list">
@@ -130,20 +156,20 @@ export function RoutineGeneratorHTML(existingRoutines = [], generationSettings =
                       ` : `
                           <div class="space-y-3">
                               ${existingRoutines.map(routine => `
-                                  <div class="rg-row flex items-center justify-between ${routine.is_active ? 'ring-1 ring-[#cbd5e1]' : ''}">
-                                      <div class="flex-1">
+                                  <div class="rg-row flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${routine.is_active ? 'ring-1 ring-[#cbd5e1]' : ''}">
+                                      <div class="flex-1 min-w-0">
                                           <div class="flex items-center gap-3">
-                                              <h4 class="font-semibold text-gray-900">${routine.name}</h4>
+                                              <h4 class="rg-row-title font-semibold text-gray-900">${routine.name}</h4>
                                               ${routine.is_active ? '<span class="rg-tag">Active</span>' : ''}
                                           </div>
-                                          <div class="flex items-center gap-4 mt-1 text-sm text-gray-500">
+                                          <div class="rg-row-meta flex items-center gap-4 mt-1 text-sm text-gray-500 flex-wrap">
                                               <span>Version ${routine.version}</span>
                                               <span>${routine.total_periods} periods</span>
                                               <span>Generated ${new Date(routine.generated_at).toLocaleDateString()}</span>
                                               ${routine.conflicts_resolved > 0 ? `<span class="text-gray-600">${routine.conflicts_resolved} conflicts</span>` : ''}
                                           </div>
                                       </div>
-                                      <div class="flex items-center gap-2">
+                                      <div class="rg-row-actions flex items-center gap-2 flex-wrap">
                                           <button onclick="app.viewRoutine(${routine.id})" class="rg-btn-mini">View</button>
                                           <button onclick="app.editRoutine(${routine.id})" class="rg-btn-mini">Edit</button>
                                           ${!routine.is_active ? `<button onclick="app.activateRoutine(${routine.id})" class="rg-btn-mini">Activate</button>` : ''}
@@ -158,7 +184,7 @@ export function RoutineGeneratorHTML(existingRoutines = [], generationSettings =
           </div>
 
           <!-- Generation Requirements Check -->
-          <div class="mx-4 md:mx-6 mt-6">
+          <div class="mx-3 sm:mx-4 md:mx-6 mt-6">
               <div class="rg-card rg-animate">
                   <h3 class="text-lg font-semibold text-gray-900 mb-4">System Requirements</h3>
                   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1687,7 +1713,7 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                 
                 showNotification(message, type = 'info') {
                     const notification = document.createElement('div');
-                    notification.className = \`fixed top-4 right-4 z-50 p-4 border border-gray-300 transform transition-all duration-300 \`;
+                    notification.className = 'fixed top-4 right-4 z-50 p-4 border border-gray-300 transform transition-all duration-300 opacity-0 translate-y-2';
                     
                     if (type === 'success') {
                         notification.classList.add('bg-green-500', 'text-white');
@@ -1697,26 +1723,25 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                         notification.classList.add('bg-blue-500', 'text-white');
                     }
                     
-                    notification.innerHTML = \`
-                        <div class="flex items-center">
-                            <span>\${message}</span>
-                            <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                </svg>
-                            </button>
-                        </div>
-                    \`;
+                    notification.innerHTML = '<div class="flex items-center">' +
+                        '<span>' + message + '</span>' +
+                        '<button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">' +
+                            '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>' +
+                            '</svg>' +
+                        '</button>' +
+                    '</div>';
                     
                     document.body.appendChild(notification);
                     
                     setTimeout(() => {
-                        notification.classList.remove('');
-                        notification.classList.add('');
+                        notification.classList.remove('opacity-0', 'translate-y-2');
+                        notification.classList.add('opacity-100', 'translate-y-0');
                     }, 100);
                     
                     setTimeout(() => {
-                        notification.classList.add('');
+                        notification.classList.remove('opacity-100', 'translate-y-0');
+                        notification.classList.add('opacity-0', 'translate-y-2');
                         setTimeout(() => {
                             if (notification.parentElement) {
                                 notification.remove();

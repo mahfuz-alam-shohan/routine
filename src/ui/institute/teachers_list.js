@@ -23,7 +23,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
         
         return `
             <tr class="border-b" data-teacher-id="${t.id}">
-                <td class="p-3">${escapeHtml(t.full_name)}</td>
+                <td class="p-3" data-teacher-name="${t.id}">${escapeHtml(t.full_name)}</td>
                 <td class="p-3 break-words">${escapeHtml(t.email)}</td>
                 <td class="p-3">${escapeHtml(t.phone || '')}</td>
                 <td class="p-3 break-words" data-subject-cell="${t.id}">
@@ -32,11 +32,15 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 </td>
                 <td class="p-3 whitespace-nowrap">
                     <button type="button" onclick="editSubjects(${t.id})" 
-                            class="text-gray-700 text-sm">
+                            class="text-blue-700 text-sm">
                         Edit
                     </button>
+                    <button type="button" onclick="editTeacherName(${t.id})" 
+                            class="text-indigo-700 text-sm ml-3">
+                        Rename
+                    </button>
                     <button type="button" onclick="removeTeacher(${t.id})" 
-                            class="text-gray-700 text-sm ml-3">
+                            class="text-red-700 text-sm ml-3">
                         Remove
                     </button>
                 </td>
@@ -282,6 +286,13 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             return true;
         }
 
+        function updateTeacherNameCell(teacherId, name) {
+            const cell = document.querySelector('[data-teacher-name="' + teacherId + '"]');
+            if (!cell) return false;
+            cell.textContent = name;
+            return true;
+        }
+
         function updateTeacherSubjectsData(teacherId, primaryId, additionalIds) {
             window.teachersData.teacherSubjects = window.teachersData.teacherSubjects.filter(ts => ts.teacher_id != teacherId);
             const primarySubject = window.teachersData.allSubjects.find(s => s.id == primaryId);
@@ -329,13 +340,14 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                 const currentSubjects = window.teachersData.teacherSubjects.filter(ts => ts.teacher_id == teacher.id);
                 const subjectsText = buildTeacherSubjectsText(currentSubjects);
                 return '<tr class="border-b" data-teacher-id="' + teacher.id + '">' +
-                    '<td class="p-3">' + escapeHtml(teacher.full_name) + '</td>' +
+                    '<td class="p-3" data-teacher-name="' + teacher.id + '">' + escapeHtml(teacher.full_name) + '</td>' +
                     '<td class="p-3 break-words">' + escapeHtml(teacher.email) + '</td>' +
                     '<td class="p-3">' + escapeHtml(teacher.phone || '') + '</td>' +
                     '<td class="p-3 break-words" data-subject-cell="' + teacher.id + '">' + escapeHtml(subjectsText) + '</td>' +
                     '<td class="p-3 whitespace-nowrap">' +
-                        '<button type="button" onclick="editSubjects(' + teacher.id + ')" class="text-gray-700 text-sm">Edit</button>' +
-                        '<button type="button" onclick="removeTeacher(' + teacher.id + ')" class="text-gray-700 text-sm ml-3">Remove</button>' +
+                        '<button type="button" onclick="editSubjects(' + teacher.id + ')" class="text-blue-700 text-sm">Edit</button>' +
+                        '<button type="button" onclick="editTeacherName(' + teacher.id + ')" class="text-indigo-700 text-sm ml-3">Rename</button>' +
+                        '<button type="button" onclick="removeTeacher(' + teacher.id + ')" class="text-red-700 text-sm ml-3">Remove</button>' +
                     '</td>' +
                 '</tr>';
             }).join('');
@@ -349,13 +361,14 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             const currentSubjects = window.teachersData.teacherSubjects.filter(ts => ts.teacher_id == teacher.id);
             const subjectsText = buildTeacherSubjectsText(currentSubjects);
             const rowHtml = '<tr class="border-b" data-teacher-id="' + teacher.id + '">' +
-                '<td class="p-3">' + escapeHtml(teacher.full_name) + '</td>' +
+                '<td class="p-3" data-teacher-name="' + teacher.id + '">' + escapeHtml(teacher.full_name) + '</td>' +
                 '<td class="p-3 break-words">' + escapeHtml(teacher.email) + '</td>' +
                 '<td class="p-3">' + escapeHtml(teacher.phone || '') + '</td>' +
                 '<td class="p-3 break-words" data-subject-cell="' + teacher.id + '">' + escapeHtml(subjectsText) + '</td>' +
                 '<td class="p-3 whitespace-nowrap">' +
-                    '<button type="button" onclick="editSubjects(' + teacher.id + ')" class="text-gray-700 text-sm">Edit</button>' +
-                    '<button type="button" onclick="removeTeacher(' + teacher.id + ')" class="text-gray-700 text-sm ml-3">Remove</button>' +
+                    '<button type="button" onclick="editSubjects(' + teacher.id + ')" class="text-blue-700 text-sm">Edit</button>' +
+                    '<button type="button" onclick="editTeacherName(' + teacher.id + ')" class="text-indigo-700 text-sm ml-3">Rename</button>' +
+                    '<button type="button" onclick="removeTeacher(' + teacher.id + ')" class="text-red-700 text-sm ml-3">Remove</button>' +
                 '</td>' +
             '</tr>';
 
@@ -660,6 +673,40 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             }
             
             window.currentAdditionalSubjects = additional.map(ts => ts.subject_id);
+        }
+
+        function editTeacherName(teacherId) {
+            const teacher = window.teachersData.teachers.find(t => t.id == teacherId);
+            const currentName = teacher ? teacher.full_name : '';
+            const newName = prompt('Edit teacher name', currentName);
+            if (newName === null) return;
+            const trimmed = newName.trim();
+            if (!trimmed || trimmed === currentName) return;
+
+            showSyncIndicator('Saving...');
+            fetch('/school/teachers-list', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    action: 'update_name',
+                    teacher_id: teacherId,
+                    full_name: trimmed
+                })
+            }).then(r => r.json()).then(result => {
+                if (result.success) {
+                    if (teacher) teacher.full_name = trimmed;
+                    const updated = updateTeacherNameCell(teacherId, trimmed);
+                    hideSyncIndicator();
+                    showToast('Updated', 'success');
+                    if (!updated) renderTeachersTable();
+                } else {
+                    hideSyncIndicator();
+                    alert('Error: ' + (result.error || 'Unknown error'));
+                }
+            }).catch(() => {
+                hideSyncIndicator();
+                alert('Network error. Please try again.');
+            });
         }
 
         function showPrimaryStep() {

@@ -216,18 +216,46 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
     }
 
     return `
-      <div class="p-6">
-          <div class="flex justify-between items-center mb-6">
+      <style>
+        .ta-table-wrap {
+          overflow-x: auto;
+          max-width: 100%;
+          -webkit-overflow-scrolling: touch;
+        }
+        .ta-table {
+          width: 100%;
+          table-layout: fixed;
+          border-collapse: collapse;
+        }
+        .ta-table th,
+        .ta-table td {
+          word-break: break-word;
+          white-space: normal;
+        }
+        @media (max-width: 640px) {
+          .ta-table th,
+          .ta-table td {
+            font-size: 11px;
+            padding: 4px;
+          }
+          .ta-table-actions button {
+            width: 100%;
+          }
+        }
+      </style>
+
+      <div class="p-3 sm:p-6">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
               <h1 class="text-xl font-bold">Teacher Assignment</h1>
-              <div class="flex gap-2">
+              <div class="flex gap-2 w-full sm:w-auto">
                   <button type="button" onclick="showTeachersList()" class="bg-gray-600 text-white px-4 py-2">
                       Teacher's List
                   </button>
               </div>
           </div>
 
-          <div>
-              <table border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+          <div class="ta-table-wrap">
+              <table class="ta-table" border="1" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%;">
                   <thead>
                       <tr style="background-color: #f0f0f0;">
                           <th style="border: 1px solid #ccc; padding: 4px;">Class/Group</th>
@@ -260,7 +288,7 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
                                               subjectId: row.subject.id
                                           })}
                                       </td>
-                                      <td style="border: 1px solid #ccc; padding: 4px; text-align: center; background-color: rgba(240, 248, 255, 0.7);">
+                                      <td class="ta-table-actions" style="border: 1px solid #ccc; padding: 4px; text-align: center; background-color: rgba(240, 248, 255, 0.7);">
                                           <button onclick="assignTeacher('section-${row.section.id}-${row.subject.id}')" style="background-color: #111827; color: white; border: none; padding: 4px 8px; cursor: pointer; font-size: 12px;">Assign</button>
                                       </td>
                                   </tr>
@@ -286,7 +314,7 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
                                               subjectId: row.subject.id
                                           })}
                                       </td>
-                                      <td style="border: 1px solid #ccc; padding: 4px; text-align: center; background-color: rgba(240, 248, 255, 0.7);">
+                                      <td class="ta-table-actions" style="border: 1px solid #ccc; padding: 4px; text-align: center; background-color: rgba(240, 248, 255, 0.7);">
                                           <button onclick="assignTeacher('section-${row.section.id}-${row.subject.id}')" style="background-color: #111827; color: white; border: none; padding: 4px 8px; cursor: pointer; font-size: 12px;">Assign</button>
                                       </td>
                                   </tr>

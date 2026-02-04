@@ -35,7 +35,7 @@ export function SchoolsPageHTML(schoolsList = []) {
   `).join('');
 
   return `
-    <div class="space-y-6">
+    <div class="space-y-6 px-3 sm:px-4">
         
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>

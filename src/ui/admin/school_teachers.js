@@ -1,6 +1,7 @@
 export function SchoolTeachersHTML(school, teachers = []) {
+    const teacherLimitLabel = school.max_teachers === null || school.max_teachers === undefined ? 'Unlimited' : school.max_teachers;
     return `
-      <div>
+      <div class="px-3 sm:px-4">
          <div class="flex items-center gap-2 text-sm text-gray-500 mb-6">
             <a href="/admin/school/view?id=${school.auth_id}" class="hover:text-blue-600">Back to Menu</a>
             <span>/</span>
@@ -9,22 +10,18 @@ export function SchoolTeachersHTML(school, teachers = []) {
 
          <div class="border border-gray-300 p-4 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
              <div>
-                 <h2 class="text-gray-900 font-bold text-base">Teacher Limit Control</h2>
-                 <p class="text-gray-600 text-sm">Enforce limits based on payment plan.</p>
+                 <h2 class="text-gray-900 font-bold text-base">Teacher Limits</h2>
+                 <p class="text-gray-600 text-sm">Limits follow the assigned membership policy.</p>
              </div>
-             <form onsubmit="updateLimit(event)" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-                 <div class="bg-white border border-gray-300 px-3 py-2 text-sm w-full sm:w-auto">
-                    <span class="text-gray-500 mr-2">Max Allowed:</span>
-                    <input type="number" name="max_teachers" value="${school.max_teachers || 10}" class="w-16 font-bold text-center outline-none">
-                 </div>
-                 <button type="submit" class="border border-gray-800 text-gray-900 px-4 py-2 text-sm font-semibold w-full sm:w-auto">Save Limit</button>
-             </form>
+             <div class="text-sm text-gray-600">
+                Max Allowed: <span class="font-semibold text-gray-900">${teacherLimitLabel}</span>
+             </div>
          </div>
 
          <div class="bg-white border border-gray-300 overflow-hidden">
              <div class="bg-gray-50 px-4 py-2 border-b border-gray-300 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                  <h3 class="font-bold text-gray-700">Registered Teachers</h3>
-                 <span class="text-xs text-gray-600">Count: ${teachers.length} / ${school.max_teachers || 10}</span>
+                 <span class="text-xs text-gray-600">Count: ${teachers.length} / ${teacherLimitLabel}</span>
              </div>
              <div class="md:hidden p-4 space-y-3">
                 ${teachers.map(t => `
@@ -72,26 +69,5 @@ export function SchoolTeachersHTML(school, teachers = []) {
          </div>
       </div>
 
-      <script>
-        async function updateLimit(e) {
-            e.preventDefault();
-            const form = new FormData(e.target);
-            const val = form.get('max_teachers');
-            
-            try {
-                const res = await fetch('/admin/school/teachers', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        action: 'update_limit', 
-                        school_id: ${school.id}, 
-                        max_val: val 
-                    })
-                });
-                if(res.ok) alert("Limit Updated!");
-                else alert("Error");
-            } catch(e) { alert("Network Error"); }
-        }
-      </script>
     `;
 }

@@ -15,26 +15,25 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
         .replace(/'/g, '&#39;');
 
     return `
-      <div class="max-w-5xl mx-auto pb-16 md:pb-10 select-none" id="schedule-app">
+      <div class="max-w-6xl xl:max-w-7xl mx-auto pb-20 md:pb-16 min-h-[70vh] select-none" id="schedule-app">
           <div class="bg-white sticky top-0 z-30 border-b border-gray-200">
               <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 px-4 py-2 md:px-5 md:py-2">
                   <div>
-                    <h2 class="text-sm md:text-lg font-semibold text-gray-900">Master Schedule</h2>
-                    <p class="text-[11px] md:text-xs text-gray-500 mt-0.5">Configure your school's daily routine</p>
+                    <h2 class="text-sm md:text-lg font-semibold text-gray-900">Schedules</h2>
+                    <p class="text-[11px] md:text-xs text-gray-500 mt-0.5">Configure your school's daily schedule</p>
                   </div>
                   <div class="flex flex-col sm:flex-row gap-2 md:gap-3">
-                       <button id="save-btn" onclick="app.save()" class="w-full sm:w-auto bg-gray-900 text-white px-3 py-1.5 text-xs font-semibold border border-gray-900 rounded-none">Save</button>
                        <button id="reset-btn" onclick="app.reset()" class="w-full sm:w-auto text-gray-600 bg-white px-3 py-1.5 text-xs font-semibold border border-gray-300 rounded-none">Reset</button>
                   </div>
               </div>
           </div>
 
-          <div class="mx-4 md:mx-6 mt-3 md:mt-3 p-3 md:p-3 bg-white border border-gray-200">
+          <div class="mx-4 md:mx-8 mt-3 md:mt-3 p-3 md:p-3 bg-white border border-gray-200">
               <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   <div class="flex items-center gap-4">
                       <span class="text-[11px] md:text-xs font-semibold text-gray-700 uppercase tracking-wide">Day Starts At</span>
                       <input type="time" id="school_start_time" value="${initialSchoolStart}" onchange="app.updateStartTime(this.value)" 
-                             class="bg-white border border-gray-300 text-gray-900 text-xs font-semibold rounded-none px-2 py-1.5 outline-none w-24 md:w-24 text-center focus:ring-2 focus:ring-gray-300">
+                             class="bg-white border border-gray-300 text-gray-900 text-xs font-semibold rounded-none px-2 py-1.5 outline-none w-28 md:w-32 text-center focus:ring-2 focus:ring-gray-300">
                   </div>
                   <div class="flex-1">
                       <div class="text-[11px] md:text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Working Days</div>
@@ -76,7 +75,7 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
           </div>
 
           ${shiftsEnabled ? `
-          <div class="mx-4 md:mx-6 mt-3 md:mt-3 p-3 md:p-3 bg-white border border-gray-200">
+          <div class="mx-4 md:mx-8 mt-3 md:mt-3 p-3 md:p-3 bg-white border border-gray-200">
               <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
                       <div class="text-[11px] md:text-xs font-semibold text-gray-700 uppercase tracking-wide">Shifts</div>
@@ -96,14 +95,14 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
           </div>
           ` : ''}
 
-          <div class="mt-3 md:mt-3 bg-white border border-gray-200 md:mx-6 overflow-hidden">
+          <div class="mt-3 md:mt-3 bg-white border border-gray-200 md:mx-8 overflow-hidden">
               
               <div class="hidden lg:grid grid-cols-12 gap-0 bg-gray-50 text-[10px] uppercase font-semibold text-gray-500 border-b border-gray-200 divide-x divide-gray-200">
                   <div class="col-span-1 text-center py-2">#</div>
                   <div class="col-span-2 py-2 pl-2">Start</div>
                   <div class="col-span-2 py-2 pl-2">End</div>
                   <div class="col-span-1 py-2 text-center">Mins</div>
-                  <div class="col-span-${showShiftControls ? '3' : '4'} py-2 pl-2">Label</div>
+                  <div class="col-span-${showShiftControls ? '3' : '4'} py-2 pl-2">Period</div>
                   <div class="col-span-1 py-2 pl-2">Type</div>
                   ${showShiftControls ? `<div class="col-span-1 py-2 text-center">Shift</div>` : ''}
                   <div class="col-span-1 py-2"></div>
@@ -140,6 +139,7 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
             showShiftControls: ${showShiftControls ? 'true' : 'false'}
         };
         let toastTimer = null;
+        let autoSaveTimer = null;
 
         // --- HELPER FUNCTIONS ---
         const Time = {
@@ -158,6 +158,30 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
         };
 
         const app = {
+            ordinal: function(number) {
+                const num = Number(number);
+                const mod100 = num % 100;
+                if (mod100 >= 11 && mod100 <= 13) return num + 'th';
+                const mod10 = num % 10;
+                if (mod10 === 1) return num + 'st';
+                if (mod10 === 2) return num + 'nd';
+                if (mod10 === 3) return num + 'rd';
+                return num + 'th';
+            },
+
+            updateAutoLabels: function() {
+                let count = 0;
+                AppState.slots.forEach(slot => {
+                    if (slot.type === 'break') {
+                        slot.label = 'Break';
+                        slot.period_index = null;
+                        return;
+                    }
+                    count += 1;
+                    slot.label = this.ordinal(count);
+                    slot.period_index = count;
+                });
+            },
             init: function() {
                 if(AppState.slots.length === 0) this.addPeriod(false);
                 this.normalizeShiftApplicability();
@@ -202,6 +226,7 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
             updateWorkingDaysCount: function() {
                 const count = document.querySelectorAll('input[name="weekday"]:checked').length;
                 document.getElementById('working-days-count').textContent = count;
+                this.scheduleAutoSave();
             },
 
             normalizeShiftApplicability: function() {
@@ -263,12 +288,14 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
                 if (checked) set.add(shiftName);
                 else set.delete(shiftName);
                 slot.applicable_shifts = Array.from(set);
+                this.scheduleAutoSave();
             },
 
             updateStartTime: function(val) {
                 AppState.startTime = val;
                 this.recalculateChain();
                 this.render();
+                this.scheduleAutoSave();
             },
 
             addPeriod: function(render = true) {
@@ -281,13 +308,16 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
                 });
                 this.recalculateChain();
                 if(render) this.render();
+                this.scheduleAutoSave();
             },
 
             removePeriod: function(index) {
                 if(AppState.slots.length <= 1) return;
+                if (!confirm('Remove this period? This will update all later times.')) return;
                 AppState.slots.splice(index, 1);
                 this.recalculateChain();
                 this.render();
+                this.scheduleAutoSave();
             },
 
             // --- CORE LOGIC ---
@@ -295,7 +325,14 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
                 const slot = AppState.slots[index];
 
                 if(field === 'start_time') {
-                    if(index === 0) { this.updateStartTime(value); return; }
+                    if(index === 0) {
+                        if (!confirm('Change start time for the day? This will shift all periods.')) {
+                            this.render();
+                            return;
+                        }
+                        this.updateStartTime(value);
+                        return;
+                    }
                     else {
                         // REVERT & SHOW WARNING
                         document.getElementById('tutorial-popup').classList.remove('hidden');
@@ -310,6 +347,10 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
                     slot.duration = mins;
                 } 
                 else if (field === 'end_time') {
+                    if (!confirm('Change end time for this period? This will update its duration.')) {
+                        this.render();
+                        return;
+                    }
                     const newDiff = Time.diff(slot.start_time, value);
                     if (newDiff > 0) slot.duration = newDiff;
                     else { alert("End time must be after start time"); this.render(); return; }
@@ -320,6 +361,7 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
 
                 this.recalculateChain();
                 this.render();
+                this.scheduleAutoSave();
             },
 
             recalculateChain: function() {
@@ -331,13 +373,16 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
                 });
             },
 
-            save: async function() {
-                const saveBtn = document.getElementById('save-btn');
+            scheduleAutoSave: function() {
+                if (autoSaveTimer) clearTimeout(autoSaveTimer);
+                autoSaveTimer = setTimeout(() => {
+                    this.save(true);
+                }, 800);
+            },
+
+            save: async function(isAuto = false) {
                 try {
-                    if (saveBtn) {
-                        saveBtn.disabled = true;
-                        saveBtn.textContent = 'Saving...';
-                    }
+                    this.updateAutoLabels();
                     await fetch('/school/schedules', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
@@ -347,14 +392,13 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
                             working_days: AppState.workingDays
                         })
                     });
-                    this.showToast('Saved');
+                    if (!isAuto) {
+                        this.showToast('Saved');
+                    } else {
+                        this.showToast('Auto-saved');
+                    }
                 } catch(e) {
                     alert("Save failed");
-                } finally {
-                    if (saveBtn) {
-                        saveBtn.disabled = false;
-                        saveBtn.textContent = 'Save';
-                    }
                 }
             },
 
@@ -390,6 +434,7 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
             // --- RENDER ENGINE ---
             render: function() {
                 const container = document.getElementById('slot-container');
+                this.updateAutoLabels();
                 container.innerHTML = AppState.slots.map((slot, i) => this.renderRow(slot, i)).join('');
             },
 
@@ -400,11 +445,15 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
                 const activeShift = AppState.activeShift;
                 const shiftChecked = showShift && Array.isArray(slot.applicable_shifts) && slot.applicable_shifts.includes(activeShift);
                 const shiftDisabled = !showShift || activeShift === 'Full Day';
+                const labelText = slot.label || '';
+                const labelClass = slot.type === 'break' ? 'text-gray-500' : 'text-gray-800';
+                const labelBg = slot.type === 'break' ? 'bg-gray-50' : 'bg-white';
+                const displayIndex = slot.type === 'break' ? '-' : (slot.period_index || '');
                 
                 return \`
                 <div class="group bg-white relative">
                     <div class="hidden lg:grid grid-cols-12 gap-0 items-center divide-x divide-gray-200">
-                        <div class="col-span-1 text-center text-[11px] text-gray-500 font-semibold py-2">\${i+1}</div>
+                        <div class="col-span-1 text-center text-[11px] text-gray-500 font-semibold py-2">\${displayIndex}</div>
                         <div class="col-span-2 px-2 py-1.5">
                              <input type="time" value="\${slot.start_time}" onchange="app.handleInput(\${i}, 'start_time', this.value)" 
                              class="w-full text-[11px] font-mono font-semibold border border-gray-300 rounded-none px-2 py-1 \${!isFirst ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-900'} focus:border-gray-500">
@@ -416,7 +465,7 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
                              <input type="number" value="\${slot.duration}" onchange="app.handleInput(\${i}, 'duration', this.value)" class="w-full text-[11px] text-center font-semibold bg-white text-gray-700 rounded-none px-2 py-1 border border-gray-300">
                         </div>
                         <div class="col-span-\${showShift ? 3 : 4} px-2 py-1.5">
-                             <input type="text" value="\${slot.label}" onchange="app.handleInput(\${i}, 'label', this.value)" class="w-full text-[11px] border border-gray-300 rounded-none px-2 py-1 bg-white outline-none font-medium placeholder-gray-400" placeholder="Period Name...">
+                             <div class="w-full text-[11px] font-semibold border border-gray-300 rounded-none px-2 py-1 \${labelBg} \${labelClass}">\${labelText}</div>
                         </div>
                         <div class="col-span-1 px-2 py-1.5">
                              <select onchange="app.handleInput(\${i}, 'type', this.value)" class="text-[11px] font-semibold uppercase bg-white border border-gray-300 rounded-none px-2 py-1 outline-none text-gray-700">
@@ -436,7 +485,7 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
 
                     <div class="lg:hidden p-3 border-l border-gray-300 bg-white">
                         <div class="flex items-center gap-2 mb-2">
-                            <span class="text-xs font-semibold text-gray-500 w-3">\${i+1}</span>
+                            <span class="text-xs font-semibold text-gray-500 w-3">\${displayIndex}</span>
                             
                             <div class="flex-1">
                                 <input type="time" value="\${slot.start_time}" onchange="app.handleInput(\${i}, 'start_time', this.value)"
@@ -456,8 +505,7 @@ export function SchedulesPageHTML(config = null, existingSlots = [], shiftConfig
                         </div>
 
                         <div class="flex items-center gap-2">
-                            <input type="text" value="\${slot.label}" onchange="app.handleInput(\${i}, 'label', this.value)" 
-                            class="flex-1 text-xs font-medium border border-gray-300 rounded-none px-2 py-1 outline-none bg-white placeholder-gray-400" placeholder="Label...">
+                            <div class="flex-1 text-xs font-semibold border border-gray-300 rounded-none px-2 py-1 \${labelBg} \${labelClass}">\${labelText}</div>
                             
                             <select onchange="app.handleInput(\${i}, 'type', this.value)" 
                             class="text-xs font-semibold uppercase bg-white border border-gray-300 rounded-none px-2 py-1 outline-none text-gray-700">

@@ -7,6 +7,8 @@ import { SchoolsPageHTML } from '../ui/admin/schools.js';
 import { SchoolDetailHTML } from '../ui/admin/school_detail.js'; 
 import { SchoolClassesHTML } from '../ui/admin/school_classes.js'; 
 import { SchoolTeachersHTML } from '../ui/admin/school_teachers.js'; 
+import { PolicyManagementHTML } from '../ui/admin/policy_management.js';
+import { OrdersHTML } from '../ui/admin/orders.js';
 import { ROLES } from '../config.js';
 import { syncDatabase } from '../core/schema_manager.js';
 
@@ -53,6 +55,7 @@ export async function handleAdminRequest(request, env) {
                   await env.DB.prepare("UPDATE auth_accounts SET password_hash=?, salt=? WHERE id=?").bind(hash, salt, admin.id).run();
                   return jsonResponse({ success: true });
               }
+
           } catch(e) { 
               if(e.message.includes("no such table")) await syncDatabase(env);
               return jsonResponse({ error: e.message }, 500); 
@@ -92,18 +95,543 @@ export async function handleAdminRequest(request, env) {
     return htmlResponse(AdminLayout(SchoolsPageHTML(result.results || []), "Schools", companyName, {email}));
   }
 
+  if (url.pathname === '/admin/policy-management') {
+    if (request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const action = body.action || '';
+
+        if (action === 'create_plan') {
+          const name = (body.name || '').toString().trim();
+          const cycle = (body.billing_cycle || '').toString().trim().toLowerCase();
+          const price = Number(body.price_taka);
+          const isPublished = body.is_published ? 1 : 0;
+          const maxTeachers = body.max_teachers !== undefined && body.max_teachers !== null && body.max_teachers !== '' ? Number(body.max_teachers) : null;
+          const maxSubjects = body.max_subjects !== undefined && body.max_subjects !== null && body.max_subjects !== '' ? Number(body.max_subjects) : null;
+          const maxRoutinesYearly = body.max_routines_yearly !== undefined && body.max_routines_yearly !== null && body.max_routines_yearly !== '' ? Number(body.max_routines_yearly) : null;
+          const maxShifts = body.max_shifts !== undefined && body.max_shifts !== null && body.max_shifts !== '' ? Number(body.max_shifts) : null;
+          const allowTeacherDashboard = body.allow_teacher_dashboard ? 1 : 0;
+          if (!name) return jsonResponse({ error: "Plan name required" }, 400);
+          if (!['weekly','monthly','yearly'].includes(cycle)) return jsonResponse({ error: "Invalid billing cycle" }, 400);
+          if (!Number.isFinite(price) || price < 0) return jsonResponse({ error: "Invalid price" }, 400);
+          if (maxTeachers !== null && (!Number.isFinite(maxTeachers) || maxTeachers < 0)) return jsonResponse({ error: "Invalid teacher limit" }, 400);
+          if (maxSubjects !== null && (!Number.isFinite(maxSubjects) || maxSubjects < 0)) return jsonResponse({ error: "Invalid subject limit" }, 400);
+          if (maxRoutinesYearly !== null && (!Number.isFinite(maxRoutinesYearly) || maxRoutinesYearly < 0)) return jsonResponse({ error: "Invalid routine limit" }, 400);
+          if (maxShifts !== null && (!Number.isFinite(maxShifts) || maxShifts < 1)) return jsonResponse({ error: "Invalid shift limit" }, 400);
+          const result = await env.DB.prepare(`
+            INSERT INTO pricing_plans (
+              name, billing_cycle, price_taka, is_published,
+              max_teachers, max_subjects, max_routines_yearly, max_shifts, allow_teacher_dashboard
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+          `).bind(name, cycle, price, isPublished, maxTeachers, maxSubjects, maxRoutinesYearly, maxShifts, allowTeacherDashboard).first();
+          return jsonResponse({ success: true, id: result?.id });
+        }
+
+        if (action === 'update_plan') {
+          const planId = Number(body.plan_id);
+          const name = (body.name || '').toString().trim();
+          const cycle = (body.billing_cycle || '').toString().trim().toLowerCase();
+          const price = Number(body.price_taka);
+          const isPublished = body.is_published ? 1 : 0;
+          const maxTeachers = body.max_teachers !== undefined && body.max_teachers !== null && body.max_teachers !== '' ? Number(body.max_teachers) : null;
+          const maxSubjects = body.max_subjects !== undefined && body.max_subjects !== null && body.max_subjects !== '' ? Number(body.max_subjects) : null;
+          const maxRoutinesYearly = body.max_routines_yearly !== undefined && body.max_routines_yearly !== null && body.max_routines_yearly !== '' ? Number(body.max_routines_yearly) : null;
+          const maxShifts = body.max_shifts !== undefined && body.max_shifts !== null && body.max_shifts !== '' ? Number(body.max_shifts) : null;
+          const allowTeacherDashboard = body.allow_teacher_dashboard ? 1 : 0;
+          if (!planId) return jsonResponse({ error: "Plan ID required" }, 400);
+          if (!name) return jsonResponse({ error: "Plan name required" }, 400);
+          if (!['weekly','monthly','yearly'].includes(cycle)) return jsonResponse({ error: "Invalid billing cycle" }, 400);
+          if (!Number.isFinite(price) || price < 0) return jsonResponse({ error: "Invalid price" }, 400);
+          if (maxTeachers !== null && (!Number.isFinite(maxTeachers) || maxTeachers < 0)) return jsonResponse({ error: "Invalid teacher limit" }, 400);
+          if (maxSubjects !== null && (!Number.isFinite(maxSubjects) || maxSubjects < 0)) return jsonResponse({ error: "Invalid subject limit" }, 400);
+          if (maxRoutinesYearly !== null && (!Number.isFinite(maxRoutinesYearly) || maxRoutinesYearly < 0)) return jsonResponse({ error: "Invalid routine limit" }, 400);
+          if (maxShifts !== null && (!Number.isFinite(maxShifts) || maxShifts < 1)) return jsonResponse({ error: "Invalid shift limit" }, 400);
+          await env.DB.prepare(`
+            UPDATE pricing_plans SET
+              name = ?, billing_cycle = ?, price_taka = ?, is_published = ?,
+              max_teachers = ?, max_subjects = ?, max_routines_yearly = ?, max_shifts = ?, allow_teacher_dashboard = ?
+            WHERE id = ?
+          `).bind(name, cycle, price, isPublished, maxTeachers, maxSubjects, maxRoutinesYearly, maxShifts, allowTeacherDashboard, planId).run();
+
+          await env.DB.prepare(`
+            UPDATE profiles_institution SET
+              plan_name = ?,
+              plan_billing_cycle = ?,
+              plan_price_taka = ?,
+              max_teachers = ?,
+              max_subjects = ?,
+              max_routines_yearly = ?,
+              max_shifts = ?,
+              allow_teacher_dashboard = ?
+            WHERE plan_id = ?
+          `).bind(
+            name,
+            cycle,
+            price,
+            maxTeachers,
+            maxSubjects,
+            maxRoutinesYearly,
+            maxShifts,
+            allowTeacherDashboard,
+            planId
+          ).run();
+
+          if (maxShifts !== null && maxShifts !== undefined) {
+            const shiftsEnabled = Number(maxShifts) > 1 ? 1 : 0;
+            await env.DB.prepare("UPDATE profiles_institution SET shifts_enabled = ? WHERE plan_id = ?")
+              .bind(shiftsEnabled, planId).run();
+            if (shiftsEnabled) {
+              const schools = await env.DB.prepare("SELECT id FROM profiles_institution WHERE plan_id = ?")
+                .bind(planId).all();
+              for (const row of schools.results || []) {
+                await ensureScheduleConfigWithShifts(env, row.id);
+              }
+            }
+          }
+
+          return jsonResponse({ success: true });
+        }
+
+        if (action === 'delete_plan') {
+          const planId = Number(body.plan_id);
+          if (!planId) return jsonResponse({ error: "Plan ID required" }, 400);
+          await env.DB.prepare("DELETE FROM pricing_orders WHERE plan_id = ?").bind(planId).run();
+          await env.DB.prepare("DELETE FROM pricing_features WHERE plan_id = ?").bind(planId).run();
+          await env.DB.prepare("DELETE FROM pricing_plans WHERE id = ?").bind(planId).run();
+          return jsonResponse({ success: true });
+        }
+
+        if (action === 'add_feature') {
+          const planId = Number(body.plan_id);
+          const text = (body.feature_text || '').toString().trim();
+          const isHighlight = body.is_highlight ? 1 : 0;
+          if (!planId) return jsonResponse({ error: "Plan ID required" }, 400);
+          if (!text) return jsonResponse({ error: "Feature text required" }, 400);
+          const result = await env.DB.prepare(`
+            INSERT INTO pricing_features (plan_id, feature_text, is_highlight, is_auto)
+            VALUES (?, ?, ?, 0) RETURNING id
+          `).bind(planId, text, isHighlight).first();
+          return jsonResponse({ success: true, id: result?.id });
+        }
+
+        if (action === 'delete_feature') {
+          const featureId = Number(body.feature_id);
+          if (!featureId) return jsonResponse({ error: "Feature ID required" }, 400);
+          await env.DB.prepare("DELETE FROM pricing_features WHERE id = ?").bind(featureId).run();
+          return jsonResponse({ success: true });
+        }
+
+        if (action === 'generate_auto_features') {
+          const planId = Number(body.plan_id);
+          if (!planId) return jsonResponse({ error: "Plan ID required" }, 400);
+          const plan = await env.DB.prepare("SELECT * FROM pricing_plans WHERE id = ?").bind(planId).first();
+          if (!plan) return jsonResponse({ error: "Plan not found" }, 404);
+
+          const featureList = [];
+          if (plan.max_teachers !== null && plan.max_teachers !== undefined) {
+            featureList.push({ text: `Up to ${plan.max_teachers} teachers`, highlight: 1 });
+          }
+          if (plan.max_subjects !== null && plan.max_subjects !== undefined) {
+            featureList.push({ text: `Up to ${plan.max_subjects} subjects`, highlight: 1 });
+          }
+          if (plan.max_routines_yearly !== null && plan.max_routines_yearly !== undefined) {
+            featureList.push({ text: `Up to ${plan.max_routines_yearly} routines per year`, highlight: 0 });
+          }
+          if (plan.max_shifts !== null && plan.max_shifts !== undefined) {
+            const shiftLabel = Number(plan.max_shifts) === 1 ? 'Single shift' : `Up to ${plan.max_shifts} shifts`;
+            featureList.push({ text: shiftLabel, highlight: 1 });
+          }
+          featureList.push({ text: `Teacher dashboard: ${Number(plan.allow_teacher_dashboard) === 1 ? 'Yes' : 'No'}`, highlight: 0 });
+
+          await env.DB.prepare("DELETE FROM pricing_features WHERE plan_id = ? AND is_auto = 1").bind(planId).run();
+
+          for (const item of featureList) {
+            await env.DB.prepare(`
+              INSERT INTO pricing_features (plan_id, feature_text, is_highlight, is_auto)
+              VALUES (?, ?, ?, 1)
+            `).bind(planId, item.text, item.highlight ? 1 : 0).run();
+          }
+
+          const rows = await env.DB.prepare("SELECT * FROM pricing_features WHERE plan_id = ? AND is_auto = 1 ORDER BY id ASC").bind(planId).all();
+          return jsonResponse({ success: true, features: rows.results || [] });
+        }
+
+        return jsonResponse({ error: "Invalid action" }, 400);
+      } catch (e) {
+        if (e.message && (e.message.includes("no such table") || e.message.includes("no such column"))) {
+          await syncDatabase(env);
+          return jsonResponse({ error: "Database updated. Please retry." }, 500);
+        }
+        return jsonResponse({ error: e.message }, 500);
+      }
+    }
+
+    let plans = [];
+    let features = [];
+    try {
+      const planRows = await env.DB.prepare("SELECT * FROM pricing_plans ORDER BY id DESC").all();
+      plans = planRows.results || [];
+      const featureRows = await env.DB.prepare("SELECT * FROM pricing_features ORDER BY id ASC").all();
+      features = featureRows.results || [];
+    } catch (e) {
+      if (e.message && e.message.includes("no such table")) {
+        await syncDatabase(env);
+      }
+    }
+    return htmlResponse(AdminLayout(PolicyManagementHTML(plans, features), "Policy Management", companyName, {email}));
+  }
+
+  if (url.pathname === '/admin/orders') {
+    if (request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const action = body.action || '';
+        const orderId = Number(body.order_id);
+        if (!orderId) return jsonResponse({ error: "Order ID required" }, 400);
+
+        if (action === 'decline_order') {
+          await env.DB.prepare("UPDATE pricing_orders SET status = 'declined', processed_at = CURRENT_TIMESTAMP WHERE id = ?")
+            .bind(orderId).run();
+          return jsonResponse({ success: true });
+        }
+
+        if (action === 'grant_order') {
+          const order = await env.DB.prepare("SELECT * FROM pricing_orders WHERE id = ?").bind(orderId).first();
+          if (!order) return jsonResponse({ error: "Order not found" }, 404);
+          if (order.status === 'granted') return jsonResponse({ error: "Order already granted" }, 400);
+
+          const phone = (order.requester_phone || '').toString().trim();
+          if (!/^\d+$/.test(phone)) {
+            return jsonResponse({ error: "Phone number must contain digits only." }, 400);
+          }
+
+          const existing = await env.DB.prepare("SELECT id FROM auth_accounts WHERE email = ?").bind(order.requester_email).first();
+          if (existing) return jsonResponse({ error: "Email already exists. Cannot grant." }, 400);
+
+          const plan = await env.DB.prepare("SELECT * FROM pricing_plans WHERE id = ?").bind(order.plan_id).first();
+          if (!plan) return jsonResponse({ error: "Plan not found" }, 404);
+
+          const { hash, salt } = await hashPassword(phone);
+          const authResult = await env.DB.prepare(
+            "INSERT INTO auth_accounts (email, password_hash, salt, role) VALUES (?, ?, ?, ?) RETURNING id"
+          ).bind(order.requester_email, hash, salt, ROLES.INSTITUTE).first();
+
+          const maxTeachers = plan.max_teachers !== null && plan.max_teachers !== undefined ? Number(plan.max_teachers) : null;
+          const shiftsEnabled = plan.max_shifts !== null && plan.max_shifts !== undefined && Number(plan.max_shifts) > 1 ? 1 : 0;
+
+          const schoolInsert = await env.DB.prepare(`
+            INSERT INTO profiles_institution (
+              auth_id, school_name, eiin_code, address,
+              max_teachers, shifts_enabled,
+              plan_id, plan_name, plan_billing_cycle, plan_price_taka,
+              max_subjects, max_routines_yearly, max_shifts, allow_teacher_dashboard
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id
+          `).bind(
+            authResult.id,
+            order.institution_name || 'Institution',
+            '',
+            '',
+            maxTeachers,
+            shiftsEnabled,
+            plan.id,
+            plan.name,
+            plan.billing_cycle,
+            plan.price_taka,
+            plan.max_subjects,
+            plan.max_routines_yearly,
+            plan.max_shifts,
+            plan.allow_teacher_dashboard ? 1 : 0
+          ).first();
+
+          const schoolId = schoolInsert?.id;
+          if (schoolId) {
+            await ensureScheduleConfigWithShifts(env, schoolId);
+          }
+
+          await env.DB.prepare(`
+            UPDATE pricing_orders
+            SET status = 'granted', school_id = ?, auth_id = ?, processed_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).bind(schoolId || null, authResult.id, orderId).run();
+
+          return jsonResponse({ success: true });
+        }
+
+        return jsonResponse({ error: "Invalid action" }, 400);
+      } catch (e) {
+        if (e.message && (e.message.includes("no such table") || e.message.includes("no such column"))) {
+          await syncDatabase(env);
+          return jsonResponse({ error: "Database updated. Please retry." }, 500);
+        }
+        return jsonResponse({ error: e.message }, 500);
+      }
+    }
+
+    let orders = [];
+    try {
+      const rows = await env.DB.prepare("SELECT * FROM pricing_orders ORDER BY created_at DESC").all();
+      orders = rows.results || [];
+    } catch (e) {
+      if (e.message && e.message.includes("no such table")) {
+        await syncDatabase(env);
+      }
+    }
+    return htmlResponse(AdminLayout(OrdersHTML(orders), "Orders", companyName, {email}));
+  }
+
   
   if (url.pathname === '/admin/school/view') {
     const authId = url.searchParams.get('id');
     const school = await env.DB.prepare(`SELECT * FROM profiles_institution WHERE auth_id = ?`).bind(authId).first();
-    if(school) school.email = (await env.DB.prepare("SELECT email FROM auth_accounts WHERE id=?").bind(authId).first()).email;
+    if (school) {
+      const account = await env.DB.prepare("SELECT email, is_active, created_at FROM auth_accounts WHERE id=?").bind(authId).first();
+      if (account) {
+        school.email = account.email;
+        school.is_active = account.is_active;
+        school.created_at = account.created_at;
+      }
+    }
     let shiftConfig = { enabled: false, shifts: ['Full Day'] };
     try {
       const scheduleConfig = await env.DB.prepare("SELECT shifts_json FROM schedule_config WHERE school_id = ?").bind(school.id).first();
       const shifts = parseShiftList(scheduleConfig?.shifts_json);
       shiftConfig = { enabled: !!school.shifts_enabled, shifts };
     } catch (e) {}
-    return htmlResponse(AdminLayout(SchoolDetailHTML(school, shiftConfig), "Manage Client", companyName, {email}));
+    let stats = {};
+    try {
+      const sid = school.id;
+      const metrics = await env.DB.prepare(`
+        SELECT
+          (SELECT COUNT(*) FROM academic_classes WHERE school_id = ?) AS class_count,
+          (SELECT COUNT(*) FROM class_groups WHERE school_id = ?) AS group_count,
+          (SELECT COUNT(*) FROM class_sections WHERE school_id = ?) AS section_count,
+          (SELECT COUNT(*) FROM academic_subjects WHERE school_id = ?) AS subject_count,
+          (SELECT COUNT(*) FROM profiles_teacher WHERE school_id = ?) AS teacher_count,
+          (SELECT COUNT(*) FROM teacher_assignments WHERE school_id = ?) AS assignment_count,
+          (SELECT COUNT(*) FROM teacher_assignments WHERE school_id = ? AND is_auto = 1) AS assignment_auto_count,
+          (SELECT COUNT(*) FROM generated_routines WHERE school_id = ?) AS routine_count,
+          (SELECT COUNT(*) FROM generated_routines WHERE school_id = ? AND is_active = 1) AS active_routine_count,
+          (SELECT MAX(generated_at) FROM generated_routines WHERE school_id = ?) AS last_generated,
+          (SELECT COUNT(*) FROM schedule_slots WHERE school_id = ?) AS slot_count,
+          (SELECT COUNT(*) FROM schedule_slots WHERE school_id = ? AND type != 'break') AS class_slot_count,
+          (SELECT COUNT(*) FROM schedule_slots WHERE school_id = ? AND type = 'break') AS break_slot_count
+      `).bind(
+        sid, sid, sid, sid, sid,
+        sid, sid, sid, sid, sid,
+        sid, sid, sid
+      ).first();
+
+      const scheduleConfig = await env.DB.prepare(`
+        SELECT working_days, off_days, periods_per_day, active_days, start_time
+        FROM schedule_config WHERE school_id = ?
+      `).bind(sid).first();
+
+      let workingDays = [];
+      let offDays = [];
+      try { workingDays = JSON.parse(scheduleConfig?.working_days || '[]'); } catch (e) {}
+      try { offDays = JSON.parse(scheduleConfig?.off_days || '[]'); } catch (e) {}
+
+      stats = {
+        ...metrics,
+        schedule: {
+          working_days: workingDays,
+          off_days: offDays,
+          periods_per_day: scheduleConfig?.periods_per_day || 0,
+          active_days: scheduleConfig?.active_days || 0,
+          start_time: scheduleConfig?.start_time || ''
+        }
+      };
+    } catch (e) {}
+    let plans = [];
+    try {
+      const planRows = await env.DB.prepare("SELECT * FROM pricing_plans ORDER BY price_taka ASC").all();
+      plans = planRows.results || [];
+    } catch (e) {}
+    return htmlResponse(AdminLayout(SchoolDetailHTML(school, shiftConfig, stats, plans), "Manage Client", companyName, {email}));
+  }
+
+  if (url.pathname === '/admin/school/status') {
+    if (request.method !== 'POST') {
+      return jsonResponse({ error: "Invalid method" }, 405);
+    }
+    try {
+      const body = await request.json();
+      const authId = body.auth_id;
+      const isActive = body.is_active ? 1 : 0;
+      if (!authId) return jsonResponse({ error: "Auth ID required" }, 400);
+      if (isActive === 1) {
+        const schoolRow = await env.DB.prepare("SELECT plan_id FROM profiles_institution WHERE auth_id = ?").bind(authId).first();
+        if (!schoolRow?.plan_id) {
+          return jsonResponse({ error: "Assign a membership before enabling access." }, 400);
+        }
+      }
+      await env.DB.prepare("UPDATE auth_accounts SET is_active = ? WHERE id = ?").bind(isActive, authId).run();
+      return jsonResponse({ success: true, is_active: isActive });
+    } catch (e) {
+      return jsonResponse({ error: e.message }, 500);
+    }
+  }
+
+  if (url.pathname === '/admin/school/membership') {
+    if (request.method !== 'POST') {
+      return jsonResponse({ error: "Invalid method" }, 405);
+    }
+    try {
+      const body = await request.json();
+      const schoolId = Number(body.school_id);
+      const planIdRaw = body.plan_id;
+      if (!schoolId) return jsonResponse({ error: "School ID required" }, 400);
+
+      const schoolRow = await env.DB.prepare("SELECT id, auth_id, shifts_enabled FROM profiles_institution WHERE id = ?").bind(schoolId).first();
+      if (!schoolRow) return jsonResponse({ error: "School not found" }, 404);
+
+      if (!planIdRaw) {
+        await env.DB.prepare(`
+          UPDATE profiles_institution
+          SET plan_id = NULL,
+              plan_name = NULL,
+              plan_billing_cycle = NULL,
+              plan_price_taka = NULL,
+              max_teachers = NULL,
+              max_subjects = NULL,
+              max_routines_yearly = NULL,
+              max_shifts = NULL,
+              allow_teacher_dashboard = 0
+          WHERE id = ?
+        `).bind(schoolId).run();
+        await env.DB.prepare("UPDATE auth_accounts SET is_active = 0 WHERE id = ?")
+          .bind(schoolRow.auth_id).run();
+        return jsonResponse({ success: true, is_active: 0, plan: null });
+      }
+
+      const planId = Number(planIdRaw);
+      if (!planId) return jsonResponse({ error: "Plan ID required" }, 400);
+      const plan = await env.DB.prepare("SELECT * FROM pricing_plans WHERE id = ?").bind(planId).first();
+      if (!plan) return jsonResponse({ error: "Plan not found" }, 404);
+
+      let shiftsEnabled = schoolRow.shifts_enabled ? 1 : 0;
+      if (plan.max_shifts !== null && plan.max_shifts !== undefined) {
+        shiftsEnabled = Number(plan.max_shifts) > 1 ? 1 : 0;
+      }
+
+      await env.DB.prepare(`
+        UPDATE profiles_institution
+        SET plan_id = ?,
+            plan_name = ?,
+            plan_billing_cycle = ?,
+            plan_price_taka = ?,
+            max_teachers = ?,
+            max_subjects = ?,
+            max_routines_yearly = ?,
+            max_shifts = ?,
+            allow_teacher_dashboard = ?,
+            shifts_enabled = ?
+        WHERE id = ?
+      `).bind(
+        plan.id,
+        plan.name,
+        plan.billing_cycle,
+        plan.price_taka,
+        plan.max_teachers !== null && plan.max_teachers !== undefined ? Number(plan.max_teachers) : null,
+        plan.max_subjects !== null && plan.max_subjects !== undefined ? Number(plan.max_subjects) : null,
+        plan.max_routines_yearly !== null && plan.max_routines_yearly !== undefined ? Number(plan.max_routines_yearly) : null,
+        plan.max_shifts !== null && plan.max_shifts !== undefined ? Number(plan.max_shifts) : null,
+        plan.allow_teacher_dashboard ? 1 : 0,
+        shiftsEnabled,
+        schoolId
+      ).run();
+
+      await env.DB.prepare("UPDATE auth_accounts SET is_active = 1 WHERE id = ?")
+        .bind(schoolRow.auth_id).run();
+
+      if (shiftsEnabled) {
+        await ensureScheduleConfigWithShifts(env, schoolId);
+      }
+
+      return jsonResponse({
+        success: true,
+        is_active: 1,
+        plan: {
+          id: plan.id,
+          name: plan.name,
+          billing_cycle: plan.billing_cycle,
+          price_taka: plan.price_taka,
+          max_teachers: plan.max_teachers,
+          max_subjects: plan.max_subjects,
+          max_routines_yearly: plan.max_routines_yearly,
+          max_shifts: plan.max_shifts,
+          allow_teacher_dashboard: plan.allow_teacher_dashboard ? 1 : 0
+        }
+      });
+    } catch (e) {
+      if (e.message && (e.message.includes("no such table") || e.message.includes("no such column"))) {
+        await syncDatabase(env);
+        return jsonResponse({ error: "Database updated. Please retry." }, 500);
+      }
+      return jsonResponse({ error: e.message }, 500);
+    }
+  }
+
+  if (url.pathname === '/admin/school/membership-limits') {
+    if (request.method !== 'POST') {
+      return jsonResponse({ error: "Invalid method" }, 405);
+    }
+    try {
+      const body = await request.json();
+      const schoolId = Number(body.school_id);
+      if (!schoolId) return jsonResponse({ error: "School ID required" }, 400);
+
+      const schoolRow = await env.DB.prepare("SELECT plan_id FROM profiles_institution WHERE id = ?").bind(schoolId).first();
+      if (!schoolRow?.plan_id) return jsonResponse({ error: "Assign a membership before editing limits." }, 400);
+
+      const parseLimit = (value, minValue) => {
+        if (value === null || value === undefined) return null;
+        const text = String(value).trim();
+        if (text === '') return null;
+        const num = Number(text);
+        if (!Number.isFinite(num) || num < minValue) return null;
+        return num;
+      };
+
+      const maxTeachers = parseLimit(body.max_teachers, 0);
+      const maxSubjects = parseLimit(body.max_subjects, 0);
+      const maxRoutinesYearly = parseLimit(body.max_routines_yearly, 0);
+      const maxShifts = parseLimit(body.max_shifts, 1);
+
+      await env.DB.prepare(`
+        UPDATE profiles_institution
+        SET max_teachers = ?,
+            max_subjects = ?,
+            max_routines_yearly = ?,
+            max_shifts = ?
+        WHERE id = ?
+      `).bind(
+        maxTeachers,
+        maxSubjects,
+        maxRoutinesYearly,
+        maxShifts,
+        schoolId
+      ).run();
+
+      return jsonResponse({
+        success: true,
+        limits: {
+          max_teachers: maxTeachers,
+          max_subjects: maxSubjects,
+          max_routines_yearly: maxRoutinesYearly,
+          max_shifts: maxShifts
+        }
+      });
+    } catch (e) {
+      if (e.message && (e.message.includes("no such table") || e.message.includes("no such column"))) {
+        await syncDatabase(env);
+        return jsonResponse({ error: "Database updated. Please retry." }, 500);
+      }
+      return jsonResponse({ error: e.message }, 500);
+    }
   }
 
   
@@ -132,6 +660,16 @@ export async function handleAdminRequest(request, env) {
         const rawName = (body.shift_name || '').toString().trim();
         if (!rawName) return jsonResponse({ error: "Shift name required" }, 400);
         if (rawName.toLowerCase() === 'full day') return jsonResponse({ error: "Full Day is reserved" }, 400);
+        try {
+          const schoolRow = await env.DB.prepare("SELECT max_shifts FROM profiles_institution WHERE id = ?").bind(schoolId).first();
+          const maxShifts = schoolRow?.max_shifts;
+          if (maxShifts !== null && maxShifts !== undefined) {
+            const currentCount = Array.from(new Set(shiftList)).length;
+            if (currentCount + 1 > Number(maxShifts)) {
+              return jsonResponse({ error: "Shift limit reached. Upgrade membership to add more shifts." }, 403);
+            }
+          }
+        } catch (e) {}
         if (!shiftList.includes(rawName)) {
           const previousShiftList = shiftList.slice();
           shiftList.push(rawName);
@@ -172,8 +710,7 @@ export async function handleAdminRequest(request, env) {
       if(request.method === 'POST') {
           const body = await request.json();
           if(body.action === 'update_limit') {
-              await env.DB.prepare("UPDATE profiles_institution SET max_teachers = ? WHERE id = ?").bind(body.max_val, body.school_id).run();
-              return jsonResponse({success:true});
+              return jsonResponse({ error: "Limits are managed through membership policies." }, 400);
           }
       }
       const authId = url.searchParams.get('id');
@@ -278,8 +815,14 @@ export async function handleAdminRequest(request, env) {
               
               if(body.action === 'edit_class') {
                   
-                  await env.DB.prepare("UPDATE academic_classes SET class_name = ?, has_groups = ? WHERE id = ? AND school_id = ?")
-                      .bind(body.class_name, body.has_groups ? 1 : 0, body.class_id, body.school_id).run();
+                  const shiftName = (body.shift_name || '').toString().trim();
+                  if (shiftName) {
+                      await env.DB.prepare("UPDATE academic_classes SET class_name = ?, has_groups = ?, shift_name = ? WHERE id = ? AND school_id = ?")
+                          .bind(body.class_name, body.has_groups ? 1 : 0, shiftName, body.class_id, body.school_id).run();
+                  } else {
+                      await env.DB.prepare("UPDATE academic_classes SET class_name = ?, has_groups = ? WHERE id = ? AND school_id = ?")
+                          .bind(body.class_name, body.has_groups ? 1 : 0, body.class_id, body.school_id).run();
+                  }
                   return jsonResponse({success:true});
               }
               

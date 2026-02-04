@@ -2,6 +2,13 @@
 
 export function ClassesPageHTML(school, classes = [], groups = [], sections = [], subjects = [], classSubjects = [], groupSubjects = [], scheduleConfig = {}) {
     
+    const escapeHtml = (value) => String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
     // Group data for easier access
     const classGroups = {};
     groups.forEach(g => {
@@ -78,15 +85,17 @@ export function ClassesPageHTML(school, classes = [], groups = [], sections = []
         
         // Sections without groups
         const sectionsWithoutGroup = sections.filter(s => !s.group_id);
+        const shiftLabel = escapeHtml(cls.shift_name || 'Full Day');
 
         return `
             <div class="mb-4 border border-gray-300">
                 <!-- Class Header -->
                 <div class="bg-gray-100 px-3 py-2 border-b">
                     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                        <div class="flex items-center gap-2">
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-2">
                             <span class="font-bold text-sm md:text-base">${cls.class_name}</span>
                             <span class="text-xs text-gray-500">(${groups.length} groups, ${sections.length} sections)</span>
+                            <span class="text-[10px] text-gray-600 border border-gray-300 px-1 py-0.5 bg-white">Shift: ${shiftLabel}</span>
                         </div>
                         <div class="text-xs text-gray-500">
                             ${cls.has_groups ? 'Has Groups' : 'No Groups'}
@@ -171,7 +180,7 @@ export function ClassesPageHTML(school, classes = [], groups = [], sections = []
         }
       </style>
       
-      <div>
+      <div class="px-3 sm:px-4">
          <div class="flex items-center gap-2 text-sm text-gray-500 mb-6">
             <a href="/school/dashboard" class="hover:text-blue-600">Back to Dashboard</a>
             <span>/</span>
