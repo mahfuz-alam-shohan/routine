@@ -17,9 +17,15 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
     });
     
     const sectionsByGroup = {};
+    const sectionsByClass = {};
     sections.forEach(s => {
-        if (!sectionsByGroup[s.group_id]) sectionsByGroup[s.group_id] = [];
-        sectionsByGroup[s.group_id].push(s);
+        if (s.group_id) {
+            if (!sectionsByGroup[s.group_id]) sectionsByGroup[s.group_id] = [];
+            sectionsByGroup[s.group_id].push(s);
+        } else {
+            if (!sectionsByClass[s.class_id]) sectionsByClass[s.class_id] = [];
+            sectionsByClass[s.class_id].push(s);
+        }
     });
     
     const subjectsById = {};
@@ -31,14 +37,76 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
     teachers.forEach(t => {
         teachersById[t.id] = t;
     });
+
+    const classSubjectsByClass = {};
+    classSubjects.forEach(cs => {
+        if (!classSubjectsByClass[cs.class_id]) classSubjectsByClass[cs.class_id] = [];
+        classSubjectsByClass[cs.class_id].push(cs);
+    });
+
+    const groupSubjectsByGroup = {};
+    groupSubjects.forEach(gs => {
+        if (!groupSubjectsByGroup[gs.group_id]) groupSubjectsByGroup[gs.group_id] = [];
+        groupSubjectsByGroup[gs.group_id].push(gs);
+    });
+
+    const assignmentsByKey = {};
+    const makeAssignmentKey = (classId, groupId, sectionId, subjectId) => {
+        const g = groupId === null || groupId === undefined ? 0 : groupId;
+        const s = sectionId === null || sectionId === undefined ? 0 : sectionId;
+        return String(classId) + '-' + g + '-' + s + '-' + subjectId;
+    };
+    (teacherAssignments || []).forEach(a => {
+        const key = makeAssignmentKey(a.class_id, a.group_id, a.section_id, a.subject_id);
+        if (!assignmentsByKey[key]) assignmentsByKey[key] = [];
+        assignmentsByKey[key].push(a);
+    });
+    Object.keys(assignmentsByKey).forEach(key => {
+        assignmentsByKey[key].sort((a, b) => {
+            const primaryDiff = Number(b.is_primary || 0) - Number(a.is_primary || 0);
+            if (primaryDiff) return primaryDiff;
+            return (a.id || 0) - (b.id || 0);
+        });
+    });
     
     function findAssignments(classId, groupId, sectionId, subjectId) {
-        return teacherAssignments.filter(ta => 
-            ta.class_id === classId &&
-            (ta.group_id === groupId || (ta.group_id === null && groupId === null)) &&
-            (ta.section_id === sectionId || (ta.section_id === null && sectionId === null)) &&
-            ta.subject_id === subjectId
-        );
+        const key = makeAssignmentKey(classId, groupId, sectionId, subjectId);
+        return assignmentsByKey[key] || [];
+    }
+
+    function renderAssignmentsBlock(assignments, context) {
+        if (!assignments || assignments.length === 0) {
+            return '<span style="color: #666; font-style: italic;">Unassigned</span>';
+        }
+        const classId = Number(context.classId);
+        const groupId = context.groupId === null || context.groupId === undefined ? null : context.groupId;
+        const sectionId = context.sectionId === null || context.sectionId === undefined ? null : context.sectionId;
+        const subjectId = Number(context.subjectId);
+        const manualAssignments = assignments.filter(a => {
+            const hasTeacher = a.teacher_id !== null && a.teacher_id !== undefined && Number(a.teacher_id) > 0;
+            const isAuto = Number(a.is_auto) === 1 || !hasTeacher;
+            return !isAuto;
+        });
+        const defaultPrimaryId = manualAssignments.find(a => Number(a.is_primary) === 1)?.id || (manualAssignments[0]?.id || null);
+        const groupLiteral = groupId === null ? 'null' : groupId;
+        const sectionLiteral = sectionId === null ? 'null' : sectionId;
+
+        return assignments.map(a => {
+            const hasTeacher = a.teacher_id !== null && a.teacher_id !== undefined && Number(a.teacher_id) > 0;
+            const isAuto = Number(a.is_auto) === 1 || !hasTeacher;
+            const isPrimary = !isAuto && (Number(a.is_primary) === 1 || (defaultPrimaryId && a.id === defaultPrimaryId));
+            const teacherName = a.teacher_name || (teachersById[a.teacher_id] ? teachersById[a.teacher_id].full_name : '') || `Teacher ${a.teacher_id || 'Unknown'}`;
+            const safeName = escapeHtml(teacherName);
+            const label = isAuto ? '<span style="color: #666; font-style: italic;">Auto-Assigned</span>' : safeName;
+            const role = isAuto ? '' : (isPrimary ? '<span style="color: #111827; font-weight: bold;"> (Primary)</span>' : '<span style="color: #666;"> (Additional)</span>');
+            return `<div style="margin-bottom: 2px;">
+                        ${label}${role}
+                        <div style="margin-top: 2px;">
+                            <button onclick="replaceTeacher(${a.id}, ${classId}, ${groupLiteral}, ${sectionLiteral}, ${subjectId})" style="background-color: #6b7280; color: white; border: none; padding: 2px 4px; cursor: pointer; font-size: 10px; margin-right: 2px;">Replace</button>
+                            <button onclick="removeTeacher(${a.id}, ${classId}, ${groupLiteral}, ${sectionLiteral}, ${subjectId})" style="background-color: #b91c1c; color: white; border: none; padding: 2px 4px; cursor: pointer; font-size: 10px;">Remove</button>
+                        </div>
+                    </div>`;
+        }).join('');
     }
     
     const sectionColors = ['#ffffff', '#f9fafb'];
@@ -59,8 +127,8 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
                 level: 0
             });
             
-            const classSubjectsList = classSubjects.filter(cs => cs.class_id === cls.id);
-            const classSections = sections.filter(s => s.class_id === cls.id && !s.group_id);
+            const classSubjectsList = classSubjectsByClass[cls.id] || [];
+            const classSections = sectionsByClass[cls.id] || [];
             
             if (classSubjectsList.length > 0 && classSections.length > 0) {
                 classSections.forEach(section => {
@@ -90,7 +158,7 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
             const sortedGroups = classGroups.sort((a, b) => a.group_name.localeCompare(b.group_name));
             
             sortedGroups.forEach(group => {
-                const groupSubjectsList = groupSubjects.filter(gs => gs.group_id === group.id);
+                const groupSubjectsList = groupSubjectsByGroup[group.id] || [];
                 const groupSections = sectionsByGroup[group.id] || [];
                 
                 if (groupSubjectsList.length > 0) {
@@ -185,17 +253,12 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
                                       <td style="border: 1px solid #ccc; padding: 4px; text-align: right;">${row.section.section_name}</td>
                                       <td style="border: 1px solid #ccc; padding: 4px;">${row.subject.subject_name}</td>
                                       <td style="border: 1px solid #ccc; padding: 4px;" data-assignment-key="${row.class.id}-${row.section.group_id || 0}-${row.section.id}-${row.subject.id}">
-                                          ${row.assignments.length === 0 ? '<span style="color: #666; font-style: italic;">Unassigned</span>' : 
-                                            row.assignments.map(a => 
-                                                `<div style="margin-bottom: 2px;">
-                                                    ${a.is_auto ? '<span style="color: #666; font-style: italic;">Auto-Assigned</span>' : (a.teacher_name || (teachersById[a.teacher_id] ? teachersById[a.teacher_id].full_name : '') || `Teacher ${a.teacher_id || 'Unknown'}`)}${a.is_primary ? '<span style="color: #111827; font-weight: bold;"> (Primary)</span>' : '<span style="color: #666;"> (Additional)</span>'}
-                                                    <div style="margin-top: 2px;">
-                                                        <button onclick="replaceTeacher(${a.id}, ${row.class.id}, ${row.section.group_id ? row.section.group_id : 'null'}, ${row.section.id}, ${row.subject.id})" style="background-color: #6b7280; color: white; border: none; padding: 2px 4px; cursor: pointer; font-size: 10px; margin-right: 2px;">Replace</button>
-                                                        <button onclick="removeTeacher(${a.id}, ${row.class.id}, ${row.section.group_id ? row.section.group_id : 'null'}, ${row.section.id}, ${row.subject.id})" style="background-color: #b91c1c; color: white; border: none; padding: 2px 4px; cursor: pointer; font-size: 10px;">Remove</button>
-                                                    </div>
-                                                </div>`
-                                            ).join('')
-                                          }
+                                          ${renderAssignmentsBlock(row.assignments, {
+                                              classId: row.class.id,
+                                              groupId: row.section.group_id,
+                                              sectionId: row.section.id,
+                                              subjectId: row.subject.id
+                                          })}
                                       </td>
                                       <td style="border: 1px solid #ccc; padding: 4px; text-align: center; background-color: rgba(240, 248, 255, 0.7);">
                                           <button onclick="assignTeacher('section-${row.section.id}-${row.subject.id}')" style="background-color: #111827; color: white; border: none; padding: 4px 8px; cursor: pointer; font-size: 12px;">Assign</button>
@@ -216,17 +279,12 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
                                       <td style="border: 1px solid #ccc; padding: 4px; text-align: right;">${row.section.section_name}</td>
                                       <td style="border: 1px solid #ccc; padding: 4px;">${row.subject.subject_name}</td>
                                       <td style="border: 1px solid #ccc; padding: 4px;" data-assignment-key="${row.class.id}-${row.section.group_id || 0}-${row.section.id}-${row.subject.id}">
-                                          ${row.assignments.length === 0 ? '<span style="color: #666; font-style: italic;">Unassigned</span>' : 
-                                            row.assignments.map(a => 
-                                                `<div style="margin-bottom: 2px;">
-                                                    ${a.is_auto ? '<span style="color: #666; font-style: italic;">Auto-Assigned</span>' : (a.teacher_name || (teachersById[a.teacher_id] ? teachersById[a.teacher_id].full_name : '') || `Teacher ${a.teacher_id || 'Unknown'}`)}${a.is_primary ? '<span style="color: #111827; font-weight: bold;"> (Primary)</span>' : '<span style="color: #666;"> (Additional)</span>'}
-                                                    <div style="margin-top: 2px;">
-                                                        <button onclick="replaceTeacher(${a.id}, ${row.class.id}, ${row.section.group_id ? row.section.group_id : 'null'}, ${row.section.id}, ${row.subject.id})" style="background-color: #6b7280; color: white; border: none; padding: 2px 4px; cursor: pointer; font-size: 10px; margin-right: 2px;">Replace</button>
-                                                        <button onclick="removeTeacher(${a.id}, ${row.class.id}, ${row.section.group_id ? row.section.group_id : 'null'}, ${row.section.id}, ${row.subject.id})" style="background-color: #b91c1c; color: white; border: none; padding: 2px 4px; cursor: pointer; font-size: 10px;">Remove</button>
-                                                    </div>
-                                                </div>`
-                                            ).join('')
-                                          }
+                                          ${renderAssignmentsBlock(row.assignments, {
+                                              classId: row.class.id,
+                                              groupId: row.section.group_id,
+                                              sectionId: row.section.id,
+                                              subjectId: row.subject.id
+                                          })}
                                       </td>
                                       <td style="border: 1px solid #ccc; padding: 4px; text-align: center; background-color: rgba(240, 248, 255, 0.7);">
                                           <button onclick="assignTeacher('section-${row.section.id}-${row.subject.id}')" style="background-color: #111827; color: white; border: none; padding: 4px 8px; cursor: pointer; font-size: 12px;">Assign</button>
@@ -322,6 +380,15 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
         window.assignmentData.teachers.forEach(t => {
             window.assignmentData.teachersById[t.id] = t;
         });
+        window.assignmentData.teacherIdsBySubject = {};
+        window.assignmentData.teacherSubjects.forEach(ts => {
+            if (!window.assignmentData.teacherIdsBySubject[ts.subject_id]) {
+                window.assignmentData.teacherIdsBySubject[ts.subject_id] = [];
+            }
+            if (!window.assignmentData.teacherIdsBySubject[ts.subject_id].includes(ts.teacher_id)) {
+                window.assignmentData.teacherIdsBySubject[ts.subject_id].push(ts.teacher_id);
+            }
+        });
 
         function escapeHtmlClient(text) {
             if (!text) return '';
@@ -401,11 +468,20 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
             const groupId = normalizeId(context.group_id);
             const sectionId = normalizeId(context.section_id);
             const subjectId = Number(context.subject_id);
+            const manualAssignments = assignments.filter(a => {
+                const hasTeacher = a.teacher_id !== null && a.teacher_id !== undefined && Number(a.teacher_id) > 0;
+                const isAuto = Number(a.is_auto) === 1 || !hasTeacher;
+                return !isAuto;
+            });
+            const defaultPrimaryId = manualAssignments.find(a => Number(a.is_primary) === 1)?.id || (manualAssignments[0]?.id || null);
             return assignments.map(a => {
+                const hasTeacher = a.teacher_id !== null && a.teacher_id !== undefined && Number(a.teacher_id) > 0;
+                const isAuto = Number(a.is_auto) === 1 || !hasTeacher;
+                const isPrimary = !isAuto && (Number(a.is_primary) === 1 || (defaultPrimaryId && a.id === defaultPrimaryId));
                 const teacherName = a.teacher_name || (window.assignmentData.teachersById[a.teacher_id] ? window.assignmentData.teachersById[a.teacher_id].full_name : '') || ('Teacher ' + (a.teacher_id || 'Unknown'));
                 const safeName = escapeHtmlClient(teacherName);
-                const label = a.is_auto ? '<span style="color: #666; font-style: italic;">Auto-Assigned</span>' : safeName;
-                const role = a.is_primary ? '<span style="color: #111827; font-weight: bold;"> (Primary)</span>' : '<span style="color: #666;"> (Additional)</span>';
+                const label = isAuto ? '<span style="color: #666; font-style: italic;">Auto-Assigned</span>' : safeName;
+                const role = isAuto ? '' : (isPrimary ? '<span style="color: #111827; font-weight: bold;"> (Primary)</span>' : '<span style="color: #666;"> (Additional)</span>');
                 const groupLiteral = groupId === null ? 'null' : groupId;
                 const sectionLiteral = sectionId === null ? 'null' : sectionId;
                 return '<div style="margin-bottom: 2px;">' +
@@ -421,8 +497,8 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
         async function fetchAssignmentsFor(context) {
             const params = new URLSearchParams({
                 class_id: context.class_id,
-                group_id: context.group_id '',
-                section_id: context.section_id '',
+                group_id: context.group_id === null || context.group_id === undefined ? '' : context.group_id,
+                section_id: context.section_id === null || context.section_id === undefined ? '' : context.section_id,
                 subject_id: context.subject_id
             });
             const response = await fetch('/school/teacher-assignments?' + params.toString(), {
@@ -441,7 +517,8 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
         async function refreshAssignmentCell(context, retries = 2) {
             const cell = getAssignmentCell(context);
             if (!cell) {
-                location.reload();
+                hideSyncIndicator();
+                showToast('Updated. Please refresh if the row is missing.', 'error');
                 return;
             }
             try {
@@ -457,8 +534,7 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
                     return refreshAssignmentCell(context, retries - 1);
                 }
                 hideSyncIndicator();
-                showToast('Sync failed. Reloading...', 'error');
-                location.reload();
+                showToast('Sync failed. Please try again.', 'error');
             }
         }
         
@@ -487,7 +563,7 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
             }).then(r => r.json()).then(result => {
                 if (result.success) {
                     closeAddTeacherModal();
-                    location.reload();
+                    showToast('Teacher added', 'success');
                 } else {
                     alert('Error: ' + (result.error || 'Unknown error'));
                 }
@@ -513,9 +589,10 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
                 subject_id: subjectId
             };
             
-            const qualifiedTeachers = window.assignmentData.teachers.filter(t => {
-                return window.assignmentData.teacherSubjects.some(ts => ts.teacher_id === t.id && ts.subject_id === subjectId);
-            });
+            const qualifiedTeacherIds = window.assignmentData.teacherIdsBySubject[subjectId] || [];
+            const qualifiedTeachers = qualifiedTeacherIds
+                .map(id => window.assignmentData.teachersById[id])
+                .filter(Boolean);
             
             if (type === 'class') {
                 const cls = window.assignmentData.classes.find(c => c.id === id);
@@ -550,8 +627,8 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
                 
                 assignmentText = className + (groupName ? ' - ' + groupName : '') + ' - ' + section.section_name + ' - ' + subject.subject_name;
                 assignmentData.class_id = section.class_id;
-                assignmentData.group_id = section.group_id;
-                assignmentData.section_id = id;
+                assignmentData.group_id = normalizeId(section.group_id);
+                assignmentData.section_id = normalizeId(id);
             }
             
             assignmentData.assignment_key = makeAssignmentKey(assignmentData.class_id, assignmentData.group_id, assignmentData.section_id, assignmentData.subject_id);
@@ -583,7 +660,7 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
 
         function getTeacherDisplayName(assignment) {
             if (!assignment) return 'Teacher';
-            if (assignment.is_auto) return 'Auto';
+            if (Number(assignment.is_auto) === 1 || !assignment.teacher_id) return 'Auto';
             if (assignment.teacher_name) return assignment.teacher_name;
             if (assignment.teacher_id && window.assignmentData.teachersById[assignment.teacher_id]) {
                 return window.assignmentData.teachersById[assignment.teacher_id].full_name;
@@ -612,9 +689,10 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
             const teacherSelect = document.getElementById('teacher-select');
             teacherSelect.innerHTML = '<option value="">Select new option...</option>';
             
-            const qualifiedTeachers = window.assignmentData.teachers.filter(t => {
-                return window.assignmentData.teacherSubjects.some(ts => ts.teacher_id === t.id && ts.subject_id === assignment.subject_id);
-            });
+            const qualifiedTeacherIds = window.assignmentData.teacherIdsBySubject[assignment.subject_id] || [];
+            const qualifiedTeachers = qualifiedTeacherIds
+                .map(id => window.assignmentData.teachersById[id])
+                .filter(Boolean);
             
             qualifiedTeachers.forEach(t => {
                 const option = document.createElement('option');
@@ -655,7 +733,7 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
                             section_id: normalizeId(sectionId),
                             subject_id: subjectId
                         };
-                        refreshAssignmentCell(context).catch(() => location.reload());
+                        refreshAssignmentCell(context);
                     } else {
                         hideSyncIndicator();
                         alert('Error: ' + (result.error || 'Unknown error'));
@@ -677,13 +755,19 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
                 return;
             }
 
+            const parsedTeacherId = selectedTeacher === 'auto' ? null : Number(selectedTeacher);
+            if (selectedTeacher !== 'auto' && !Number.isFinite(parsedTeacherId)) {
+                alert('Please select a valid teacher.');
+                return;
+            }
+
             const data = {
                 action: assignmentData.is_replacement ? 'replace_teacher' : 'assign_teacher',
                 class_id: assignmentData.class_id,
                 group_id: assignmentData.group_id,
                 section_id: assignmentData.section_id,
                 subject_id: assignmentData.subject_id,
-                teacher_id: selectedTeacher === 'auto' ? null : selectedTeacher,
+                teacher_id: parsedTeacherId,
                 is_auto: selectedTeacher === 'auto' ? 1 : 0,
                 is_primary: 1
             };
@@ -706,7 +790,7 @@ export function TeachersAssignmentPageHTML(school, classes = [], groups = [], se
                         section_id: normalizeId(assignmentData.section_id),
                         subject_id: assignmentData.subject_id
                     };
-                    refreshAssignmentCell(context).catch(() => location.reload());
+                    refreshAssignmentCell(context);
                 } else {
                     hideSyncIndicator();
                     alert('Error: ' + (result.error || 'Unknown error'));

@@ -50,7 +50,7 @@ export function SchoolsPageHTML(schoolsList = []) {
         </div>
 
         <div id="list-view" class="bg-white border border-gray-300 overflow-hidden">
-            <div class="md:hidden space-y-3 p-4">
+            <div id="schools-mobile-list" class="md:hidden space-y-3 p-4">
                 ${mobileCards.length > 0 ? mobileCards : '<div class="py-10 text-center text-gray-500 text-sm">No schools found.</div>'}
             </div>
             <div class="hidden md:block overflow-x-auto">
@@ -64,7 +64,7 @@ export function SchoolsPageHTML(schoolsList = []) {
                             <th scope="col" class="border border-gray-300 px-4 py-2 text-right text-[11px] font-bold text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white">
+                    <tbody id="schools-table-body" class="bg-white">
                         ${rows.length > 0 ? rows : '<tr><td colspan="5" class="border border-gray-300 px-6 py-12 text-center text-gray-500">No schools found. <br><span class="text-sm">Click "Add New School" to create one.</span></td></tr>'}
                     </tbody>
                 </table>
@@ -127,6 +127,74 @@ export function SchoolsPageHTML(schoolsList = []) {
     </div>
 
     <script>
+        window.adminSchools = ${JSON.stringify(schoolsList || [])};
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function renderSchoolsList() {
+            const list = Array.isArray(window.adminSchools) ? window.adminSchools.slice() : [];
+            list.sort((a, b) => String(a.school_name || '').localeCompare(String(b.school_name || '')));
+
+            const tableBody = document.getElementById('schools-table-body');
+            if (tableBody) {
+                if (!list.length) {
+                    tableBody.innerHTML = '<tr><td colspan="5" class="border border-gray-300 px-6 py-12 text-center text-gray-500">No schools found. <br><span class="text-sm">Click "Add New School" to create one.</span></td></tr>';
+                } else {
+                    tableBody.innerHTML = list.map(function(school) {
+                        const authId = encodeURIComponent(school.auth_id || '');
+                        return '<tr>' +
+                            '<td class="border border-gray-300 px-4 py-2 whitespace-nowrap">' +
+                                '<div class="text-sm font-semibold text-gray-900">' + escapeHtml(school.school_name) + '</div>' +
+                                '<div class="text-xs text-gray-500 md:hidden">EIIN: ' + escapeHtml(school.eiin_code || 'N/A') + '</div>' +
+                            '</td>' +
+                            '<td class="border border-gray-300 px-4 py-2 whitespace-nowrap hidden md:table-cell text-sm text-gray-600">' + escapeHtml(school.eiin_code || 'N/A') + '</td>' +
+                            '<td class="border border-gray-300 px-4 py-2 whitespace-nowrap text-sm text-gray-600">' + escapeHtml(school.email || '') + '</td>' +
+                            '<td class="border border-gray-300 px-4 py-2 whitespace-nowrap text-sm text-gray-600">Active</td>' +
+                            '<td class="border border-gray-300 px-4 py-2 whitespace-nowrap text-right text-sm font-medium">' +
+                                '<a href="/admin/school/view?id=' + authId + '" class="border border-gray-400 text-gray-700 px-3 py-1 text-xs">' +
+                                    'Manage' +
+                                '</a>' +
+                            '</td>' +
+                        '</tr>';
+                    }).join('');
+                }
+            }
+
+            const mobileList = document.getElementById('schools-mobile-list');
+            if (mobileList) {
+                if (!list.length) {
+                    mobileList.innerHTML = '<div class="py-10 text-center text-gray-500 text-sm">No schools found.</div>';
+                } else {
+                    mobileList.innerHTML = list.map(function(school) {
+                        const authId = encodeURIComponent(school.auth_id || '');
+                        return '<div class="border border-gray-300 p-4 bg-white">' +
+                            '<div class="flex items-start justify-between gap-3">' +
+                                '<div>' +
+                                    '<div class="text-sm font-semibold text-gray-900">' + escapeHtml(school.school_name) + '</div>' +
+                                    '<div class="text-xs text-gray-500 mt-1">EIIN: ' + escapeHtml(school.eiin_code || 'N/A') + '</div>' +
+                                    '<div class="text-xs text-gray-500 mt-1">' + escapeHtml(school.email || '') + '</div>' +
+                                '</div>' +
+                                '<span class="text-[10px] text-gray-600">Active</span>' +
+                            '</div>' +
+                            '<div class="mt-3">' +
+                                '<a href="/admin/school/view?id=' + authId + '" class="inline-flex items-center text-xs font-semibold text-gray-700 border border-gray-400 px-3 py-1">' +
+                                    'Manage' +
+                                '</a>' +
+                            '</div>' +
+                        '</div>';
+                    }).join('');
+                }
+            }
+        }
+
         function toggleForm() {
             const form = document.getElementById('add-form');
             form.classList.toggle('hidden');
@@ -152,7 +220,15 @@ export function SchoolsPageHTML(schoolsList = []) {
                 const result = await res.json();
                 
                 if (result.success) {
-                    window.location.reload(); 
+                    if (result.school && result.school.auth_id) {
+                        window.adminSchools = window.adminSchools || [];
+                        window.adminSchools.unshift(result.school);
+                        renderSchoolsList();
+                    }
+                    toggleForm();
+                    e.target.reset();
+                    btn.innerText = originalText;
+                    btn.disabled = false;
                 } else {
                     alert("Error: " + result.error);
                     btn.innerText = originalText;

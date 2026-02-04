@@ -316,6 +316,33 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
             return text;
         }
 
+        function renderTeachersTable() {
+            const tbody = document.getElementById('teachers-tbody');
+            if (!tbody) return false;
+            const teachers = (window.teachersData && window.teachersData.teachers) ? window.teachersData.teachers.slice() : [];
+            if (!teachers.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="border p-8 text-center text-gray-500">No teachers added yet</td></tr>';
+                return true;
+            }
+            teachers.sort((a, b) => String(a.full_name || '').localeCompare(String(b.full_name || '')));
+            const rows = teachers.map(teacher => {
+                const currentSubjects = window.teachersData.teacherSubjects.filter(ts => ts.teacher_id == teacher.id);
+                const subjectsText = buildTeacherSubjectsText(currentSubjects);
+                return '<tr class="border-b" data-teacher-id="' + teacher.id + '">' +
+                    '<td class="p-3">' + escapeHtml(teacher.full_name) + '</td>' +
+                    '<td class="p-3 break-words">' + escapeHtml(teacher.email) + '</td>' +
+                    '<td class="p-3">' + escapeHtml(teacher.phone || '') + '</td>' +
+                    '<td class="p-3 break-words" data-subject-cell="' + teacher.id + '">' + escapeHtml(subjectsText) + '</td>' +
+                    '<td class="p-3 whitespace-nowrap">' +
+                        '<button type="button" onclick="editSubjects(' + teacher.id + ')" class="text-gray-700 text-sm">Edit</button>' +
+                        '<button type="button" onclick="removeTeacher(' + teacher.id + ')" class="text-gray-700 text-sm ml-3">Remove</button>' +
+                    '</td>' +
+                '</tr>';
+            }).join('');
+            tbody.innerHTML = rows;
+            return true;
+        }
+
         function addTeacherRow(teacher) {
             const tbody = document.getElementById('teachers-tbody');
             if (!tbody) return false;
@@ -731,7 +758,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                     hideSyncIndicator();
                     showToast('Updated', 'success');
                     if (!updated) {
-                        location.reload();
+                        renderTeachersTable();
                     }
                 } else {
                     hideSyncIndicator();
@@ -765,7 +792,7 @@ export function TeachersPageHTML(school, teachers = [], allSubjects = [], teache
                         hideSyncIndicator();
                         showToast('Removed', 'success');
                     } else {
-                        location.reload();
+                        renderTeachersTable();
                     }
                 } else {
                     hideSyncIndicator();

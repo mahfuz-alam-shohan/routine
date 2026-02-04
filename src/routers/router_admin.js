@@ -77,7 +77,15 @@ export async function handleAdminRequest(request, env) {
             const { hash, salt } = await hashPassword(body.password);
             const authResult = await env.DB.prepare("INSERT INTO auth_accounts (email, password_hash, salt, role) VALUES (?, ?, ?, ?) RETURNING id").bind(body.email, hash, salt, ROLES.INSTITUTE).first();
             await env.DB.prepare("INSERT INTO profiles_institution (auth_id, school_name, eiin_code, address) VALUES (?, ?, ?, ?)").bind(authResult.id, body.school_name, body.eiin || '', body.address || '').run();
-            return jsonResponse({ success: true });
+            return jsonResponse({ 
+                success: true,
+                school: {
+                    auth_id: authResult.id,
+                    school_name: body.school_name,
+                    eiin_code: body.eiin || '',
+                    email: body.email
+                }
+            });
         } catch(e) { return jsonResponse({ error: e.message }, 500); }
     }
     const result = await env.DB.prepare(`SELECT p.auth_id, p.school_name, p.eiin_code, a.email FROM profiles_institution p JOIN auth_accounts a ON p.auth_id = a.id ORDER BY p.id DESC`).all();
@@ -243,33 +251,50 @@ export async function handleAdminRequest(request, env) {
               if(body.action === 'create_class') {
                   
                   const shiftName = (body.shift_name || 'Full Day').toString().trim() || 'Full Day';
+                  let insertResult;
                   try {
-                      await env.DB.prepare("INSERT INTO academic_classes (school_id, class_name, has_groups, shift_name) VALUES (?, ?, ?, ?)")
+                      insertResult = await env.DB.prepare("INSERT INTO academic_classes (school_id, class_name, has_groups, shift_name) VALUES (?, ?, ?, ?)")
                           .bind(body.school_id, body.class_name, body.has_groups ? 1 : 0, shiftName).run();
                   } catch (e) {
                       if (e.message && e.message.includes("no such column")) {
                           await syncDatabase(env);
-                          await env.DB.prepare("INSERT INTO academic_classes (school_id, class_name, has_groups, shift_name) VALUES (?, ?, ?, ?)")
+                          insertResult = await env.DB.prepare("INSERT INTO academic_classes (school_id, class_name, has_groups, shift_name) VALUES (?, ?, ?, ?)")
                               .bind(body.school_id, body.class_name, body.has_groups ? 1 : 0, shiftName).run();
                       } else {
                           throw e;
                       }
                   }
-                  return jsonResponse({success:true});
+                  const classId = insertResult?.meta?.last_row_id;
+                  return jsonResponse({
+                      success: true,
+                      class: {
+                          id: classId,
+                          class_name: body.class_name,
+                          has_groups: body.has_groups ? 1 : 0,
+                          shift_name: shiftName
+                      }
+                  });
               }
               
               if(body.action === 'edit_class') {
                   
-                  await env.DB.prepare("UPDATE academic_classes SET class_name = ? WHERE id = ? AND school_id = ?")
-                      .bind(body.class_name, body.class_id, body.school_id).run();
+                  await env.DB.prepare("UPDATE academic_classes SET class_name = ?, has_groups = ? WHERE id = ? AND school_id = ?")
+                      .bind(body.class_name, body.has_groups ? 1 : 0, body.class_id, body.school_id).run();
                   return jsonResponse({success:true});
               }
               
               if(body.action === 'add_group') {
                   
-                  await env.DB.prepare("INSERT INTO class_groups (school_id, class_id, group_name) VALUES (?, ?, ?)")
+                  const insertResult = await env.DB.prepare("INSERT INTO class_groups (school_id, class_id, group_name) VALUES (?, ?, ?)")
                       .bind(body.school_id, body.class_id, body.group_name).run();
-                  return jsonResponse({success:true});
+                  return jsonResponse({
+                      success: true,
+                      group: {
+                          id: insertResult?.meta?.last_row_id,
+                          class_id: body.class_id,
+                          group_name: body.group_name
+                      }
+                  });
               }
               
               if(body.action === 'edit_group') {
@@ -281,9 +306,17 @@ export async function handleAdminRequest(request, env) {
               
               if(body.action === 'add_section') {
                   
-                  await env.DB.prepare("INSERT INTO class_sections (school_id, class_id, group_id, section_name) VALUES (?, ?, ?, ?)")
+                  const insertResult = await env.DB.prepare("INSERT INTO class_sections (school_id, class_id, group_id, section_name) VALUES (?, ?, ?, ?)")
                       .bind(body.school_id, body.class_id, body.group_id || null, body.section_name).run();
-                  return jsonResponse({success:true});
+                  return jsonResponse({
+                      success: true,
+                      section: {
+                          id: insertResult?.meta?.last_row_id,
+                          class_id: body.class_id,
+                          group_id: body.group_id || null,
+                          section_name: body.section_name
+                      }
+                  });
               }
               
               if(body.action === 'edit_section') {

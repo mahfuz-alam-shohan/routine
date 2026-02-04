@@ -671,20 +671,64 @@ export async function handleInstituteRequest(request, env) {
   
   
   if (url.pathname === '/school/teacher-assignments') {
+      const normalizeId = (value) => {
+          if (value === null || value === undefined || value === '' || value === 'null') return null;
+          const num = Number(value);
+          return Number.isNaN(num) ? null : num;
+      };
+
+      const normalizeAssignmentsForContext = async ({ classId, groupId, sectionId, subjectId }) => {
+          if (!Number.isFinite(classId) || !Number.isFinite(subjectId)) return;
+          const rows = await env.DB.prepare(`
+              SELECT id, teacher_id, is_auto, is_primary
+              FROM teacher_assignments
+              WHERE school_id = ? AND class_id = ? AND
+                    (group_id = ? OR (group_id IS NULL AND ? IS NULL)) AND
+                    (section_id = ? OR (section_id IS NULL AND ? IS NULL)) AND
+                    subject_id = ?
+              ORDER BY id ASC
+          `).bind(
+              school.id,
+              classId,
+              groupId,
+              groupId,
+              sectionId,
+              sectionId,
+              subjectId
+          ).all();
+          const assignments = rows.results || [];
+          if (!assignments.length) return;
+
+          const manual = assignments.filter(a => a.teacher_id !== null && a.teacher_id !== undefined && Number(a.teacher_id) > 0);
+          let primaryId = manual.find(a => Number(a.is_primary) === 1)?.id;
+          if (!primaryId && manual.length) primaryId = manual[0].id;
+
+          for (const assignment of assignments) {
+              const hasTeacher = assignment.teacher_id !== null && assignment.teacher_id !== undefined && Number(assignment.teacher_id) > 0;
+              const nextIsAuto = hasTeacher ? 0 : 1;
+              const nextIsPrimary = hasTeacher && assignment.id === primaryId ? 1 : 0;
+              if (Number(assignment.is_auto) === nextIsAuto && Number(assignment.is_primary) === nextIsPrimary) continue;
+              await env.DB.prepare(`
+                  UPDATE teacher_assignments
+                  SET is_auto = ?, is_primary = ?
+                  WHERE id = ? AND school_id = ?
+              `).bind(
+                  nextIsAuto,
+                  nextIsPrimary,
+                  assignment.id,
+                  school.id
+              ).run();
+          }
+      };
+
       if (request.method === 'GET') {
-          const classId = Number(url.searchParams.get('class_id'));
-          const subjectId = Number(url.searchParams.get('subject_id'));
-          const groupParam = url.searchParams.get('group_id');
-          const sectionParam = url.searchParams.get('section_id');
-          const groupId = groupParam === null || groupParam === '' || groupParam === 'null' ? null : Number(groupParam);
-          const sectionId = sectionParam === null || sectionParam === '' || sectionParam === 'null' ? null : Number(sectionParam);
+          const classId = normalizeId(url.searchParams.get('class_id'));
+          const subjectId = normalizeId(url.searchParams.get('subject_id'));
+          const groupId = normalizeId(url.searchParams.get('group_id'));
+          const sectionId = normalizeId(url.searchParams.get('section_id'));
           
           if (!Number.isFinite(classId) || !Number.isFinite(subjectId)) {
               return jsonResponse({ error: "Missing or invalid identifiers" }, 400);
-          }
-          
-          if ((groupId !== null && Number.isNaN(groupId)) || (sectionId !== null && Number.isNaN(sectionId))) {
-              return jsonResponse({ error: "Invalid identifiers" }, 400);
           }
           
           const assignments = await env.DB.prepare(`
@@ -712,7 +756,17 @@ export async function handleInstituteRequest(request, env) {
           const body = await request.json();
           
           if (body.action === 'assign_teacher') {
-              if (!body.teacher_id) {
+              const classId = normalizeId(body.class_id);
+              const groupId = normalizeId(body.group_id);
+              const sectionId = normalizeId(body.section_id);
+              const subjectId = normalizeId(body.subject_id);
+              const teacherId = normalizeId(body.teacher_id);
+
+              if (!Number.isFinite(classId) || !Number.isFinite(subjectId)) {
+                  return jsonResponse({ error: "Missing or invalid identifiers" }, 400);
+              }
+
+              if (!Number.isFinite(teacherId)) {
                   return jsonResponse({ error: "Please select a teacher before assigning." }, 400);
               }
               
@@ -724,13 +778,13 @@ export async function handleInstituteRequest(request, env) {
                         subject_id = ? AND teacher_id = ?
               `).bind(
                   school.id,
-                  body.class_id,
-                  body.group_id,
-                  body.group_id,
-                  body.section_id,
-                  body.section_id,
-                  body.subject_id,
-                  body.teacher_id
+                  classId,
+                  groupId,
+                  groupId,
+                  sectionId,
+                  sectionId,
+                  subjectId,
+                  teacherId
               ).first();
               
               if (existingTeacherAssignment) {
@@ -747,12 +801,12 @@ export async function handleInstituteRequest(request, env) {
                   LIMIT 1
               `).bind(
                   school.id,
-                  body.class_id,
-                  body.group_id,
-                  body.group_id,
-                  body.section_id,
-                  body.section_id,
-                  body.subject_id
+                  classId,
+                  groupId,
+                  groupId,
+                  sectionId,
+                  sectionId,
+                  subjectId
               ).first();
               
               const hasPrimaryAssignment = !!primaryAssignment;
@@ -769,12 +823,12 @@ export async function handleInstituteRequest(request, env) {
                   LIMIT 1
               `).bind(
                   school.id,
-                  body.class_id,
-                  body.group_id,
-                  body.group_id,
-                  body.section_id,
-                  body.section_id,
-                  body.subject_id
+                  classId,
+                  groupId,
+                  groupId,
+                  sectionId,
+                  sectionId,
+                  subjectId
               ).first();
               
               if (autoAssignment) {
@@ -783,7 +837,7 @@ export async function handleInstituteRequest(request, env) {
                       SET teacher_id = ?, is_auto = 0, is_primary = ?
                       WHERE id = ? AND school_id = ?
                   `).bind(
-                      body.teacher_id,
+                      teacherId,
                       isPrimary,
                       autoAssignment.id,
                       school.id
@@ -799,16 +853,16 @@ export async function handleInstituteRequest(request, env) {
                                 subject_id = ? AND id != ? AND (is_auto = 1 OR teacher_id IS NULL)
                       `).bind(
                           school.id,
-                          body.class_id,
-                          body.group_id,
-                          body.group_id,
-                          body.section_id,
-                          body.section_id,
-                          body.subject_id,
+                          classId,
+                          groupId,
+                          groupId,
+                          sectionId,
+                          sectionId,
+                          subjectId,
                           autoAssignment.id
                       ).run();
                   }
-                  
+                  await normalizeAssignmentsForContext({ classId, groupId, sectionId, subjectId });
                   return jsonResponse({ success: true });
               }
               
@@ -818,14 +872,15 @@ export async function handleInstituteRequest(request, env) {
                   VALUES (?, ?, ?, ?, ?, ?, 0, ?)
               `).bind(
                   school.id,
-                  body.class_id,
-                  body.group_id,
-                  body.section_id,
-                  body.subject_id,
-                  body.teacher_id,
+                  classId,
+                  groupId,
+                  sectionId,
+                  subjectId,
+                  teacherId,
                   isPrimary
               ).run();
-              
+
+              await normalizeAssignmentsForContext({ classId, groupId, sectionId, subjectId });
               return jsonResponse({ success: true });
           }
           
@@ -841,8 +896,10 @@ export async function handleInstituteRequest(request, env) {
               if (!currentAssignment) {
                   return jsonResponse({ error: "Assignment not found" }, 404);
               }
-              
-              if (!body.teacher_id) {
+
+              const teacherId = normalizeId(body.teacher_id);
+
+              if (!Number.isFinite(teacherId)) {
                   await env.DB.prepare(`
                       UPDATE teacher_assignments
                       SET teacher_id = null, is_auto = 1, is_primary = 0
@@ -877,30 +934,45 @@ export async function handleInstituteRequest(request, env) {
                       SET teacher_id = ?, is_auto = 0, is_primary = ?
                       WHERE id = ? AND school_id = ?
                   `).bind(
-                      body.teacher_id,
+                      teacherId,
                       shouldBePrimary ? 1 : 0,
                       body.existing_assignment_id,
                       school.id
                   ).run();
               }
-              
+
+              await normalizeAssignmentsForContext({
+                  classId: currentAssignment.class_id,
+                  groupId: currentAssignment.group_id,
+                  sectionId: currentAssignment.section_id,
+                  subjectId: currentAssignment.subject_id
+              });
               return jsonResponse({ success: true });
           }
           
           if (body.action === 'assign_auto') {
+              const classId = normalizeId(body.class_id);
+              const groupId = normalizeId(body.group_id);
+              const sectionId = normalizeId(body.section_id);
+              const subjectId = normalizeId(body.subject_id);
+
+              if (!Number.isFinite(classId) || !Number.isFinite(subjectId)) {
+                  return jsonResponse({ error: "Missing or invalid identifiers" }, 400);
+              }
               
               await env.DB.prepare(`
                   INSERT INTO teacher_assignments (school_id, class_id, group_id, section_id, subject_id, teacher_id, is_auto, is_primary) 
                   VALUES (?, ?, ?, ?, ?, ?, 1, 0)
               `).bind(
                   school.id,
-                  body.class_id,
-                  body.group_id || null,
-                  body.section_id || null,
-                  body.subject_id,
+                  classId,
+                  groupId,
+                  sectionId,
+                  subjectId,
                   null 
               ).run();
-              
+
+              await normalizeAssignmentsForContext({ classId, groupId, sectionId, subjectId });
               return jsonResponse({ success: true });
           }
           
@@ -914,7 +986,20 @@ export async function handleInstituteRequest(request, env) {
                   body.assignment_id,
                   school.id
               ).run();
-              
+
+              const context = await env.DB.prepare(`
+                  SELECT class_id, group_id, section_id, subject_id
+                  FROM teacher_assignments
+                  WHERE id = ? AND school_id = ?
+              `).bind(body.assignment_id, school.id).first();
+              if (context) {
+                  await normalizeAssignmentsForContext({
+                      classId: context.class_id,
+                      groupId: context.group_id,
+                      sectionId: context.section_id,
+                      subjectId: context.subject_id
+                  });
+              }
               return jsonResponse({ success: true });
           }
           
@@ -931,6 +1016,11 @@ export async function handleInstituteRequest(request, env) {
               
               if (!currentAssignment) {
                   return jsonResponse({ error: "Assignment not found" }, 404);
+              }
+
+              const manualTeacherId = normalizeId(body.teacher_id);
+              if (!Number.isFinite(manualTeacherId)) {
+                  return jsonResponse({ error: "Please select a valid teacher." }, 400);
               }
               
               const primaryExists = await env.DB.prepare(`
@@ -958,12 +1048,18 @@ export async function handleInstituteRequest(request, env) {
                   SET teacher_id = ?, is_auto = 0, is_primary = ?
                   WHERE id = ? AND school_id = ?
               `).bind(
-                  body.teacher_id,
+                  manualTeacherId,
                   shouldBePrimary ? 1 : 0,
                   body.assignment_id,
                   school.id
               ).run();
-              
+
+              await normalizeAssignmentsForContext({
+                  classId: currentAssignment.class_id,
+                  groupId: currentAssignment.group_id,
+                  sectionId: currentAssignment.section_id,
+                  subjectId: currentAssignment.subject_id
+              });
               return jsonResponse({ success: true });
           }
           
@@ -974,7 +1070,15 @@ export async function handleInstituteRequest(request, env) {
           const body = await request.json();
           
           if (body.action === 'remove_teacher') {
-              
+              const context = await env.DB.prepare(`
+                  SELECT class_id, group_id, section_id, subject_id
+                  FROM teacher_assignments
+                  WHERE id = ? AND school_id = ?
+              `).bind(
+                  body.assignment_id,
+                  school.id
+              ).first();
+
               await env.DB.prepare(`
                   DELETE FROM teacher_assignments 
                   WHERE id = ? AND school_id = ?
@@ -982,7 +1086,15 @@ export async function handleInstituteRequest(request, env) {
                   body.assignment_id,
                   school.id
               ).run();
-              
+
+              if (context) {
+                  await normalizeAssignmentsForContext({
+                      classId: context.class_id,
+                      groupId: context.group_id,
+                      sectionId: context.section_id,
+                      subjectId: context.subject_id
+                  });
+              }
               return jsonResponse({ success: true });
           }
           

@@ -80,15 +80,8 @@ export function SchoolDetailHTML(school, shiftConfig = null) {
                           <span>Shifts</span>
                           <span>Full Day is default</span>
                       </div>
-                      <div class="space-y-2">
-                          ${shifts.map(shift => `
-                              <div class="flex items-center justify-between border border-gray-300 px-3 py-2">
-                                  <span class="text-sm text-gray-900">${escapeHtml(shift)}</span>
-                                  ${shift === 'Full Day' ? `<span class="text-xs text-gray-500">Default</span>` : `
-                                      <button onclick='removeShift(${JSON.stringify(shift)})' class="text-xs text-red-600 hover:text-red-700">Remove</button>
-                                  `}
-                              </div>
-                          `).join('')}
+                      <div id="shift-list" class="space-y-2">
+                          <div class="text-xs text-gray-500">Loading shifts...</div>
                       </div>
                       <form onsubmit="addShift(event)" class="flex flex-col sm:flex-row gap-2 mt-3">
                           <input type="text" id="shift-name" placeholder="Shift name (e.g. Morning)" class="flex-1 border border-gray-300 px-2 py-1 text-sm" required>
@@ -102,6 +95,40 @@ export function SchoolDetailHTML(school, shiftConfig = null) {
 
       <script>
         const SCHOOL_ID = ${school.id};
+        window.adminShiftList = ${JSON.stringify(shifts || []).replace(/</g, '\\u003c')};
+
+        function escapeHtmlClient(value) {
+            if (value === null || value === undefined) return '';
+            let result = String(value);
+            result = result.split('&').join('&amp;');
+            result = result.split('<').join('&lt;');
+            result = result.split('>').join('&gt;');
+            result = result.split('"').join('&quot;');
+            result = result.split("'").join('&#39;');
+            return result;
+        }
+
+        function renderShiftList() {
+            const container = document.getElementById('shift-list');
+            if (!container) return;
+            const list = Array.isArray(window.adminShiftList) && window.adminShiftList.length
+                ? window.adminShiftList.slice()
+                : ['Full Day'];
+            container.innerHTML = list.map(shift => {
+                const safeName = escapeHtmlClient(shift);
+                if (shift === 'Full Day') {
+                    return '<div class="flex items-center justify-between border border-gray-300 px-3 py-2">' +
+                        '<span class="text-sm text-gray-900">' + safeName + '</span>' +
+                        '<span class="text-xs text-gray-500">Default</span>' +
+                    '</div>';
+                }
+                const encoded = encodeURIComponent(shift);
+                return '<div class="flex items-center justify-between border border-gray-300 px-3 py-2">' +
+                    '<span class="text-sm text-gray-900">' + safeName + '</span>' +
+                    '<button type="button" data-action="remove-shift" data-shift="' + encoded + '" class="text-xs text-red-600 hover:text-red-700">Remove</button>' +
+                '</div>';
+            }).join('');
+        }
 
         function toggleShiftEnabled(input) {
             fetch('/admin/school/shifts', {
@@ -133,7 +160,13 @@ export function SchoolDetailHTML(school, shiftConfig = null) {
                 body: JSON.stringify({ action: 'add_shift', school_id: SCHOOL_ID, shift_name: name })
             }).then(res => res.json()).then(result => {
                 if (result.success) {
-                    window.location.reload();
+                    const nameNormalized = name;
+                    window.adminShiftList = window.adminShiftList || [];
+                    if (!window.adminShiftList.includes(nameNormalized)) {
+                        window.adminShiftList.push(nameNormalized);
+                    }
+                    renderShiftList();
+                    input.value = '';
                 } else {
                     alert(result.error || 'Unable to add shift.');
                 }
@@ -150,7 +183,8 @@ export function SchoolDetailHTML(school, shiftConfig = null) {
                 body: JSON.stringify({ action: 'remove_shift', school_id: SCHOOL_ID, shift_name: name })
             }).then(res => res.json()).then(result => {
                 if (result.success) {
-                    window.location.reload();
+                    window.adminShiftList = (window.adminShiftList || []).filter(shift => shift !== name);
+                    renderShiftList();
                 } else {
                     alert(result.error || 'Unable to remove shift.');
                 }
@@ -158,6 +192,18 @@ export function SchoolDetailHTML(school, shiftConfig = null) {
                 alert('Network error. Please try again.');
             });
         }
+
+        const shiftList = document.getElementById('shift-list');
+        if (shiftList) {
+            shiftList.addEventListener('click', function(event) {
+                const target = event.target.closest('[data-action="remove-shift"]');
+                if (!target) return;
+                const encoded = target.getAttribute('data-shift') || '';
+                removeShift(decodeURIComponent(encoded));
+            });
+        }
+
+        renderShiftList();
       </script>
     `;
 }

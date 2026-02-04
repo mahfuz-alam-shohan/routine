@@ -519,6 +519,9 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
         const CLASS_CAPACITY_MAP = ${JSON.stringify(classCapacityMap)};
         
         // Store subjects data for validation
+        const SUBJECTS = ${JSON.stringify(subjects)};
+        const CLASSES = ${JSON.stringify(classes)};
+        const SECTIONS = ${JSON.stringify(sections)};
         const CLASS_SUBJECTS = ${JSON.stringify(classSubjects)};
         const GROUP_SUBJECTS = ${JSON.stringify(groupSubjects)};
         const GROUPS = ${JSON.stringify(groups)};
@@ -553,6 +556,21 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
+        }
+
+        function escapeJsString(text) {
+            if (!text) return '';
+            return text.toString()
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'");
+        }
+
+        function sortSubjectsByName(list) {
+            return list.slice().sort((a, b) => {
+                const nameA = (a.subject_name || '').toLowerCase();
+                const nameB = (b.subject_name || '').toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
         }
 
         function getSubjectTableBody() {
@@ -614,6 +632,38 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
         function removeEmptySubjectRow(tbody) {
             const emptyRow = tbody.querySelector('tr[data-empty="true"]');
             if (emptyRow) emptyRow.remove();
+        }
+
+        function removeSubjectFromLocal(subjectId) {
+            const index = SUBJECTS.findIndex(s => s.id === subjectId);
+            if (index >= 0) SUBJECTS.splice(index, 1);
+            for (let i = CLASS_SUBJECTS.length - 1; i >= 0; i -= 1) {
+                if (CLASS_SUBJECTS[i].subject_id === subjectId) CLASS_SUBJECTS.splice(i, 1);
+            }
+            for (let i = GROUP_SUBJECTS.length - 1; i >= 0; i -= 1) {
+                if (GROUP_SUBJECTS[i].subject_id === subjectId) GROUP_SUBJECTS.splice(i, 1);
+            }
+            removeSubjectOption(subjectId);
+            renderSubjectBankTable();
+            renderCurriculumTable();
+        }
+
+        function replaceSubjectInLocal(oldSubjectId, newSubjectId) {
+            const replacement = SUBJECTS.find(s => s.id === newSubjectId);
+            const replacementName = replacement ? replacement.subject_name : '';
+            CLASS_SUBJECTS.forEach(cs => {
+                if (cs.subject_id === oldSubjectId) {
+                    cs.subject_id = newSubjectId;
+                    cs.subject_name = replacementName || cs.subject_name;
+                }
+            });
+            GROUP_SUBJECTS.forEach(gs => {
+                if (gs.subject_id === oldSubjectId) {
+                    gs.subject_id = newSubjectId;
+                    gs.subject_name = replacementName || gs.subject_name;
+                }
+            });
+            removeSubjectFromLocal(oldSubjectId);
         }
 
         function getCurriculumBody() {
@@ -685,6 +735,97 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             '</tr>';
         }
 
+        function buildClassRowHtml(cls, groupCount) {
+            const safeName = escapeHtmlClient(cls.class_name || '');
+            const jsName = escapeJsString(cls.class_name || '');
+            return '<tr data-row="class" data-class-id="' + cls.id + '" style="background-color: #f8f8f8; font-weight: bold;">' +
+                '<td style="border: 1px solid #ccc; padding: 4px; text-align: left;">' + safeName + ' (' + groupCount + ' groups)</td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px;" colspan="4"></td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px; text-align: center;">' +
+                    '<button onclick="openAddClassSubjectModal(' + cls.id + ', \'' + jsName + '\')">+ Add</button>' +
+                '</td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px;"></td>' +
+            '</tr>';
+        }
+
+        function buildGroupRowHtml(group, cls, capacity, sectionCount) {
+            const safeGroup = escapeHtmlClient(group.group_name || '');
+            const safeClass = escapeHtmlClient(cls.class_name || '');
+            const groupJs = escapeJsString(group.group_name || '');
+            const classJs = escapeJsString(cls.class_name || '');
+            return '<tr data-row="group" data-class-id="' + cls.id + '" data-group-id="' + group.id + '" style="background-color: #fafafa; font-weight: bold;">' +
+                '<td style="border: 1px solid #ccc; padding: 4px; padding-left: 20px; text-align: right;">' + safeGroup + ' (' + sectionCount + ' sections)</td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px;" colspan="3"></td>' +
+                '<td data-capacity-cell="group-' + group.id + '" style="border: 1px solid #ccc; padding: 4px;">' + capacity.current + '/' + capacity.max + '</td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px; text-align: center;">' +
+                    '<button onclick="openAddGroupSubjectModal(' + group.id + ', \'' + groupJs + '\', ' + cls.id + ', \'' + classJs + '\')">+ Add</button>' +
+                '</td>' +
+                '<td style="border: 1px solid #ccc; padding: 4px;"></td>' +
+            '</tr>';
+        }
+
+        function renderSubjectBankTable() {
+            const tbody = getSubjectTableBody();
+            if (!tbody) return false;
+            const ordered = sortSubjectsByName(SUBJECTS);
+            if (!ordered.length) {
+                tbody.innerHTML = '<tr data-empty="true"><td colspan="4" style="border: 1px solid #ccc; padding: 4px; text-align: center;">No subjects added yet.</td></tr>';
+                return true;
+            }
+            const rows = ordered.map((sub, index) => buildSubjectRowHtml(sub.id, sub.subject_name, index + 1)).join('');
+            tbody.innerHTML = rows;
+            return true;
+        }
+
+        function renderCurriculumTable() {
+            const tbody = getCurriculumBody();
+            if (!tbody) return false;
+
+            const groupsByClass = {};
+            GROUPS.forEach(g => {
+                if (!groupsByClass[g.class_id]) groupsByClass[g.class_id] = [];
+                groupsByClass[g.class_id].push(g);
+            });
+
+            const classSubjectsByClass = {};
+            CLASS_SUBJECTS.forEach(cs => {
+                if (!classSubjectsByClass[cs.class_id]) classSubjectsByClass[cs.class_id] = [];
+                classSubjectsByClass[cs.class_id].push(cs);
+            });
+
+            const groupSubjectsByGroup = {};
+            GROUP_SUBJECTS.forEach(gs => {
+                if (!groupSubjectsByGroup[gs.group_id]) groupSubjectsByGroup[gs.group_id] = [];
+                groupSubjectsByGroup[gs.group_id].push(gs);
+            });
+
+            const rows = [];
+            CLASSES.forEach(cls => {
+                const classGroups = groupsByClass[cls.id] || [];
+                rows.push(buildClassRowHtml(cls, classGroups.length));
+
+                const classSubs = classSubjectsByClass[cls.id] || [];
+                classSubs.forEach(cs => rows.push(buildClassSubjectRowHtml(cs)));
+
+                classGroups.forEach(group => {
+                    const groupSubs = groupSubjectsByGroup[group.id] || [];
+                    const sectionCount = SECTIONS.filter(s => s.group_id === group.id).length;
+                    const current = getClassSubjectLoad(cls.id) + getGroupSubjectLoad(group.id);
+                    const maxCap = CLASS_CAPACITY_MAP[cls.id] || DEFAULT_MAX_CLASSES_PER_SECTION;
+                    rows.push(buildGroupRowHtml(group, cls, { current: current, max: maxCap }, sectionCount));
+                    groupSubs.forEach(gs => rows.push(buildGroupSubjectRowHtml(gs)));
+                });
+            });
+
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="7" style="border: 1px solid #ccc; padding: 4px; text-align: center;">No classes found</td></tr>';
+                return true;
+            }
+
+            tbody.innerHTML = rows.join('');
+            return true;
+        }
+
         function insertClassSubjectRow(entry) {
             const tbody = getCurriculumBody();
             if (!tbody) return false;
@@ -727,15 +868,19 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                 body: JSON.stringify({action: 'create', name: name})
             }).then(res => res.json()).then(response => {
                 if(response.success) {
-                    const tbody = getSubjectTableBody();
-                    if (!tbody || !response.id) {
-                        window.location.reload();
+                    if (!response.id) {
                         return;
                     }
-                    removeEmptySubjectRow(tbody);
-                    const index = tbody.querySelectorAll('tr[data-subject-id]').length + 1;
-                    tbody.insertAdjacentHTML('beforeend', buildSubjectRowHtml(response.id, name, index));
-                    reindexSubjectRows();
+                    SUBJECTS.push({ id: response.id, subject_name: name });
+                    const tbody = getSubjectTableBody();
+                    if (!tbody) {
+                        renderSubjectBankTable();
+                    } else {
+                        removeEmptySubjectRow(tbody);
+                        const index = tbody.querySelectorAll('tr[data-subject-id]').length + 1;
+                        tbody.insertAdjacentHTML('beforeend', buildSubjectRowHtml(response.id, name, index));
+                        reindexSubjectRows();
+                    }
                     addSubjectOption(response.id, name);
                     input.value = '';
                     input.focus();
@@ -770,6 +915,14 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                 body: JSON.stringify({action: 'rename', id: id, name: name})
             }).then(res => res.json()).then(response => {
                 if(response.success) {
+                    const subject = SUBJECTS.find(s => s.id === id);
+                    if (subject) subject.subject_name = name;
+                    CLASS_SUBJECTS.forEach(cs => {
+                        if (cs.subject_id === id) cs.subject_name = name;
+                    });
+                    GROUP_SUBJECTS.forEach(gs => {
+                        if (gs.subject_id === id) gs.subject_name = name;
+                    });
                     const nameEl = document.getElementById('name-' + id);
                     const formEl = document.getElementById('form-' + id);
                     if (nameEl) {
@@ -783,6 +936,10 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                         formEl.style.display = 'none';
                     }
                     updateSubjectOption(id, name);
+                    if (!nameEl || !formEl) {
+                        renderSubjectBankTable();
+                        renderCurriculumTable();
+                    }
                 }
             });
         }
@@ -835,6 +992,14 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                 });
             }).then(response => {
                 if(response.success) {
+                    const index = SUBJECTS.findIndex(s => s.id === id);
+                    if (index >= 0) SUBJECTS.splice(index, 1);
+                    for (let i = CLASS_SUBJECTS.length - 1; i >= 0; i -= 1) {
+                        if (CLASS_SUBJECTS[i].subject_id === id) CLASS_SUBJECTS.splice(i, 1);
+                    }
+                    for (let i = GROUP_SUBJECTS.length - 1; i >= 0; i -= 1) {
+                        if (GROUP_SUBJECTS[i].subject_id === id) GROUP_SUBJECTS.splice(i, 1);
+                    }
                     const row = document.querySelector('tr[data-subject-id="' + id + '"]');
                     if (row) row.remove();
                     removeSubjectOption(id);
@@ -843,6 +1008,10 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                         tbody.innerHTML = '<tr data-empty="true"><td colspan="4" style="border: 1px solid #ccc; padding: 4px; text-align: center;">No subjects added yet.</td></tr>';
                     }
                     reindexSubjectRows();
+                    if (!row || !tbody) {
+                        renderSubjectBankTable();
+                        renderCurriculumTable();
+                    }
                 } else {
                     alert('Error: ' + (response.error || 'Failed to delete subject'));
                 }
@@ -981,7 +1150,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             }).then(res => res.json()).then(response => {
                 if (response.success) {
                     closeDeleteReviewModal();
-                    window.location.reload();
+                    removeSubjectFromLocal(subjectId);
                 } else {
                     alert('Error removing assignments: ' + (response.error || 'Unknown error'));
                 }
@@ -1055,7 +1224,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             }).then(res => res.json()).then(response => {
                 if (response.success) {
                     document.body.removeChild(document.querySelector('.fixed.inset-0'));
-                    window.location.reload();
+                    replaceSubjectInLocal(subjectId, parseInt(replacementId));
                 } else {
                     alert('Error replacing subject: ' + (response.error || 'Unknown error'));
                 }
@@ -1083,7 +1252,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             }).then(res => res.json()).then(response => {
                 if (response.success) {
                     document.body.removeChild(document.querySelector('.fixed.inset-0'));
-                    window.location.reload();
+                    removeSubjectFromLocal(subjectId);
                 } else {
                     alert('Error removing assignments: ' + (response.error || 'Unknown error'));
                 }
@@ -1174,7 +1343,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             }).then(res => res.json()).then(response => {
                 if(response.success) {
                     if (!response.id) {
-                        window.location.reload();
+                        renderCurriculumTable();
                         return;
                     }
                     const newEntry = {
@@ -1191,7 +1360,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                     const inserted = insertClassSubjectRow(newEntry);
                     closeModal('addClassSubjectModal');
                     if (!inserted) {
-                        window.location.reload();
+                        renderCurriculumTable();
                         return;
                     }
                     updateGroupCapacitiesForClass(classId);
@@ -1270,7 +1439,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
             }).then(res => res.json()).then(response => {
                 if(response.success) {
                     if (!response.id) {
-                        window.location.reload();
+                        renderCurriculumTable();
                         return;
                     }
                     const newEntry = {
@@ -1288,7 +1457,7 @@ export function SubjectsPageHTML(school, subjects = [], classes = [], groups = [
                     const inserted = insertGroupSubjectRow(newEntry);
                     closeModal('addGroupSubjectModal');
                     if (!inserted) {
-                        window.location.reload();
+                        renderCurriculumTable();
                         return;
                     }
                     updateGroupCapacityCell(groupId);

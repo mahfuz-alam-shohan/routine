@@ -120,39 +120,40 @@ export function RoutineGeneratorHTML(existingRoutines = [], generationSettings =
           <div class="mx-4 md:mx-6 mt-6">
               <div class="rg-card rg-animate">
                   <h3 class="text-lg font-semibold text-gray-900 mb-4">Generated Routines</h3>
-                  
-                  ${existingRoutines.length === 0 ? `
-                      <div class="text-center py-8 text-gray-500">
-                          <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                          <p class="text-base font-medium">No routines generated yet</p>
-                          <p class="text-sm mt-1">Generate your first routine to get started</p>
-                      </div>
-                  ` : `
-                      <div class="space-y-3">
-                          ${existingRoutines.map(routine => `
-                              <div class="rg-row flex items-center justify-between ${routine.is_active ? 'ring-1 ring-[#cbd5e1]' : ''}">
-                                  <div class="flex-1">
-                                      <div class="flex items-center gap-3">
-                                          <h4 class="font-semibold text-gray-900">${routine.name}</h4>
-                                          ${routine.is_active ? '<span class="rg-tag">Active</span>' : ''}
+                  <div id="routine-list">
+                      ${existingRoutines.length === 0 ? `
+                          <div class="text-center py-8 text-gray-500">
+                              <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                              <p class="text-base font-medium">No routines generated yet</p>
+                              <p class="text-sm mt-1">Generate your first routine to get started</p>
+                          </div>
+                      ` : `
+                          <div class="space-y-3">
+                              ${existingRoutines.map(routine => `
+                                  <div class="rg-row flex items-center justify-between ${routine.is_active ? 'ring-1 ring-[#cbd5e1]' : ''}">
+                                      <div class="flex-1">
+                                          <div class="flex items-center gap-3">
+                                              <h4 class="font-semibold text-gray-900">${routine.name}</h4>
+                                              ${routine.is_active ? '<span class="rg-tag">Active</span>' : ''}
+                                          </div>
+                                          <div class="flex items-center gap-4 mt-1 text-sm text-gray-500">
+                                              <span>Version ${routine.version}</span>
+                                              <span>${routine.total_periods} periods</span>
+                                              <span>Generated ${new Date(routine.generated_at).toLocaleDateString()}</span>
+                                              ${routine.conflicts_resolved > 0 ? `<span class="text-gray-600">${routine.conflicts_resolved} conflicts</span>` : ''}
+                                          </div>
                                       </div>
-                                      <div class="flex items-center gap-4 mt-1 text-sm text-gray-500">
-                                          <span>Version ${routine.version}</span>
-                                          <span>${routine.total_periods} periods</span>
-                                          <span>Generated ${new Date(routine.generated_at).toLocaleDateString()}</span>
-                                          ${routine.conflicts_resolved > 0 ? `<span class="text-gray-600">${routine.conflicts_resolved} conflicts</span>` : ''}
+                                      <div class="flex items-center gap-2">
+                                          <button onclick="app.viewRoutine(${routine.id})" class="rg-btn-mini">View</button>
+                                          <button onclick="app.editRoutine(${routine.id})" class="rg-btn-mini">Edit</button>
+                                          ${!routine.is_active ? `<button onclick="app.activateRoutine(${routine.id})" class="rg-btn-mini">Activate</button>` : ''}
+                                          <button onclick="app.deleteRoutine(${routine.id})" class="rg-btn-mini">Delete</button>
                                       </div>
                                   </div>
-                                  <div class="flex items-center gap-2">
-                                      <button onclick="app.viewRoutine(${routine.id})" class="rg-btn-mini">View</button>
-                                      <button onclick="app.editRoutine(${routine.id})" class="rg-btn-mini">Edit</button>
-                                      ${!routine.is_active ? `<button onclick="app.activateRoutine(${routine.id})" class="rg-btn-mini">Activate</button>` : ''}
-                                      <button onclick="app.deleteRoutine(${routine.id})" class="rg-btn-mini">Delete</button>
-                                  </div>
-                              </div>
-                          `).join('')}
-                      </div>
-                  `}
+                              `).join('')}
+                          </div>
+                      `}
+                  </div>
               </div>
           </div>
 
@@ -341,9 +342,67 @@ export function RoutineGeneratorHTML(existingRoutines = [], generationSettings =
       </div>
       
       <script>
+        window.routineAppData = {
+            routines: ${JSON.stringify(existingRoutines || [])}
+        };
         // Routine Generator JavaScript
         window.RoutineGeneratorApp = function() {
             return {
+                renderRoutineList() {
+                    const container = document.getElementById('routine-list');
+                    if (!container) return false;
+                    const routines = (window.routineAppData && Array.isArray(window.routineAppData.routines))
+                        ? window.routineAppData.routines.slice()
+                        : [];
+                    if (!routines.length) {
+                        container.innerHTML = '<div class="text-center py-8 text-gray-500">' +
+                            '<svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 01.707.293l5.414 5.414a2 2 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>' +
+                            '<p class="text-base font-medium">No routines generated yet</p>' +
+                            '<p class="text-sm mt-1">Generate your first routine to get started</p>' +
+                        '</div>';
+                        return true;
+                    }
+                    routines.sort((a, b) => {
+                        const timeA = a && a.generated_at ? new Date(a.generated_at).getTime() : 0;
+                        const timeB = b && b.generated_at ? new Date(b.generated_at).getTime() : 0;
+                        return timeB - timeA;
+                    });
+                    const list = routines.map(routine => {
+                        const generatedAt = routine.generated_at ? new Date(routine.generated_at).toLocaleDateString() : '';
+                        const version = routine.version || 1;
+                        const totalPeriods = routine.total_periods || 0;
+                        const conflicts = routine.conflicts_resolved || 0;
+                        const rowClass = routine.is_active ? ' ring-1 ring-[#cbd5e1]' : '';
+                        const activeTag = routine.is_active ? '<span class="rg-tag">Active</span>' : '';
+                        const conflictTag = conflicts > 0 ? '<span class="text-gray-600">' + conflicts + ' conflicts</span>' : '';
+                        const activateButton = !routine.is_active
+                            ? '<button onclick="app.activateRoutine(' + routine.id + ')" class="rg-btn-mini">Activate</button>'
+                            : '';
+                        const routineName = routine.name || 'Routine';
+                        return '<div class="rg-row flex items-center justify-between' + rowClass + '">' +
+                            '<div class="flex-1">' +
+                                '<div class="flex items-center gap-3">' +
+                                    '<h4 class="font-semibold text-gray-900">' + routineName + '</h4>' +
+                                    activeTag +
+                                '</div>' +
+                                '<div class="flex items-center gap-4 mt-1 text-sm text-gray-500">' +
+                                    '<span>Version ' + version + '</span>' +
+                                    '<span>' + totalPeriods + ' periods</span>' +
+                                    '<span>Generated ' + generatedAt + '</span>' +
+                                    conflictTag +
+                                '</div>' +
+                            '</div>' +
+                            '<div class="flex items-center gap-2">' +
+                                '<button onclick="app.viewRoutine(' + routine.id + ')" class="rg-btn-mini">View</button>' +
+                                '<button onclick="app.editRoutine(' + routine.id + ')" class="rg-btn-mini">Edit</button>' +
+                                activateButton +
+                                '<button onclick="app.deleteRoutine(' + routine.id + ')" class="rg-btn-mini">Delete</button>' +
+                            '</div>' +
+                        '</div>';
+                    }).join('');
+                    container.innerHTML = '<div class="space-y-3">' + list + '</div>';
+                    return true;
+                },
                 createGeneratorWorker() {
                     const workerScript = function() {
                         const shuffleArray = (arr) => {
@@ -1505,9 +1564,22 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                         const saveResult = await saveResponse.json();
                         if (saveResult.success) {
                             this.showNotification('Routine generated successfully!', 'success');
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 1500);
+                            const routineId = saveResult.routineId;
+                            if (routineId) {
+                                const newRoutine = {
+                                    id: routineId,
+                                    name: 'Generated Routine ' + new Date().toLocaleDateString(),
+                                    version: 1,
+                                    is_active: 0,
+                                    generated_at: new Date().toISOString(),
+                                    total_periods: routineResult.entries ? routineResult.entries.length : 0,
+                                    conflicts_resolved: 0
+                                };
+                                if (!window.routineAppData) window.routineAppData = { routines: [] };
+                                if (!Array.isArray(window.routineAppData.routines)) window.routineAppData.routines = [];
+                                window.routineAppData.routines.unshift(newRoutine);
+                                this.renderRoutineList();
+                            }
                         } else {
                             this.showNotification(saveResult.error || 'Failed to save routine', 'error');
                         }
@@ -1529,6 +1601,7 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                 },
                 
                 async activateRoutine(routineId) {
+                    const routineIdNum = Number(routineId);
                     try {
                         const response = await fetch(\`/school/api/routine/\${routineId}/activate\`, {
                             method: 'POST'
@@ -1538,9 +1611,12 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                         
                         if (result.success) {
                             this.showNotification('Routine activated successfully!', 'success');
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 1000);
+                            if (window.routineAppData && Array.isArray(window.routineAppData.routines)) {
+                                window.routineAppData.routines.forEach(r => { r.is_active = 0; });
+                                const target = window.routineAppData.routines.find(r => Number(r.id) === routineIdNum);
+                                if (target) target.is_active = 1;
+                                this.renderRoutineList();
+                            }
                         } else {
                             this.showNotification(result.error || 'Failed to activate routine', 'error');
                         }
@@ -1554,6 +1630,7 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                     if (!confirm('Are you sure you want to delete this routine? This action cannot be undone.')) {
                         return;
                     }
+                    const routineIdNum = Number(routineId);
                     
                     try {
                         const response = await fetch(\`/school/api/routine/\${routineId}\`, {
@@ -1564,9 +1641,10 @@ const generateGreedyPlan = (sectionKeys, sectionData, workingDays, classSlots) =
                         
                         if (result.success) {
                             this.showNotification('Routine deleted successfully!', 'success');
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 1000);
+                            if (window.routineAppData && Array.isArray(window.routineAppData.routines)) {
+                                window.routineAppData.routines = window.routineAppData.routines.filter(r => Number(r.id) !== routineIdNum);
+                                this.renderRoutineList();
+                            }
                         } else {
                             this.showNotification(result.error || 'Failed to delete routine', 'error');
                         }

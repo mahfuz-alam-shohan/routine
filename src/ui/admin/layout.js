@@ -129,22 +129,6 @@ export function AdminLayout(contentHTML, title = "Dashboard", companyName = "Rou
       </div>
 
       <script>
-        const enableAutoRefresh = () => {
-            let lastInteraction = Date.now();
-            const mark = () => { lastInteraction = Date.now(); };
-            ['click', 'keydown', 'scroll', 'mousemove', 'touchstart'].forEach((evt) => {
-                document.addEventListener(evt, mark, { passive: true });
-            });
-            const intervalMs = 120000;
-            setInterval(() => {
-                if (document.hidden) return;
-                const active = document.activeElement;
-                if (active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) return;
-                if (Date.now() - lastInteraction < intervalMs) return;
-                window.location.reload();
-            }, intervalMs);
-        };
-
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebar-overlay');
@@ -152,10 +136,6 @@ export function AdminLayout(contentHTML, title = "Dashboard", companyName = "Rou
             if (isClosed) { sidebar.classList.remove('-translate-x-full'); overlay.classList.remove('hidden'); }
             else { sidebar.classList.add('-translate-x-full'); overlay.classList.add('hidden'); }
         }
-
-        window.addEventListener('DOMContentLoaded', () => {
-            enableAutoRefresh();
-        });
       </script>
   </body>
   </html>

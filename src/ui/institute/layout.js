@@ -194,22 +194,6 @@ export function InstituteLayout(content, title, schoolName) {
         </main>
 
         <script>
-            const enableAutoRefresh = () => {
-                let lastInteraction = Date.now();
-                const mark = () => { lastInteraction = Date.now(); };
-                ['click', 'keydown', 'scroll', 'mousemove', 'touchstart'].forEach((evt) => {
-                    document.addEventListener(evt, mark, { passive: true });
-                });
-                const intervalMs = 120000;
-                setInterval(() => {
-                    if (document.hidden) return;
-                    const active = document.activeElement;
-                    if (active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) return;
-                    if (Date.now() - lastInteraction < intervalMs) return;
-                    window.location.reload();
-                }, intervalMs);
-            };
-
             function toggleSidebar() {
                 const sb = document.getElementById('sidebar');
                 const bd = document.getElementById('sidebar-backdrop');
@@ -242,7 +226,6 @@ export function InstituteLayout(content, title, schoolName) {
             }
 
             window.addEventListener('DOMContentLoaded', () => {
-                enableAutoRefresh();
                 setActiveNav();
             });
         </script>

@@ -33,6 +33,12 @@ export function RoutineViewerHTML(routineData = {}) {
     });
     const getSlotLabel = (slotIndex) => slotLabelMap.get(slotIndex) || `Period ${slotIndex + 1}`;
 
+    const classById = new Map(classes.map(item => [item.id, item]));
+    const groupById = new Map(groups.map(item => [item.id, item]));
+    const sectionById = new Map(sections.map(item => [item.id, item]));
+    const subjectById = new Map(subjects.map(item => [item.id, item]));
+    const teacherById = new Map(teachers.map(item => [item.id, item]));
+
     const classShiftMap = new Map(classes.map(cls => [cls.id, cls.shift_name || 'Full Day']));
     const sectionMap = new Map();
     const addSection = (key, label, shiftName) => {
@@ -72,9 +78,14 @@ export function RoutineViewerHTML(routineData = {}) {
         shiftSlotMap[shift] = Array.from(new Set(shiftSlotMap[shift]));
     });
 
+    const classPeriodIndexBySlot = new Map();
+    classSlots.forEach((slot, index) => {
+        classPeriodIndexBySlot.set(slot.slot_index, index);
+    });
+
     sections.forEach(sec => {
-        const cls = classes.find(c => c.id === sec.class_id);
-        const grp = groups.find(g => g.id === sec.group_id);
+        const cls = classById.get(sec.class_id);
+        const grp = groupById.get(sec.group_id);
         const className = cls ? cls.class_name : 'Class';
         const groupName = grp ? ` - ${grp.group_name}` : '';
         const sectionName = sec.section_name ? ` - ${sec.section_name}` : '';
@@ -84,7 +95,7 @@ export function RoutineViewerHTML(routineData = {}) {
     });
 
     entries.forEach(entry => {
-        const className = entry.class_name || classes.find(c => c.id === entry.class_id)?.class_name || 'Class';
+        const className = entry.class_name || classById.get(entry.class_id)?.class_name || 'Class';
         const groupName = entry.group_name ? ` - ${entry.group_name}` : '';
         const sectionName = entry.section_name ? ` - ${entry.section_name}` : ' - Main';
         const key = `${entry.class_id}-${entry.group_id || 0}-${entry.section_id || 0}`;
@@ -108,7 +119,7 @@ export function RoutineViewerHTML(routineData = {}) {
     const teacherSubjectCounts = {};
 
     const getSectionLabel = (entry) => {
-        const className = entry.class_name || classes.find(c => c.id === entry.class_id)?.class_name || 'Class';
+        const className = entry.class_name || classById.get(entry.class_id)?.class_name || 'Class';
         const sectionName = entry.section_name || '';
         const groupName = entry.group_name || '';
         if (sectionName) return `${className}${sectionName}`;
@@ -150,7 +161,7 @@ export function RoutineViewerHTML(routineData = {}) {
             teacherDayLoad[entry.teacher_id][entry.day_of_week] = (teacherDayLoad[entry.teacher_id][entry.day_of_week] || 0) + 1;
 
             if (!teacherSubjectCounts[entry.teacher_id]) teacherSubjectCounts[entry.teacher_id] = {};
-            const subjectName = entry.subject_name || subjects.find(s => s.id === entry.subject_id)?.subject_name || 'Subject';
+            const subjectName = entry.subject_name || subjectById.get(entry.subject_id)?.subject_name || 'Subject';
             teacherSubjectCounts[entry.teacher_id][subjectName] = (teacherSubjectCounts[entry.teacher_id][subjectName] || 0) + 1;
         }
     });
@@ -167,8 +178,8 @@ export function RoutineViewerHTML(routineData = {}) {
 
     const getPeriodLabel = (slot) => {
         if (slot.type === 'break') return 'Break Period';
-        const index = classSlots.findIndex(s => s.slot_index === slot.slot_index);
-        return index >= 0 ? ordinal(index + 1) : getSlotLabel(slot.slot_index);
+        const index = classPeriodIndexBySlot.get(slot.slot_index);
+        return index !== undefined ? ordinal(index + 1) : getSlotLabel(slot.slot_index);
     };
 
     const subjectPalette = [
@@ -309,11 +320,11 @@ export function RoutineViewerHTML(routineData = {}) {
                                       </thead>
                                       <tbody class="divide-y divide-gray-200">
                                           ${conflictSummary.entryConflicts.map(conflict => {
-                                              const className = classes.find(c => c.id === conflict.class_id)?.class_name || 'Class';
-                                              const groupName = conflict.group_id ? (groups.find(g => g.id === conflict.group_id)?.group_name || '') : '';
-                                              const sectionName = conflict.section_id ? (sections.find(s => s.id === conflict.section_id)?.section_name || 'Main') : 'Main';
-                                              const subjectName = subjects.find(s => s.id === conflict.subject_id)?.subject_name || 'Subject';
-                                              const teacherName = teachers.find(t => t.id === conflict.teacher_id)?.full_name || 'Unassigned';
+                                              const className = classById.get(conflict.class_id)?.class_name || 'Class';
+                                              const groupName = conflict.group_id ? (groupById.get(conflict.group_id)?.group_name || '') : '';
+                                              const sectionName = conflict.section_id ? (sectionById.get(conflict.section_id)?.section_name || 'Main') : 'Main';
+                                              const subjectName = subjectById.get(conflict.subject_id)?.subject_name || 'Subject';
+                                              const teacherName = teacherById.get(conflict.teacher_id)?.full_name || 'Unassigned';
                                               const periodLabel = getSlotLabel(conflict.slot_index);
                                               return `
                                                   <tr>
@@ -439,8 +450,8 @@ export function RoutineViewerHTML(routineData = {}) {
                                                           : '';
                                                       return `<td class="px-2 py-2 text-center text-gray-300 border border-gray-200" data-slot-index="${slot.slot_index}"${titleAttr}>-</td>`;
                                                   }
-                                                  const subjectName = entry.subject_name || subjects.find(s => s.id === entry.subject_id)?.subject_name || 'Subject';
-                                                  const teacherName = entry.teacher_name || teachers.find(t => t.id === entry.teacher_id)?.full_name || 'Unassigned';
+                                                  const subjectName = entry.subject_name || subjectById.get(entry.subject_id)?.subject_name || 'Subject';
+                                                  const teacherName = entry.teacher_name || teacherById.get(entry.teacher_id)?.full_name || 'Unassigned';
                                                   const conflictClass = entry.is_conflict ? 'text-red-600' : 'text-gray-900';
                                                   const conflictTitle = entry.conflict_reason
                                                       ? ' title="' + String(entry.conflict_reason)
