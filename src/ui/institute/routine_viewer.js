@@ -1,3 +1,7 @@
+import { PrintLayoutEditorHTML } from './print_layout_editor.js';
+
+
+
 export function RoutineViewerHTML(routineData = {}) {
     const {
         routine = {},
@@ -320,13 +324,13 @@ export function RoutineViewerHTML(routineData = {}) {
                                       </thead>
                                       <tbody class="divide-y divide-gray-200">
                                           ${conflictSummary.entryConflicts.map(conflict => {
-                                              const className = classById.get(conflict.class_id)?.class_name || 'Class';
-                                              const groupName = conflict.group_id ? (groupById.get(conflict.group_id)?.group_name || '') : '';
-                                              const sectionName = conflict.section_id ? (sectionById.get(conflict.section_id)?.section_name || 'Main') : 'Main';
-                                              const subjectName = subjectById.get(conflict.subject_id)?.subject_name || 'Subject';
-                                              const teacherName = teacherById.get(conflict.teacher_id)?.full_name || 'Unassigned';
-                                              const periodLabel = getSlotLabel(conflict.slot_index);
-                                              return `
+        const className = classById.get(conflict.class_id)?.class_name || 'Class';
+        const groupName = conflict.group_id ? (groupById.get(conflict.group_id)?.group_name || '') : '';
+        const sectionName = conflict.section_id ? (sectionById.get(conflict.section_id)?.section_name || 'Main') : 'Main';
+        const subjectName = subjectById.get(conflict.subject_id)?.subject_name || 'Subject';
+        const teacherName = teacherById.get(conflict.teacher_id)?.full_name || 'Unassigned';
+        const periodLabel = getSlotLabel(conflict.slot_index);
+        return `
                                                   <tr>
                                                       <td class="px-3 py-2 text-gray-700">${conflict.day_of_week}</td>
                                                       <td class="px-3 py-2 text-gray-700">${periodLabel}</td>
@@ -336,7 +340,7 @@ export function RoutineViewerHTML(routineData = {}) {
                                                       <td class="px-3 py-2 text-red-600">${conflict.reason || 'Conflict'}</td>
                                                   </tr>
                                               `;
-                                          }).join('')}
+    }).join('')}
                                       </tbody>
                                   </table>
                               </div>
@@ -418,58 +422,58 @@ export function RoutineViewerHTML(routineData = {}) {
                                   <tr>
                                       <th class="px-3 py-2 text-left text-gray-500 font-medium border border-gray-200">Day</th>
                                       ${sortedSlots.map(slot => {
-                                          const timeLabel = slot.start_time && slot.end_time ? `${slot.start_time}-${slot.end_time}` : '';
-                                          return `
+        const timeLabel = slot.start_time && slot.end_time ? `${slot.start_time}-${slot.end_time}` : '';
+        return `
                                               <th class="px-2 py-2 text-center text-gray-500 font-medium border border-gray-200" data-slot-index="${slot.slot_index}">
                                                   <div>${getPeriodLabel(slot)}</div>
                                                   ${timeLabel ? `<div class="text-[10px] text-gray-400">${timeLabel}</div>` : ''}
                                               </th>
                                           `;
-                                      }).join('')}
+    }).join('')}
                                   </tr>
                               </thead>
                               <tbody class="divide-y divide-gray-200">
                                   ${activeDays.map(day => {
-                                      return `
+        return `
                                           <tr>
                                               <td class="px-3 py-2 text-gray-700 font-medium border border-gray-200">${day.charAt(0).toUpperCase() + day.slice(1)}</td>
                                               ${sortedSlots.map(slot => {
-                                                  if (slot.type === 'break') {
-                                                      return `<td class="px-2 py-2 text-center text-gray-400 bg-gray-50 border border-gray-200" data-slot-index="${slot.slot_index}">Break Period</td>`;
-                                                  }
-                                                  const entry = entriesBySection[section.key]?.[day]?.[slot.slot_index];
-                                                  if (!entry) {
-                                                      const gapKey = `${section.key}-${day}-${slot.slot_index}`;
-                                                      const gapReason = gapReasonMap.get(gapKey);
-                                                      const titleAttr = gapReason
-                                                          ? ' title="' + String(gapReason)
-                                                              .replace(/&/g, '&amp;')
-                                                              .replace(/"/g, '&quot;')
-                                                              .replace(/</g, '&lt;')
-                                                              .replace(/>/g, '&gt;') + '"'
-                                                          : '';
-                                                      return `<td class="px-2 py-2 text-center text-gray-300 border border-gray-200" data-slot-index="${slot.slot_index}"${titleAttr}>-</td>`;
-                                                  }
-                                                  const subjectName = entry.subject_name || subjectById.get(entry.subject_id)?.subject_name || 'Subject';
-                                                  const teacherName = entry.teacher_name || teacherById.get(entry.teacher_id)?.full_name || 'Unassigned';
-                                                  const conflictClass = entry.is_conflict ? 'text-red-600' : 'text-gray-900';
-                                                  const conflictTitle = entry.conflict_reason
-                                                      ? ' title="' + String(entry.conflict_reason)
-                                                          .replace(/&/g, '&amp;')
-                                                          .replace(/"/g, '&quot;')
-                                                          .replace(/</g, '&lt;')
-                                                          .replace(/>/g, '&gt;') + '"'
-                                                      : '';
-                                                  return `
+            if (slot.type === 'break') {
+                return `<td class="px-2 py-2 text-center text-gray-400 bg-gray-50 border border-gray-200" data-slot-index="${slot.slot_index}">Break Period</td>`;
+            }
+            const entry = entriesBySection[section.key]?.[day]?.[slot.slot_index];
+            if (!entry) {
+                const gapKey = `${section.key}-${day}-${slot.slot_index}`;
+                const gapReason = gapReasonMap.get(gapKey);
+                const titleAttr = gapReason
+                    ? ' title="' + String(gapReason)
+                        .replace(/&/g, '&amp;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;') + '"'
+                    : '';
+                return `<td class="px-2 py-2 text-center text-gray-300 border border-gray-200" data-slot-index="${slot.slot_index}"${titleAttr}>-</td>`;
+            }
+            const subjectName = entry.subject_name || subjectById.get(entry.subject_id)?.subject_name || 'Subject';
+            const teacherName = entry.teacher_name || teacherById.get(entry.teacher_id)?.full_name || 'Unassigned';
+            const conflictClass = entry.is_conflict ? 'text-red-600' : 'text-gray-900';
+            const conflictTitle = entry.conflict_reason
+                ? ' title="' + String(entry.conflict_reason)
+                    .replace(/&/g, '&amp;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;') + '"'
+                : '';
+            return `
                                                       <td class="px-2 py-2 text-center border border-gray-200" data-slot-index="${slot.slot_index}">
                                                           <div class="text-xs font-medium ${conflictClass}"${conflictTitle}>${subjectName}</div>
                                                           <div class="text-[11px] text-gray-500">${teacherName}</div>
                                                       </td>
                                                   `;
-                                              }).join('')}
+        }).join('')}
                                           </tr>
                                       `;
-                                  }).join('')}
+    }).join('')}
                               </tbody>
                           </table>
                       </div>
@@ -491,13 +495,13 @@ export function RoutineViewerHTML(routineData = {}) {
                                       <th class="px-3 py-2 text-left text-gray-500 font-medium border border-gray-200">SL</th>
                                       <th class="px-3 py-2 text-left text-gray-500 font-medium border border-gray-200">NAME</th>
                                       ${sortedSlots.map(slot => {
-                                          if (slot.type === 'break') {
-                                              return `<th class="px-2 py-2 text-center text-gray-300 font-medium border border-gray-200" data-slot-index="${slot.slot_index}"></th>`;
-                                          }
-                                          const index = classSlots.findIndex(s => s.slot_index === slot.slot_index);
-                                          const label = index >= 0 ? ordinal(index + 1) : '';
-                                          return `<th class="px-2 py-2 text-center text-gray-500 font-medium border border-gray-200" data-slot-index="${slot.slot_index}">${label}</th>`;
-                                      }).join('')}
+        if (slot.type === 'break') {
+            return `<th class="px-2 py-2 text-center text-gray-300 font-medium border border-gray-200" data-slot-index="${slot.slot_index}"></th>`;
+        }
+        const index = classSlots.findIndex(s => s.slot_index === slot.slot_index);
+        const label = index >= 0 ? ordinal(index + 1) : '';
+        return `<th class="px-2 py-2 text-center text-gray-500 font-medium border border-gray-200" data-slot-index="${slot.slot_index}">${label}</th>`;
+    }).join('')}
                                       <th class="px-2 py-2 text-center text-gray-500 font-medium border border-gray-200">Total</th>
                                   </tr>
                                   <tr>
@@ -505,28 +509,28 @@ export function RoutineViewerHTML(routineData = {}) {
                                       <th class="px-3 py-2 text-left text-gray-400 font-medium border border-gray-200"></th>
                                       <th class="px-3 py-2 text-left text-gray-400 font-medium border border-gray-200"></th>
                                       ${sortedSlots.map(slot => {
-                                          if (slot.type === 'break') {
-                                              return `<th class="px-2 py-2 text-center text-gray-300 font-medium border border-gray-200" data-slot-index="${slot.slot_index}"></th>`;
-                                          }
-                                          return `<th class="px-2 py-2 text-center text-gray-400 font-medium border border-gray-200" data-slot-index="${slot.slot_index}">${slot.start_time}-${slot.end_time}</th>`;
-                                      }).join('')}
+        if (slot.type === 'break') {
+            return `<th class="px-2 py-2 text-center text-gray-300 font-medium border border-gray-200" data-slot-index="${slot.slot_index}"></th>`;
+        }
+        return `<th class="px-2 py-2 text-center text-gray-400 font-medium border border-gray-200" data-slot-index="${slot.slot_index}">${slot.start_time}-${slot.end_time}</th>`;
+    }).join('')}
                                       <th class="px-2 py-2 text-center text-gray-400 font-medium border border-gray-200"></th>
                                   </tr>
                               </thead>
                               <tbody class="divide-y divide-gray-200">
                                   ${teachers
-                                      .slice()
-                                      .sort((a, b) => {
-                                          const aLabel = teacherPrimarySubject(a.id) || 'Unassigned';
-                                          const bLabel = teacherPrimarySubject(b.id) || 'Unassigned';
-                                          if (aLabel !== bLabel) return aLabel.localeCompare(bLabel);
-                                          return (a.full_name || '').localeCompare(b.full_name || '');
-                                      })
-                                      .map((teacher, index) => {
-                                      const subjectLabel = teacherPrimarySubject(teacher.id) || 'Unassigned';
-                                      const dayTotal = teacherDayLoad[teacher.id]?.[day] || 0;
-                                      const dayLoadClass = getDayLoadClass(dayTotal);
-                                      return `
+            .slice()
+            .sort((a, b) => {
+                const aLabel = teacherPrimarySubject(a.id) || 'Unassigned';
+                const bLabel = teacherPrimarySubject(b.id) || 'Unassigned';
+                if (aLabel !== bLabel) return aLabel.localeCompare(bLabel);
+                return (a.full_name || '').localeCompare(b.full_name || '');
+            })
+            .map((teacher, index) => {
+                const subjectLabel = teacherPrimarySubject(teacher.id) || 'Unassigned';
+                const dayTotal = teacherDayLoad[teacher.id]?.[day] || 0;
+                const dayLoadClass = getDayLoadClass(dayTotal);
+                return `
                                           <tr data-teacher-id="${teacher.id}">
                                               <td class="px-3 py-2 text-gray-700 border border-gray-200" style="background-color: ${getSubjectColor(subjectLabel)};">${subjectLabel}</td>
                                               <td class="px-3 py-2 text-gray-700 border border-gray-200">${index + 1}</td>
@@ -534,23 +538,23 @@ export function RoutineViewerHTML(routineData = {}) {
                                                   ${teacher.full_name || 'Teacher'}
                                               </td>
                                               ${sortedSlots.map(slot => {
-                                                  if (slot.type === 'break') {
-                                                      return `<td class="px-2 py-2 text-center text-gray-300 border border-gray-200" data-slot-index="${slot.slot_index}"></td>`;
-                                                  }
-                                                  const items = teacherSchedule[teacher.id]?.[day]?.[slot.slot_index] || [];
-                                                  const itemHtml = items.map(item => `<div class="text-[11px] text-gray-700 teacher-cell-item" data-shift="${item.shift || 'Full Day'}">${item.label}</div>`).join('');
-                                                  const emptyDisplay = items.length ? 'none' : 'block';
-                                                  return `
+                    if (slot.type === 'break') {
+                        return `<td class="px-2 py-2 text-center text-gray-300 border border-gray-200" data-slot-index="${slot.slot_index}"></td>`;
+                    }
+                    const items = teacherSchedule[teacher.id]?.[day]?.[slot.slot_index] || [];
+                    const itemHtml = items.map(item => `<div class="text-[11px] text-gray-700 teacher-cell-item" data-shift="${item.shift || 'Full Day'}">${item.label}</div>`).join('');
+                    const emptyDisplay = items.length ? 'none' : 'block';
+                    return `
                                                       <td class="px-2 py-2 text-center border border-gray-200 teacher-cell" data-slot-index="${slot.slot_index}">
                                                           ${itemHtml}
                                                           <div class="text-[11px] text-gray-300 teacher-cell-empty" style="display: ${emptyDisplay};">-</div>
                                                       </td>
                                                   `;
-                                              }).join('')}
+                }).join('')}
                                               <td class="px-2 py-2 text-center text-gray-700 font-medium border border-gray-200" data-teacher-total="${teacher.id}" data-total-all="${dayTotal}">${dayTotal}</td>
                                           </tr>
                                       `;
-                                  }).join('')}
+            }).join('')}
                               </tbody>
                           </table>
                       </div>
@@ -566,7 +570,11 @@ export function RoutineViewerHTML(routineData = {}) {
                     window.location.href = '/school/routine-generator';
                 },
                 printRoutine() {
-                    window.print();
+                    if (window.PrintLayoutEditor) {
+                        window.PrintLayoutEditor.open();
+                    } else {
+                        window.print();
+                    }
                 },
                 setView(view) {
                     const sectionView = document.getElementById('section-view');
@@ -775,5 +783,6 @@ export function RoutineViewerHTML(routineData = {}) {
         .day-load-ok { background-color: #dcfce7; }
         .day-load-low { background-color: #dbeafe; }
       </style>
+      ${PrintLayoutEditorHTML()}
     `;
 }

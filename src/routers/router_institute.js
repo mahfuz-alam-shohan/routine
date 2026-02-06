@@ -2,10 +2,10 @@ import { htmlResponse, jsonResponse, getCookie } from '../core/utils.js';
 import { InstituteLayout } from '../ui/institute/layout.js';
 import { InstituteDashboardHTML } from '../ui/institute/dashboard.js';
 import { InstituteInactiveHTML } from '../ui/institute/inactive.js';
-import { TeachersPageHTML } from '../ui/institute/teachers_list.js'; 
-import { ClassesPageHTML } from '../ui/institute/classes.js'; 
-import { SubjectsPageHTML } from '../ui/institute/subjects.js'; 
-import { SchedulesPageHTML } from '../ui/institute/schedules.js'; 
+import { TeachersPageHTML } from '../ui/institute/teachers_list.js';
+import { ClassesPageHTML } from '../ui/institute/classes.js';
+import { SubjectsPageHTML } from '../ui/institute/subjects.js';
+import { SchedulesPageHTML } from '../ui/institute/schedules.js';
 import { TeachersAssignmentPageHTML } from '../ui/institute/teachers_assignment.js';
 import { RoutineGeneratorHTML } from '../ui/institute/routine_generator.js';
 import { RoutineViewerHTML } from '../ui/institute/routine_viewer.js';
@@ -13,11 +13,70 @@ import { syncDatabase } from '../core/schema_manager.js';
 
 export async function handleInstituteRequest(request, env) {
   const url = new URL(request.url);
+
+  if (url.pathname === '/school/print-layouts') {
+    const email = getCookie(request, 'user_email');
+    if (!email) return jsonResponse({ error: "Unauthorized" }, 401);
+
+    // We need to fetch the school again here because this route might be called via fetch JSON
+    const school = await env.DB.prepare(`SELECT p.id FROM profiles_institution p JOIN auth_accounts a ON p.auth_id = a.id WHERE a.email = ?`).bind(email).first();
+    if (!school) return jsonResponse({ error: "School not found" }, 404);
+
+    if (request.method === 'GET') {
+      try {
+        const layouts = await env.DB.prepare("SELECT * FROM routine_print_layouts WHERE school_id = ? ORDER BY id DESC").bind(school.id).all();
+        return jsonResponse({ success: true, layouts: layouts.results || [] });
+      } catch (e) {
+        if (e.message.includes("no such table")) await syncDatabase(env);
+        return jsonResponse({ error: e.message }, 500);
+      }
+    }
+
+    if (request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const action = body.action || 'save';
+
+        if (action === 'save') {
+          const { name, config, is_default, id } = body;
+          const configJson = JSON.stringify(config || {});
+
+          if (is_default) {
+            await env.DB.prepare("UPDATE routine_print_layouts SET is_default = 0 WHERE school_id = ?").bind(school.id).run();
+          }
+
+          if (id) {
+            await env.DB.prepare("UPDATE routine_print_layouts SET name = ?, config_json = ?, is_default = ? WHERE id = ? AND school_id = ?")
+              .bind(name, configJson, is_default ? 1 : 0, id, school.id).run();
+            return jsonResponse({ success: true, id });
+          } else {
+            const res = await env.DB.prepare("INSERT INTO routine_print_layouts (school_id, name, config_json, is_default) VALUES (?, ?, ?, ?) RETURNING id")
+              .bind(school.id, name, configJson, is_default ? 1 : 0).first();
+            return jsonResponse({ success: true, id: res.id });
+          }
+        }
+
+        if (action === 'delete') {
+          if (!body.id) return jsonResponse({ error: "ID required" }, 400);
+          await env.DB.prepare("DELETE FROM routine_print_layouts WHERE id = ? AND school_id = ?").bind(body.id, school.id).run();
+          return jsonResponse({ success: true });
+        }
+
+        return jsonResponse({ error: "Invalid action" }, 400);
+      } catch (e) {
+        if (e.message.includes("no such table")) await syncDatabase(env);
+        return jsonResponse({ error: e.message }, 500);
+      }
+    }
+
+    return jsonResponse({ error: "Method not allowed" }, 405);
+  }
+
   const email = getCookie(request, 'user_email');
   if (!email) return htmlResponse("<h1>Login Failed</h1>");
 
   const school = await env.DB.prepare(`SELECT p.* FROM profiles_institution p JOIN auth_accounts a ON p.auth_id = a.id WHERE a.email = ?`).bind(email).first();
-  if(!school) return new Response("Error", {status: 404});
+  if (!school) return new Response("Error", { status: 404 });
 
   const membershipId = Number(school.plan_id);
   const hasMembership = Number.isFinite(membershipId) && membershipId > 0;
@@ -27,7 +86,7 @@ export async function handleInstituteRequest(request, env) {
     );
   }
 
-  
+
   if (url.pathname === '/school/dashboard') {
     const tCount = await env.DB.prepare("SELECT count(*) as count FROM profiles_teacher WHERE school_id = ?").bind(school.id).first();
     const cCount = await env.DB.prepare("SELECT count(*) as count FROM academic_classes WHERE school_id = ?").bind(school.id).first();
@@ -39,557 +98,557 @@ export async function handleInstituteRequest(request, env) {
       const scheduleConfig = await env.DB.prepare("SELECT shifts_json FROM schedule_config WHERE school_id = ?").bind(school.id).first();
       const shifts = parseShiftList(scheduleConfig?.shifts_json);
       shiftCount = shifts.length || 1;
-    } catch (e) {}
+    } catch (e) { }
 
     return htmlResponse(InstituteLayout(InstituteDashboardHTML({
-        teachers: tCount.count,
-        classes: cCount.count,
-        routines: rCount.count,
-        subjects: sCount.count,
-        routineYearCount,
-        shiftCount,
-        limits: {
-          max_teachers: school.max_teachers,
-          max_subjects: school.max_subjects,
-          max_routines_yearly: school.max_routines_yearly,
-          max_shifts: school.max_shifts,
-          plan_name: school.plan_name,
-          plan_billing_cycle: school.plan_billing_cycle,
-          plan_price_taka: school.plan_price_taka
-        }
+      teachers: tCount.count,
+      classes: cCount.count,
+      routines: rCount.count,
+      subjects: sCount.count,
+      routineYearCount,
+      shiftCount,
+      limits: {
+        max_teachers: school.max_teachers,
+        max_subjects: school.max_subjects,
+        max_routines_yearly: school.max_routines_yearly,
+        max_shifts: school.max_shifts,
+        plan_name: school.plan_name,
+        plan_billing_cycle: school.plan_billing_cycle,
+        plan_price_taka: school.plan_price_taka
+      }
     }), "Dashboard", school.school_name));
   }
 
-  
+
   if (url.pathname === '/school/schedules') {
-      
-      if (request.method === 'POST') {
-          try {
-              const body = await request.json();
-              if(body.action === 'save_schedule') {
-                  let scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
-                  if (!scheduleConfig) {
-                      await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days, shifts_json) VALUES (?, ?, ?, ?, ?, ?)")
-                          .bind(school.id, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]', '["Full Day"]').run();
-                      scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
-                  }
-                  const shiftList = school.shifts_enabled ? parseShiftList(scheduleConfig?.shifts_json) : ['Full Day'];
 
-                  await env.DB.prepare("DELETE FROM schedule_slots WHERE school_id = ?").bind(school.id).run();
-
-                  for(let i = 0; i < body.slots.length; i++) {
-                      const slot = body.slots[i];
-                      const applicableShifts = school.shifts_enabled
-                        ? parseApplicableShifts(slot.applicable_shifts, shiftList)
-                        : ['Full Day'];
-                      await env.DB.prepare("INSERT INTO schedule_slots (school_id, slot_index, start_time, end_time, label, duration, type, applicable_shifts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-                          .bind(school.id, i, slot.start_time, slot.end_time, slot.label, slot.duration, slot.type, JSON.stringify(applicableShifts)).run();
-                  }
-
-                  const workingDaysArray = parseWorkingDays(body.working_days);
-                  const workingDays = JSON.stringify(workingDaysArray);
-                  const allDays = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
-                  const offDays = JSON.stringify(allDays.filter(day => !workingDaysArray.includes(day)));
-                  const workingDaysCount = workingDaysArray.length || 5;
-                  
-                  
-                  await env.DB.prepare("UPDATE schedule_config SET working_days = ?, off_days = ?, active_days = ? WHERE school_id = ?")
-                      .bind(workingDays, offDays, workingDaysCount, school.id).run();
-              }
-              return jsonResponse({ success: true });
-          } catch(e) { 
-              if(e.message.includes("no such table")) await syncDatabase(env);
-              return jsonResponse({ error: e.message }, 500); 
+    if (request.method === 'POST') {
+      try {
+        const body = await request.json();
+        if (body.action === 'save_schedule') {
+          let scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+          if (!scheduleConfig) {
+            await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days, shifts_json) VALUES (?, ?, ?, ?, ?, ?)")
+              .bind(school.id, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]', '["Full Day"]').run();
+            scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
           }
-      }
+          const shiftList = school.shifts_enabled ? parseShiftList(scheduleConfig?.shifts_json) : ['Full Day'];
 
-      
-      if (request.method === 'DELETE') {
           await env.DB.prepare("DELETE FROM schedule_slots WHERE school_id = ?").bind(school.id).run();
-          let shiftsJson = '["Full Day"]';
-          try {
-              const existingConfig = await env.DB.prepare("SELECT shifts_json FROM schedule_config WHERE school_id = ?").bind(school.id).first();
-              if (existingConfig?.shifts_json) shiftsJson = existingConfig.shifts_json;
-          } catch (e) {}
-          await env.DB.prepare("DELETE FROM schedule_config WHERE school_id = ?").bind(school.id).run();
-          await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days, shifts_json) VALUES (?, ?, ?, ?, ?, ?)")
-              .bind(school.id, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]', shiftsJson).run();
-          return jsonResponse({ success: true });
-      }
 
-      
-      let config = null;
-      let slots = [];
-      try { 
-          config = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first(); 
-          slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
-          
-          
-          slots = slots.map(slot => {
-              if (!slot.duration && slot.start_time && slot.end_time) {
-                  const [h1, m1] = slot.start_time.split(':').map(Number);
-                  const [h2, m2] = slot.end_time.split(':').map(Number);
-                  slot.duration = Math.round((new Date(2000, 0, 1, h2, m2) - new Date(2000, 0, 1, h1, m1)) / 60000);
-              }
-              return slot;
-          });
-      } catch(e) { 
-          console.error('Database error:', e);
-          await syncDatabase(env); 
-      }
-      const shiftList = parseShiftList(config?.shifts_json);
-      if (config) {
-          const workingDaysArray = parseWorkingDays(config.working_days);
-          if (config.working_days !== JSON.stringify(workingDaysArray)) {
-              await env.DB.prepare("UPDATE schedule_config SET working_days = ?, active_days = ? WHERE school_id = ?")
-                  .bind(JSON.stringify(workingDaysArray), workingDaysArray.length, school.id).run();
-              config.working_days = workingDaysArray;
-              config.active_days = workingDaysArray.length;
-          } else {
-              config.working_days = workingDaysArray;
+          for (let i = 0; i < body.slots.length; i++) {
+            const slot = body.slots[i];
+            const applicableShifts = school.shifts_enabled
+              ? parseApplicableShifts(slot.applicable_shifts, shiftList)
+              : ['Full Day'];
+            await env.DB.prepare("INSERT INTO schedule_slots (school_id, slot_index, start_time, end_time, label, duration, type, applicable_shifts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+              .bind(school.id, i, slot.start_time, slot.end_time, slot.label, slot.duration, slot.type, JSON.stringify(applicableShifts)).run();
           }
+
+          const workingDaysArray = parseWorkingDays(body.working_days);
+          const workingDays = JSON.stringify(workingDaysArray);
+          const allDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+          const offDays = JSON.stringify(allDays.filter(day => !workingDaysArray.includes(day)));
+          const workingDaysCount = workingDaysArray.length || 5;
+
+
+          await env.DB.prepare("UPDATE schedule_config SET working_days = ?, off_days = ?, active_days = ? WHERE school_id = ?")
+            .bind(workingDays, offDays, workingDaysCount, school.id).run();
+        }
+        return jsonResponse({ success: true });
+      } catch (e) {
+        if (e.message.includes("no such table")) await syncDatabase(env);
+        return jsonResponse({ error: e.message }, 500);
       }
-      if (config && config.shifts_json !== JSON.stringify(shiftList)) {
-          await env.DB.prepare("UPDATE schedule_config SET shifts_json = ? WHERE school_id = ?")
-              .bind(JSON.stringify(shiftList), school.id).run();
-          config.shifts_json = JSON.stringify(shiftList);
-      }
-      let normalizedSlots = normalizeSlotsForShifts(slots, shiftList);
-      const slotUpdates = normalizedSlots.filter(slot => {
-          const normalized = parseApplicableShifts(slot.applicable_shifts, shiftList);
-          const normalizedJson = JSON.stringify(normalized);
-          const raw = typeof slot.applicable_shifts === 'string'
-              ? slot.applicable_shifts
-              : JSON.stringify(slot.applicable_shifts || []);
-          return normalizedJson !== raw;
+    }
+
+
+    if (request.method === 'DELETE') {
+      await env.DB.prepare("DELETE FROM schedule_slots WHERE school_id = ?").bind(school.id).run();
+      let shiftsJson = '["Full Day"]';
+      try {
+        const existingConfig = await env.DB.prepare("SELECT shifts_json FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+        if (existingConfig?.shifts_json) shiftsJson = existingConfig.shifts_json;
+      } catch (e) { }
+      await env.DB.prepare("DELETE FROM schedule_config WHERE school_id = ?").bind(school.id).run();
+      await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days, shifts_json) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(school.id, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]', shiftsJson).run();
+      return jsonResponse({ success: true });
+    }
+
+
+    let config = null;
+    let slots = [];
+    try {
+      config = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+      slots = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
+
+
+      slots = slots.map(slot => {
+        if (!slot.duration && slot.start_time && slot.end_time) {
+          const [h1, m1] = slot.start_time.split(':').map(Number);
+          const [h2, m2] = slot.end_time.split(':').map(Number);
+          slot.duration = Math.round((new Date(2000, 0, 1, h2, m2) - new Date(2000, 0, 1, h1, m1)) / 60000);
+        }
+        return slot;
       });
-      for (const slot of slotUpdates) {
-          const normalized = parseApplicableShifts(slot.applicable_shifts, shiftList);
-          await env.DB.prepare("UPDATE schedule_slots SET applicable_shifts = ? WHERE id = ?")
-              .bind(JSON.stringify(normalized), slot.id).run();
+    } catch (e) {
+      console.error('Database error:', e);
+      await syncDatabase(env);
+    }
+    const shiftList = parseShiftList(config?.shifts_json);
+    if (config) {
+      const workingDaysArray = parseWorkingDays(config.working_days);
+      if (config.working_days !== JSON.stringify(workingDaysArray)) {
+        await env.DB.prepare("UPDATE schedule_config SET working_days = ?, active_days = ? WHERE school_id = ?")
+          .bind(JSON.stringify(workingDaysArray), workingDaysArray.length, school.id).run();
+        config.working_days = workingDaysArray;
+        config.active_days = workingDaysArray.length;
+      } else {
+        config.working_days = workingDaysArray;
       }
-      if (slotUpdates.length) {
-          const refreshed = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
-          normalizedSlots = normalizeSlotsForShifts(refreshed, shiftList);
-      }
-      const shiftConfig = {
-          enabled: !!school.shifts_enabled,
-          shifts: shiftList
-      };
-      slots = normalizedSlots;
-      return htmlResponse(InstituteLayout(SchedulesPageHTML(config, slots, shiftConfig), "Master Schedule", school.school_name));
+    }
+    if (config && config.shifts_json !== JSON.stringify(shiftList)) {
+      await env.DB.prepare("UPDATE schedule_config SET shifts_json = ? WHERE school_id = ?")
+        .bind(JSON.stringify(shiftList), school.id).run();
+      config.shifts_json = JSON.stringify(shiftList);
+    }
+    let normalizedSlots = normalizeSlotsForShifts(slots, shiftList);
+    const slotUpdates = normalizedSlots.filter(slot => {
+      const normalized = parseApplicableShifts(slot.applicable_shifts, shiftList);
+      const normalizedJson = JSON.stringify(normalized);
+      const raw = typeof slot.applicable_shifts === 'string'
+        ? slot.applicable_shifts
+        : JSON.stringify(slot.applicable_shifts || []);
+      return normalizedJson !== raw;
+    });
+    for (const slot of slotUpdates) {
+      const normalized = parseApplicableShifts(slot.applicable_shifts, shiftList);
+      await env.DB.prepare("UPDATE schedule_slots SET applicable_shifts = ? WHERE id = ?")
+        .bind(JSON.stringify(normalized), slot.id).run();
+    }
+    if (slotUpdates.length) {
+      const refreshed = (await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? ORDER BY slot_index ASC").bind(school.id).all()).results;
+      normalizedSlots = normalizeSlotsForShifts(refreshed, shiftList);
+    }
+    const shiftConfig = {
+      enabled: !!school.shifts_enabled,
+      shifts: shiftList
+    };
+    slots = normalizedSlots;
+    return htmlResponse(InstituteLayout(SchedulesPageHTML(config, slots, shiftConfig), "Master Schedule", school.school_name));
   }
 
-  
+
   if (url.pathname === '/school/subjects/usage') {
-      const subjectId = url.searchParams.get('id');
-      if (!subjectId) {
-          return jsonResponse({error: 'Subject ID required'}, 400);
-      }
-      
-      try {
-          
-          
-          const classUsage = await env.DB.prepare(`
+    const subjectId = url.searchParams.get('id');
+    if (!subjectId) {
+      return jsonResponse({ error: 'Subject ID required' }, 400);
+    }
+
+    try {
+
+
+      const classUsage = await env.DB.prepare(`
               SELECT cs.id, c.class_name, cs.classes_per_week, 
                      cs.is_fixed, cs.min_classes, cs.max_classes
               FROM class_subjects cs 
               JOIN academic_classes c ON cs.class_id = c.id
               WHERE cs.subject_id = ? AND cs.school_id = ?
           `).bind(subjectId, school.id).all();
-          
-          
-          const groupUsage = await env.DB.prepare(`
+
+
+      const groupUsage = await env.DB.prepare(`
               SELECT gs.id, g.group_name, gs.classes_per_week,
                      gs.is_fixed, gs.min_classes, gs.max_classes
               FROM group_subjects gs
               JOIN class_groups g ON gs.group_id = g.id
               WHERE gs.subject_id = ? AND gs.school_id = ?
           `).bind(subjectId, school.id).all();
-          
-          
-          
-          let teacherUsage = { results: [] };
-          try {
-              
-              const tableCheck = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='teacher_assignments'").first();
-              if (tableCheck) {
-                  teacherUsage = await env.DB.prepare(`
+
+
+
+      let teacherUsage = { results: [] };
+      try {
+
+        const tableCheck = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='teacher_assignments'").first();
+        if (tableCheck) {
+          teacherUsage = await env.DB.prepare(`
                       SELECT ta.id, t.full_name as teacher_name, sub.subject_name
                       FROM teacher_assignments ta
                       JOIN profiles_teacher t ON ta.teacher_id = t.id
                       JOIN academic_subjects sub ON ta.subject_id = sub.id
                       WHERE ta.subject_id = ? AND ta.school_id = ?
                   `).bind(subjectId, school.id).all();
-              } else {
-              }
-          } catch (error) {
-              teacherUsage = { results: [] };
-          }
-          
-          const subjectInfo = await env.DB.prepare("SELECT subject_name FROM academic_subjects WHERE id = ? AND school_id = ?").bind(subjectId, school.id).first();
-          
-          return jsonResponse({
-              success: true,
-              data: {
-                  subject: subjectInfo,
-                  classes: classUsage.results,
-                  groups: groupUsage.results,
-                  teachers: teacherUsage.results
-              }
-          });
+        } else {
+        }
       } catch (error) {
-          console.error('Usage check error:', error);
-          return jsonResponse({error: 'Error checking subject usage: ' + error.message}, 500);
+        teacherUsage = { results: [] };
       }
+
+      const subjectInfo = await env.DB.prepare("SELECT subject_name FROM academic_subjects WHERE id = ? AND school_id = ?").bind(subjectId, school.id).first();
+
+      return jsonResponse({
+        success: true,
+        data: {
+          subject: subjectInfo,
+          classes: classUsage.results,
+          groups: groupUsage.results,
+          teachers: teacherUsage.results
+        }
+      });
+    } catch (error) {
+      console.error('Usage check error:', error);
+      return jsonResponse({ error: 'Error checking subject usage: ' + error.message }, 500);
+    }
   }
 
-  
+
   if (url.pathname === '/school/subjects/replace') {
-      const body = await request.json();
-      
-      try {
-          if (body.action === 'replace_subject') {
-              const { oldSubjectId, newSubjectId } = body;
-              
-              
-              await env.DB.prepare(`
+    const body = await request.json();
+
+    try {
+      if (body.action === 'replace_subject') {
+        const { oldSubjectId, newSubjectId } = body;
+
+
+        await env.DB.prepare(`
                   UPDATE class_subjects 
                   SET subject_id = ? 
                   WHERE subject_id = ? AND school_id = ?
               `).bind(newSubjectId, oldSubjectId, school.id).run();
-              
-              
-              await env.DB.prepare(`
+
+
+        await env.DB.prepare(`
                   UPDATE group_subjects 
                   SET subject_id = ? 
                   WHERE subject_id = ? AND school_id = ?
               `).bind(newSubjectId, oldSubjectId, school.id).run();
-              
-              
-              await env.DB.prepare("DELETE FROM academic_subjects WHERE id = ? AND school_id = ?").bind(oldSubjectId, school.id).run();
-              
-              return jsonResponse({success:true});
-          }
-          
-          return jsonResponse({error:"Invalid action"},400);
-      } catch (error) {
-          console.error('Replace error:', error);
-          return jsonResponse({error: 'Error replacing subject: ' + error.message}, 500);
+
+
+        await env.DB.prepare("DELETE FROM academic_subjects WHERE id = ? AND school_id = ?").bind(oldSubjectId, school.id).run();
+
+        return jsonResponse({ success: true });
       }
-  }
-  
-  
-  if (url.pathname === '/school/subjects/remove-assignments') {
-      const body = await request.json();
-      
-      try {
-          if (body.action === 'remove_assignments_and_delete') {
-              const { subjectId } = body;
-              
-              
-              await env.DB.prepare("DELETE FROM class_subjects WHERE subject_id = ? AND school_id = ?").bind(subjectId, school.id).run();
-              
-              
-              await env.DB.prepare("DELETE FROM group_subjects WHERE subject_id = ? AND school_id = ?").bind(subjectId, school.id).run();
-              
-              
-              try {
-                  await env.DB.prepare("DELETE FROM teacher_assignments WHERE subject_id = ? AND school_id = ?").bind(subjectId, school.id).run();
-              } catch (error) {
-              }
-              
-              
-              await env.DB.prepare("DELETE FROM academic_subjects WHERE id = ? AND school_id = ?").bind(subjectId, school.id).run();
-              
-              return jsonResponse({success:true});
-          }
-          
-          return jsonResponse({error:"Invalid action"},400);
-      } catch (error) {
-          console.error('Remove assignments error:', error);
-          return jsonResponse({error: 'Error removing assignments: ' + error.message}, 500);
-      }
-  }
-  
-  
-  if (url.pathname === '/school/subjects/list') {
-      try {
-          const subjects = await env.DB.prepare("SELECT id, subject_name FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
-          return jsonResponse({
-              success: true,
-              data: subjects.results
-          });
-      } catch (error) {
-          console.error('Subjects list error:', error);
-          return jsonResponse({error: 'Error fetching subjects'}, 500);
-      }
+
+      return jsonResponse({ error: "Invalid action" }, 400);
+    } catch (error) {
+      console.error('Replace error:', error);
+      return jsonResponse({ error: 'Error replacing subject: ' + error.message }, 500);
+    }
   }
 
-  
+
+  if (url.pathname === '/school/subjects/remove-assignments') {
+    const body = await request.json();
+
+    try {
+      if (body.action === 'remove_assignments_and_delete') {
+        const { subjectId } = body;
+
+
+        await env.DB.prepare("DELETE FROM class_subjects WHERE subject_id = ? AND school_id = ?").bind(subjectId, school.id).run();
+
+
+        await env.DB.prepare("DELETE FROM group_subjects WHERE subject_id = ? AND school_id = ?").bind(subjectId, school.id).run();
+
+
+        try {
+          await env.DB.prepare("DELETE FROM teacher_assignments WHERE subject_id = ? AND school_id = ?").bind(subjectId, school.id).run();
+        } catch (error) {
+        }
+
+
+        await env.DB.prepare("DELETE FROM academic_subjects WHERE id = ? AND school_id = ?").bind(subjectId, school.id).run();
+
+        return jsonResponse({ success: true });
+      }
+
+      return jsonResponse({ error: "Invalid action" }, 400);
+    } catch (error) {
+      console.error('Remove assignments error:', error);
+      return jsonResponse({ error: 'Error removing assignments: ' + error.message }, 500);
+    }
+  }
+
+
+  if (url.pathname === '/school/subjects/list') {
+    try {
+      const subjects = await env.DB.prepare("SELECT id, subject_name FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
+      return jsonResponse({
+        success: true,
+        data: subjects.results
+      });
+    } catch (error) {
+      console.error('Subjects list error:', error);
+      return jsonResponse({ error: 'Error fetching subjects' }, 500);
+    }
+  }
+
+
   if (url.pathname === '/school/subjects') {
-      if(request.method === 'POST') {
-          try {
-              const body = await request.json();
-              
-              
-              if(body.action === 'create') {
-                  if (school.max_subjects !== null && school.max_subjects !== undefined) {
-                      const subjectCount = await env.DB.prepare("SELECT COUNT(*) as count FROM academic_subjects WHERE school_id = ?").bind(school.id).first();
-                      if (subjectCount && subjectCount.count >= Number(school.max_subjects)) {
-                          return jsonResponse({ error: "Subject limit reached. Upgrade membership to add more subjects." }, 403);
-                      }
-                  }
-                  const created = await env.DB.prepare("INSERT INTO academic_subjects (school_id, subject_name) VALUES (?, ?) RETURNING id")
-                      .bind(school.id, body.name)
-                      .first();
-                  return jsonResponse({ success: true, id: created?.id || null, subject_name: body.name });
-              }
-              if(body.action === 'rename') {
-                  await env.DB.prepare("UPDATE academic_subjects SET subject_name = ? WHERE id = ?").bind(body.name, body.id).run();
-                  return jsonResponse({success:true});
-              }
-              
-              
-              if(body.action === 'add_class_subject') {
-                  
-                  const existingSubject = await env.DB.prepare("SELECT id FROM class_subjects WHERE school_id = ? AND class_id = ? AND subject_id = ?")
-                      .bind(body.school_id, body.class_id, body.subject_id).first();
-                  if(existingSubject) return jsonResponse({error: "This subject is already added to this class"}, 400);
-                  
-                  
-                  const existingGroupSubject = await env.DB.prepare(`
+    if (request.method === 'POST') {
+      try {
+        const body = await request.json();
+
+
+        if (body.action === 'create') {
+          if (school.max_subjects !== null && school.max_subjects !== undefined) {
+            const subjectCount = await env.DB.prepare("SELECT COUNT(*) as count FROM academic_subjects WHERE school_id = ?").bind(school.id).first();
+            if (subjectCount && subjectCount.count >= Number(school.max_subjects)) {
+              return jsonResponse({ error: "Subject limit reached. Upgrade membership to add more subjects." }, 403);
+            }
+          }
+          const created = await env.DB.prepare("INSERT INTO academic_subjects (school_id, subject_name) VALUES (?, ?) RETURNING id")
+            .bind(school.id, body.name)
+            .first();
+          return jsonResponse({ success: true, id: created?.id || null, subject_name: body.name });
+        }
+        if (body.action === 'rename') {
+          await env.DB.prepare("UPDATE academic_subjects SET subject_name = ? WHERE id = ?").bind(body.name, body.id).run();
+          return jsonResponse({ success: true });
+        }
+
+
+        if (body.action === 'add_class_subject') {
+
+          const existingSubject = await env.DB.prepare("SELECT id FROM class_subjects WHERE school_id = ? AND class_id = ? AND subject_id = ?")
+            .bind(body.school_id, body.class_id, body.subject_id).first();
+          if (existingSubject) return jsonResponse({ error: "This subject is already added to this class" }, 400);
+
+
+          const existingGroupSubject = await env.DB.prepare(`
                       SELECT gs.id FROM group_subjects gs 
                       JOIN class_groups cg ON gs.group_id = cg.id 
                       WHERE gs.school_id = ? AND cg.class_id = ? AND gs.subject_id = ?
                   `).bind(body.school_id, body.class_id, body.subject_id).first();
-                  if(existingGroupSubject) return jsonResponse({error: "This subject is already added to one or more groups in this class. Remove it from groups first, or keep it only in groups."}, 400);
-                  
-                  const isFixed = body.is_fixed === true || body.is_fixed === 'true';
-                  let insertResult = null;
-                  if(isFixed) {
-                      insertResult = await env.DB.prepare("INSERT INTO class_subjects (school_id, class_id, subject_id, classes_per_week, is_fixed) VALUES (?, ?, ?, ?, ?) RETURNING id")
-                          .bind(body.school_id, body.class_id, body.subject_id, body.classes_per_week, 1).first();
-                  } else {
-                      insertResult = await env.DB.prepare("INSERT INTO class_subjects (school_id, class_id, subject_id, min_classes, max_classes, is_fixed) VALUES (?, ?, ?, ?, ?, ?) RETURNING id")
-                          .bind(body.school_id, body.class_id, body.subject_id, body.min_classes, body.max_classes, 0).first();
-                  }
-                  
-                  
-                  await env.DB.prepare(`
+          if (existingGroupSubject) return jsonResponse({ error: "This subject is already added to one or more groups in this class. Remove it from groups first, or keep it only in groups." }, 400);
+
+          const isFixed = body.is_fixed === true || body.is_fixed === 'true';
+          let insertResult = null;
+          if (isFixed) {
+            insertResult = await env.DB.prepare("INSERT INTO class_subjects (school_id, class_id, subject_id, classes_per_week, is_fixed) VALUES (?, ?, ?, ?, ?) RETURNING id")
+              .bind(body.school_id, body.class_id, body.subject_id, body.classes_per_week, 1).first();
+          } else {
+            insertResult = await env.DB.prepare("INSERT INTO class_subjects (school_id, class_id, subject_id, min_classes, max_classes, is_fixed) VALUES (?, ?, ?, ?, ?, ?) RETURNING id")
+              .bind(body.school_id, body.class_id, body.subject_id, body.min_classes, body.max_classes, 0).first();
+          }
+
+
+          await env.DB.prepare(`
                       INSERT INTO teacher_assignments (school_id, class_id, group_id, section_id, subject_id, teacher_id, is_auto, is_primary) 
                       VALUES (?, ?, ?, ?, ?, ?, 1, 0)
                   `).bind(body.school_id, body.class_id, null, null, body.subject_id, null).run();
-                  
-                  return jsonResponse({success:true, id: insertResult?.id || null});
-              }
-              if(body.action === 'add_group_subject') {
-                  
-                  const existingSubject = await env.DB.prepare("SELECT id FROM group_subjects WHERE school_id = ? AND group_id = ? AND subject_id = ?")
-                      .bind(body.school_id, body.group_id, body.subject_id).first();
-                  if(existingSubject) return jsonResponse({error: "This subject is already added to this group"}, 400);
-                  
-                  
-                  const classInfo = await env.DB.prepare("SELECT class_id FROM class_groups WHERE id = ?").bind(body.group_id).first();
-                  if(!classInfo) return jsonResponse({error: "Group not found"}, 400);
-                  
-                  
-                  const existingClassSubject = await env.DB.prepare("SELECT id FROM class_subjects WHERE school_id = ? AND class_id = ? AND subject_id = ?")
-                      .bind(body.school_id, classInfo.class_id, body.subject_id).first();
-                  if(existingClassSubject) return jsonResponse({error: "This subject is already added to the entire class. Remove it from class first, or keep it only as class subject."}, 400);
-                  
-                  const isFixed = body.is_fixed === true || body.is_fixed === 'true';
-                  let insertResult = null;
-                  if(isFixed) {
-                      insertResult = await env.DB.prepare("INSERT INTO group_subjects (school_id, group_id, subject_id, classes_per_week, is_fixed) VALUES (?, ?, ?, ?, ?) RETURNING id")
-                          .bind(body.school_id, body.group_id, body.subject_id, body.classes_per_week, 1).first();
-                  } else {
-                      insertResult = await env.DB.prepare("INSERT INTO group_subjects (school_id, group_id, subject_id, min_classes, max_classes, is_fixed) VALUES (?, ?, ?, ?, ?, ?) RETURNING id")
-                          .bind(body.school_id, body.group_id, body.subject_id, body.min_classes, body.max_classes, 0).first();
-                  }
-                  
-                  
-                  await env.DB.prepare(`
+
+          return jsonResponse({ success: true, id: insertResult?.id || null });
+        }
+        if (body.action === 'add_group_subject') {
+
+          const existingSubject = await env.DB.prepare("SELECT id FROM group_subjects WHERE school_id = ? AND group_id = ? AND subject_id = ?")
+            .bind(body.school_id, body.group_id, body.subject_id).first();
+          if (existingSubject) return jsonResponse({ error: "This subject is already added to this group" }, 400);
+
+
+          const classInfo = await env.DB.prepare("SELECT class_id FROM class_groups WHERE id = ?").bind(body.group_id).first();
+          if (!classInfo) return jsonResponse({ error: "Group not found" }, 400);
+
+
+          const existingClassSubject = await env.DB.prepare("SELECT id FROM class_subjects WHERE school_id = ? AND class_id = ? AND subject_id = ?")
+            .bind(body.school_id, classInfo.class_id, body.subject_id).first();
+          if (existingClassSubject) return jsonResponse({ error: "This subject is already added to the entire class. Remove it from class first, or keep it only as class subject." }, 400);
+
+          const isFixed = body.is_fixed === true || body.is_fixed === 'true';
+          let insertResult = null;
+          if (isFixed) {
+            insertResult = await env.DB.prepare("INSERT INTO group_subjects (school_id, group_id, subject_id, classes_per_week, is_fixed) VALUES (?, ?, ?, ?, ?) RETURNING id")
+              .bind(body.school_id, body.group_id, body.subject_id, body.classes_per_week, 1).first();
+          } else {
+            insertResult = await env.DB.prepare("INSERT INTO group_subjects (school_id, group_id, subject_id, min_classes, max_classes, is_fixed) VALUES (?, ?, ?, ?, ?, ?) RETURNING id")
+              .bind(body.school_id, body.group_id, body.subject_id, body.min_classes, body.max_classes, 0).first();
+          }
+
+
+          await env.DB.prepare(`
                       INSERT INTO teacher_assignments (school_id, class_id, group_id, section_id, subject_id, teacher_id, is_auto, is_primary) 
                       VALUES (?, ?, ?, ?, ?, ?, 1, 0)
                   `).bind(body.school_id, classInfo.class_id, body.group_id, null, body.subject_id, null).run();
-                  
-                  return jsonResponse({success:true, id: insertResult?.id || null});
-              }
-              
-              return jsonResponse({error:"Invalid action"},400);
-          } catch(e) {
-              console.error('Subjects API Error:', e);
-              return jsonResponse({error: e.message}, 500);
-          }
+
+          return jsonResponse({ success: true, id: insertResult?.id || null });
+        }
+
+        return jsonResponse({ error: "Invalid action" }, 400);
+      } catch (e) {
+        console.error('Subjects API Error:', e);
+        return jsonResponse({ error: e.message }, 500);
       }
-      
-      if(request.method === 'DELETE') {
-          const body = await request.json();
-          
-          try {
-              
-              if(body.type === 'bank') {
-                  
-                  
-                  const subjectExists = await env.DB.prepare("SELECT id, subject_name FROM academic_subjects WHERE id = ? AND school_id = ?").bind(body.id, school.id).first();
-                  
-                  if (!subjectExists) {
-                      return jsonResponse({error: "Subject not found"}, 404);
-                  }
-                  
-                  
-                  const classUsage = await env.DB.prepare("SELECT COUNT(*) as count FROM class_subjects WHERE subject_id = ? AND school_id = ?").bind(body.id, school.id).first();
-                  const groupUsage = await env.DB.prepare("SELECT COUNT(*) as count FROM group_subjects WHERE subject_id = ? AND school_id = ?").bind(body.id, school.id).first();
-                  
-                  
-                  if (classUsage.count > 0) {
-                      return jsonResponse({ 
-                          error: "Cannot delete subject - it is assigned to " + classUsage.count + " class(es). Remove from curriculum first." 
-                      }, 400);
-                  }
-                  
-                  if (groupUsage.count > 0) {
-                      return jsonResponse({ 
-                          error: "Cannot delete subject - it is assigned to " + groupUsage.count + " group(s). Remove from curriculum first." 
-                      }, 400);
-                  }
-                  
-                  
-                  const deleteResult = await env.DB.prepare("DELETE FROM academic_subjects WHERE id = ? AND school_id = ?").bind(body.id, school.id).run();
-                  
-                  return jsonResponse({success:true, deleted: subjectExists});
-              }
-              
-              
-              if(body.action === 'delete_class_subject') {
-                  await env.DB.prepare("DELETE FROM class_subjects WHERE id=?").bind(body.id).run();
-                  return jsonResponse({success:true});
-              }
-              if(body.action === 'delete_group_subject') {
-                  await env.DB.prepare("DELETE FROM group_subjects WHERE id=?").bind(body.id).run();
-                  return jsonResponse({success:true});
-              }
-              
-              return jsonResponse({error:"Invalid delete request"},400);
-          } catch (error) {
-              console.error('Delete error:', error);
-              return jsonResponse({ 
-                  error: "Database error: " + error.message 
-              }, 500);
-          }
-      }
-      
-      
-      
-      
+    }
+
+    if (request.method === 'DELETE') {
+      const body = await request.json();
+
       try {
-          
-          await env.DB.prepare("UPDATE class_subjects SET is_fixed = 1 WHERE is_fixed IS NULL").run();
-          
-          await env.DB.prepare("UPDATE group_subjects SET is_fixed = 1 WHERE is_fixed IS NULL").run();
-      } catch(e) {
+
+        if (body.type === 'bank') {
+
+
+          const subjectExists = await env.DB.prepare("SELECT id, subject_name FROM academic_subjects WHERE id = ? AND school_id = ?").bind(body.id, school.id).first();
+
+          if (!subjectExists) {
+            return jsonResponse({ error: "Subject not found" }, 404);
+          }
+
+
+          const classUsage = await env.DB.prepare("SELECT COUNT(*) as count FROM class_subjects WHERE subject_id = ? AND school_id = ?").bind(body.id, school.id).first();
+          const groupUsage = await env.DB.prepare("SELECT COUNT(*) as count FROM group_subjects WHERE subject_id = ? AND school_id = ?").bind(body.id, school.id).first();
+
+
+          if (classUsage.count > 0) {
+            return jsonResponse({
+              error: "Cannot delete subject - it is assigned to " + classUsage.count + " class(es). Remove from curriculum first."
+            }, 400);
+          }
+
+          if (groupUsage.count > 0) {
+            return jsonResponse({
+              error: "Cannot delete subject - it is assigned to " + groupUsage.count + " group(s). Remove from curriculum first."
+            }, 400);
+          }
+
+
+          const deleteResult = await env.DB.prepare("DELETE FROM academic_subjects WHERE id = ? AND school_id = ?").bind(body.id, school.id).run();
+
+          return jsonResponse({ success: true, deleted: subjectExists });
+        }
+
+
+        if (body.action === 'delete_class_subject') {
+          await env.DB.prepare("DELETE FROM class_subjects WHERE id=?").bind(body.id).run();
+          return jsonResponse({ success: true });
+        }
+        if (body.action === 'delete_group_subject') {
+          await env.DB.prepare("DELETE FROM group_subjects WHERE id=?").bind(body.id).run();
+          return jsonResponse({ success: true });
+        }
+
+        return jsonResponse({ error: "Invalid delete request" }, 400);
+      } catch (error) {
+        console.error('Delete error:', error);
+        return jsonResponse({
+          error: "Database error: " + error.message
+        }, 500);
       }
-      
-      const subjects = await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
-      const classes = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ? ORDER BY class_name ASC").bind(school.id).all();
-      const groups = await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ? ORDER BY class_id, group_name").bind(school.id).all();
-      const sections = await env.DB.prepare("SELECT cs.*, cg.group_name FROM class_sections cs LEFT JOIN class_groups cg ON cs.group_id = cg.id WHERE cs.school_id = ?").bind(school.id).all();
-      
-      
-      const classSubjects = await env.DB.prepare(`
+    }
+
+
+
+
+    try {
+
+      await env.DB.prepare("UPDATE class_subjects SET is_fixed = 1 WHERE is_fixed IS NULL").run();
+
+      await env.DB.prepare("UPDATE group_subjects SET is_fixed = 1 WHERE is_fixed IS NULL").run();
+    } catch (e) {
+    }
+
+    const subjects = await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
+    const classes = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ? ORDER BY class_name ASC").bind(school.id).all();
+    const groups = await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ? ORDER BY class_id, group_name").bind(school.id).all();
+    const sections = await env.DB.prepare("SELECT cs.*, cg.group_name FROM class_sections cs LEFT JOIN class_groups cg ON cs.group_id = cg.id WHERE cs.school_id = ?").bind(school.id).all();
+
+
+    const classSubjects = await env.DB.prepare(`
         SELECT cs.*, sub.subject_name 
         FROM class_subjects cs 
         JOIN academic_subjects sub ON cs.subject_id = sub.id 
         WHERE cs.school_id = ?
       `).bind(school.id).all();
-      
-      const groupSubjects = await env.DB.prepare(`
+
+    const groupSubjects = await env.DB.prepare(`
         SELECT gs.*, sub.subject_name, g.group_name, g.class_id
         FROM group_subjects gs 
         JOIN academic_subjects sub ON gs.subject_id = sub.id
         JOIN class_groups g ON gs.group_id = g.id
         WHERE gs.school_id = ?
       `).bind(school.id).all();
-      
-      
-      let scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
-      if (!scheduleConfig) {
-        await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days, shifts_json) VALUES (?, ?, ?, ?, ?, ?)")
-          .bind(school.id, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]', '["Full Day"]').run();
-        scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
-      }
-      
-      
-      const workingDaysArray = parseWorkingDays(scheduleConfig?.working_days);
-      const workingDaysCount = workingDaysArray.length; 
-      const scheduleSlots = await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? AND type = 'class'").bind(school.id).all();
-      const shiftList = parseShiftList(scheduleConfig?.shifts_json);
-      const normalizedSlots = normalizeSlotsForShifts(scheduleSlots.results || [], shiftList);
-      const slotIndexesByShift = buildSlotIndexesByShift(normalizedSlots, shiftList);
-      const shiftSlotCounts = {};
-      shiftList.forEach(shift => { shiftSlotCounts[shift] = (slotIndexesByShift[shift] || []).length; });
-      const fallbackPeriods = normalizedSlots.length || 8;
-      const fullDaySlots = shiftSlotCounts['Full Day'] || fallbackPeriods;
-      const maxClassesPerSection = workingDaysCount * fullDaySlots;
-      const classShiftMap = {};
-      const classSlotsPerDayMap = {};
-      const classCapacityMap = {};
-      (classes.results || []).forEach(cls => {
-        const rawShift = cls.shift_name || 'Full Day';
-        const shiftName = shiftList.includes(rawShift) ? rawShift : 'Full Day';
-        classShiftMap[cls.id] = shiftName;
-        const slotsPerDay = shiftSlotCounts[shiftName] || fallbackPeriods;
-        classSlotsPerDayMap[cls.id] = slotsPerDay;
-        classCapacityMap[cls.id] = workingDaysCount * slotsPerDay;
-      });
-      const shiftCapacityMap = {};
-      shiftList.forEach(shift => { shiftCapacityMap[shift] = workingDaysCount * (shiftSlotCounts[shift] || 0); });
-      
-      scheduleConfig.actualClassPeriodsPerDay = fullDaySlots;
-      scheduleConfig.maxClassesPerSection = maxClassesPerSection;
-      scheduleConfig.workingDaysCount = workingDaysCount;
-      scheduleConfig.workingDaysArray = workingDaysArray;
-      scheduleConfig.shiftsEnabled = !!school.shifts_enabled;
-      scheduleConfig.shiftList = shiftList;
-      scheduleConfig.shiftSlotCounts = shiftSlotCounts;
-      scheduleConfig.shiftCapacityMap = shiftCapacityMap;
-      scheduleConfig.classCapacityMap = classCapacityMap;
-      scheduleConfig.classSlotsPerDayMap = classSlotsPerDayMap;
-      scheduleConfig.classShiftMap = classShiftMap;
-      
-      return htmlResponse(InstituteLayout(
-        SubjectsPageHTML(
-          school,
-          subjects.results, 
-          classes.results,
-          groups.results,
-          sections.results,
-          classSubjects.results,
-          groupSubjects.results,
-          scheduleConfig
-        ), 
-        "Subjects Management", 
-        school.school_name
-      ));
+
+
+    let scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+    if (!scheduleConfig) {
+      await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days, shifts_json) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(school.id, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]', '["Full Day"]').run();
+      scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+    }
+
+
+    const workingDaysArray = parseWorkingDays(scheduleConfig?.working_days);
+    const workingDaysCount = workingDaysArray.length;
+    const scheduleSlots = await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? AND type = 'class'").bind(school.id).all();
+    const shiftList = parseShiftList(scheduleConfig?.shifts_json);
+    const normalizedSlots = normalizeSlotsForShifts(scheduleSlots.results || [], shiftList);
+    const slotIndexesByShift = buildSlotIndexesByShift(normalizedSlots, shiftList);
+    const shiftSlotCounts = {};
+    shiftList.forEach(shift => { shiftSlotCounts[shift] = (slotIndexesByShift[shift] || []).length; });
+    const fallbackPeriods = normalizedSlots.length || 8;
+    const fullDaySlots = shiftSlotCounts['Full Day'] || fallbackPeriods;
+    const maxClassesPerSection = workingDaysCount * fullDaySlots;
+    const classShiftMap = {};
+    const classSlotsPerDayMap = {};
+    const classCapacityMap = {};
+    (classes.results || []).forEach(cls => {
+      const rawShift = cls.shift_name || 'Full Day';
+      const shiftName = shiftList.includes(rawShift) ? rawShift : 'Full Day';
+      classShiftMap[cls.id] = shiftName;
+      const slotsPerDay = shiftSlotCounts[shiftName] || fallbackPeriods;
+      classSlotsPerDayMap[cls.id] = slotsPerDay;
+      classCapacityMap[cls.id] = workingDaysCount * slotsPerDay;
+    });
+    const shiftCapacityMap = {};
+    shiftList.forEach(shift => { shiftCapacityMap[shift] = workingDaysCount * (shiftSlotCounts[shift] || 0); });
+
+    scheduleConfig.actualClassPeriodsPerDay = fullDaySlots;
+    scheduleConfig.maxClassesPerSection = maxClassesPerSection;
+    scheduleConfig.workingDaysCount = workingDaysCount;
+    scheduleConfig.workingDaysArray = workingDaysArray;
+    scheduleConfig.shiftsEnabled = !!school.shifts_enabled;
+    scheduleConfig.shiftList = shiftList;
+    scheduleConfig.shiftSlotCounts = shiftSlotCounts;
+    scheduleConfig.shiftCapacityMap = shiftCapacityMap;
+    scheduleConfig.classCapacityMap = classCapacityMap;
+    scheduleConfig.classSlotsPerDayMap = classSlotsPerDayMap;
+    scheduleConfig.classShiftMap = classShiftMap;
+
+    return htmlResponse(InstituteLayout(
+      SubjectsPageHTML(
+        school,
+        subjects.results,
+        classes.results,
+        groups.results,
+        sections.results,
+        classSubjects.results,
+        groupSubjects.results,
+        scheduleConfig
+      ),
+      "Subjects Management",
+      school.school_name
+    ));
   }
 
-  
+
   if (url.pathname === '/school/teachers') {
-      
-      const classes = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ? ORDER BY class_name ASC").bind(school.id).all();
-      const groups = await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ? ORDER BY class_id, group_name").bind(school.id).all();
-      const sections = await env.DB.prepare("SELECT * FROM class_sections WHERE school_id = ?").bind(school.id).all();
-      const subjects = await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
-      const teachers = await env.DB.prepare("SELECT * FROM profiles_teacher WHERE school_id = ? ORDER BY full_name ASC").bind(school.id).all();
-      const teacherSubjects = await env.DB.prepare(`
+
+    const classes = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ? ORDER BY class_name ASC").bind(school.id).all();
+    const groups = await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ? ORDER BY class_id, group_name").bind(school.id).all();
+    const sections = await env.DB.prepare("SELECT * FROM class_sections WHERE school_id = ?").bind(school.id).all();
+    const subjects = await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
+    const teachers = await env.DB.prepare("SELECT * FROM profiles_teacher WHERE school_id = ? ORDER BY full_name ASC").bind(school.id).all();
+    const teacherSubjects = await env.DB.prepare(`
         SELECT ts.*, sub.subject_name 
         FROM teacher_subjects ts 
         JOIN academic_subjects sub ON ts.subject_id = sub.id 
         WHERE ts.school_id = ?
       `).bind(school.id).all();
-      
-      const teacherAssignments = await env.DB.prepare(`
+
+    const teacherAssignments = await env.DB.prepare(`
         SELECT ta.*, t.full_name as teacher_name, sub.subject_name, g.group_name, g.class_id
         FROM teacher_assignments ta
         LEFT JOIN profiles_teacher t ON ta.teacher_id = t.id
@@ -597,142 +656,142 @@ export async function handleInstituteRequest(request, env) {
         LEFT JOIN class_groups g ON ta.group_id = g.id
         WHERE ta.school_id = ?
       `).bind(school.id).all();
-      
-      
-      
-      const classSubjects = await env.DB.prepare(`
+
+
+
+    const classSubjects = await env.DB.prepare(`
         SELECT cs.*, sub.subject_name 
         FROM class_subjects cs 
         JOIN academic_subjects sub ON cs.subject_id = sub.id 
         WHERE cs.school_id = ?
       `).bind(school.id).all();
-      
-      const groupSubjects = await env.DB.prepare(`
+
+    const groupSubjects = await env.DB.prepare(`
         SELECT gs.*, sub.subject_name 
         FROM group_subjects gs 
         JOIN academic_subjects sub ON gs.subject_id = sub.id
         WHERE gs.school_id = ?
       `).bind(school.id).all();
-      
-      return htmlResponse(InstituteLayout(
-        TeachersAssignmentPageHTML(
-          school,
-          classes.results || classes, 
-          groups.results || groups,
-          sections.results || sections,
-          subjects.results || subjects,
-          classSubjects.results || classSubjects,
-          groupSubjects.results || groupSubjects,
-          teachers.results || teachers,
-          teacherSubjects.results || teacherSubjects,
-          teacherAssignments.results || teacherAssignments
-        ), 
-        "Teacher Assignment", 
-        school.school_name
-      ));
+
+    return htmlResponse(InstituteLayout(
+      TeachersAssignmentPageHTML(
+        school,
+        classes.results || classes,
+        groups.results || groups,
+        sections.results || sections,
+        subjects.results || subjects,
+        classSubjects.results || classSubjects,
+        groupSubjects.results || groupSubjects,
+        teachers.results || teachers,
+        teacherSubjects.results || teacherSubjects,
+        teacherAssignments.results || teacherAssignments
+      ),
+      "Teacher Assignment",
+      school.school_name
+    ));
   }
 
-  
-  if (url.pathname === '/school/teachers-list') {
-      if (request.method === 'POST') {
-          const body = await request.json();
-          
-          
-          if (body.full_name && body.email && body.phone) {
-              const current = await env.DB.prepare("SELECT count(*) as count FROM profiles_teacher WHERE school_id = ?").bind(school.id).first();
-              if (school.max_teachers !== null && school.max_teachers !== undefined) {
-                  if (current.count >= Number(school.max_teachers)) {
-                      return jsonResponse({ error: "Teacher limit reached. Upgrade membership to add more teachers." }, 403);
-                  }
-              }
-              
-              await env.DB.prepare("INSERT INTO profiles_teacher (school_id, full_name, email, phone) VALUES (?, ?, ?, ?)")
-                  .bind(school.id, body.full_name, body.email, body.phone).run();
-              return jsonResponse({ success: true });
-          }
 
-          if (body.action === 'update_name') {
-              const teacherId = Number(body.teacher_id);
-              const fullName = (body.full_name || '').toString().trim();
-              if (!teacherId || !fullName) return jsonResponse({ error: "Teacher name required" }, 400);
-              await env.DB.prepare("UPDATE profiles_teacher SET full_name = ? WHERE id = ? AND school_id = ?")
-                  .bind(fullName, teacherId, school.id).run();
-              return jsonResponse({ success: true });
+  if (url.pathname === '/school/teachers-list') {
+    if (request.method === 'POST') {
+      const body = await request.json();
+
+
+      if (body.full_name && body.email && body.phone) {
+        const current = await env.DB.prepare("SELECT count(*) as count FROM profiles_teacher WHERE school_id = ?").bind(school.id).first();
+        if (school.max_teachers !== null && school.max_teachers !== undefined) {
+          if (current.count >= Number(school.max_teachers)) {
+            return jsonResponse({ error: "Teacher limit reached. Upgrade membership to add more teachers." }, 403);
           }
-          
-          
-          if (body.action === 'assign_subjects') {
-              
-              await env.DB.prepare("DELETE FROM teacher_subjects WHERE teacher_id = ?").bind(body.teacher_id).run();
-              
-              
-              if (body.primary_subject) {
-                  await env.DB.prepare("INSERT INTO teacher_subjects (school_id, teacher_id, subject_id, is_primary) VALUES (?, ?, ?, 1)")
-                      .bind(school.id, body.teacher_id, body.primary_subject).run();
-              }
-              
-              
-              if (body.additional_subjects && Array.isArray(body.additional_subjects)) {
-                  for (const subjectId of body.additional_subjects) {
-                      await env.DB.prepare("INSERT INTO teacher_subjects (school_id, teacher_id, subject_id, is_primary) VALUES (?, ?, ?, 0)")
-                          .bind(school.id, body.teacher_id, subjectId).run();
-                  }
-              }
-              
-              return jsonResponse({ success: true });
-          }
-          
-          return jsonResponse({ error: "Invalid request" }, 400);
+        }
+
+        await env.DB.prepare("INSERT INTO profiles_teacher (school_id, full_name, email, phone) VALUES (?, ?, ?, ?)")
+          .bind(school.id, body.full_name, body.email, body.phone).run();
+        return jsonResponse({ success: true });
       }
-      
-      if (request.method === 'DELETE') {
-          const body = await request.json();
-          
-          
-          if (body.id) {
-              await env.DB.prepare("DELETE FROM profiles_teacher WHERE id = ?").bind(body.id).run();
-              await env.DB.prepare("DELETE FROM teacher_subjects WHERE teacher_id = ?").bind(body.id).run();
-              return jsonResponse({ success: true });
-          }
-          
-          return jsonResponse({ error: "Invalid request" }, 400);
+
+      if (body.action === 'update_name') {
+        const teacherId = Number(body.teacher_id);
+        const fullName = (body.full_name || '').toString().trim();
+        if (!teacherId || !fullName) return jsonResponse({ error: "Teacher name required" }, 400);
+        await env.DB.prepare("UPDATE profiles_teacher SET full_name = ? WHERE id = ? AND school_id = ?")
+          .bind(fullName, teacherId, school.id).run();
+        return jsonResponse({ success: true });
       }
-      
-      
-      const teachers = await env.DB.prepare("SELECT * FROM profiles_teacher WHERE school_id = ? ORDER BY id DESC").bind(school.id).all();
-      const allSubjects = await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
-      const teacherSubjects = await env.DB.prepare(`
+
+
+      if (body.action === 'assign_subjects') {
+
+        await env.DB.prepare("DELETE FROM teacher_subjects WHERE teacher_id = ?").bind(body.teacher_id).run();
+
+
+        if (body.primary_subject) {
+          await env.DB.prepare("INSERT INTO teacher_subjects (school_id, teacher_id, subject_id, is_primary) VALUES (?, ?, ?, 1)")
+            .bind(school.id, body.teacher_id, body.primary_subject).run();
+        }
+
+
+        if (body.additional_subjects && Array.isArray(body.additional_subjects)) {
+          for (const subjectId of body.additional_subjects) {
+            await env.DB.prepare("INSERT INTO teacher_subjects (school_id, teacher_id, subject_id, is_primary) VALUES (?, ?, ?, 0)")
+              .bind(school.id, body.teacher_id, subjectId).run();
+          }
+        }
+
+        return jsonResponse({ success: true });
+      }
+
+      return jsonResponse({ error: "Invalid request" }, 400);
+    }
+
+    if (request.method === 'DELETE') {
+      const body = await request.json();
+
+
+      if (body.id) {
+        await env.DB.prepare("DELETE FROM profiles_teacher WHERE id = ?").bind(body.id).run();
+        await env.DB.prepare("DELETE FROM teacher_subjects WHERE teacher_id = ?").bind(body.id).run();
+        return jsonResponse({ success: true });
+      }
+
+      return jsonResponse({ error: "Invalid request" }, 400);
+    }
+
+
+    const teachers = await env.DB.prepare("SELECT * FROM profiles_teacher WHERE school_id = ? ORDER BY id DESC").bind(school.id).all();
+    const allSubjects = await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
+    const teacherSubjects = await env.DB.prepare(`
         SELECT ts.*, sub.subject_name 
         FROM teacher_subjects ts 
         JOIN academic_subjects sub ON ts.subject_id = sub.id 
         WHERE ts.school_id = ?
         ORDER BY ts.is_primary DESC, sub.subject_name ASC
       `).bind(school.id).all();
-      
-      
-      return htmlResponse(InstituteLayout(
-        TeachersPageHTML(
-          school,
-          teachers.results || teachers, 
-          allSubjects.results || allSubjects,
-          teacherSubjects.results || teacherSubjects
-        ), 
-        "Teachers Management", 
-        school.school_name
-      ));
-  }
-  
-  
-  if (url.pathname === '/school/teacher-assignments') {
-      const normalizeId = (value) => {
-          if (value === null || value === undefined || value === '' || value === 'null') return null;
-          const num = Number(value);
-          return Number.isNaN(num) ? null : num;
-      };
 
-      const normalizeAssignmentsForContext = async ({ classId, groupId, sectionId, subjectId }) => {
-          if (!Number.isFinite(classId) || !Number.isFinite(subjectId)) return;
-          const rows = await env.DB.prepare(`
+
+    return htmlResponse(InstituteLayout(
+      TeachersPageHTML(
+        school,
+        teachers.results || teachers,
+        allSubjects.results || allSubjects,
+        teacherSubjects.results || teacherSubjects
+      ),
+      "Teachers Management",
+      school.school_name
+    ));
+  }
+
+
+  if (url.pathname === '/school/teacher-assignments') {
+    const normalizeId = (value) => {
+      if (value === null || value === undefined || value === '' || value === 'null') return null;
+      const num = Number(value);
+      return Number.isNaN(num) ? null : num;
+    };
+
+    const normalizeAssignmentsForContext = async ({ classId, groupId, sectionId, subjectId }) => {
+      if (!Number.isFinite(classId) || !Number.isFinite(subjectId)) return;
+      const rows = await env.DB.prepare(`
               SELECT id, teacher_id, is_auto, is_primary
               FROM teacher_assignments
               WHERE school_id = ? AND class_id = ? AND
@@ -741,50 +800,50 @@ export async function handleInstituteRequest(request, env) {
                     subject_id = ?
               ORDER BY id ASC
           `).bind(
-              school.id,
-              classId,
-              groupId,
-              groupId,
-              sectionId,
-              sectionId,
-              subjectId
-          ).all();
-          const assignments = rows.results || [];
-          if (!assignments.length) return;
+        school.id,
+        classId,
+        groupId,
+        groupId,
+        sectionId,
+        sectionId,
+        subjectId
+      ).all();
+      const assignments = rows.results || [];
+      if (!assignments.length) return;
 
-          const manual = assignments.filter(a => a.teacher_id !== null && a.teacher_id !== undefined && Number(a.teacher_id) > 0);
-          let primaryId = manual.find(a => Number(a.is_primary) === 1)?.id;
-          if (!primaryId && manual.length) primaryId = manual[0].id;
+      const manual = assignments.filter(a => a.teacher_id !== null && a.teacher_id !== undefined && Number(a.teacher_id) > 0);
+      let primaryId = manual.find(a => Number(a.is_primary) === 1)?.id;
+      if (!primaryId && manual.length) primaryId = manual[0].id;
 
-          for (const assignment of assignments) {
-              const hasTeacher = assignment.teacher_id !== null && assignment.teacher_id !== undefined && Number(assignment.teacher_id) > 0;
-              const nextIsAuto = hasTeacher ? 0 : 1;
-              const nextIsPrimary = hasTeacher && assignment.id === primaryId ? 1 : 0;
-              if (Number(assignment.is_auto) === nextIsAuto && Number(assignment.is_primary) === nextIsPrimary) continue;
-              await env.DB.prepare(`
+      for (const assignment of assignments) {
+        const hasTeacher = assignment.teacher_id !== null && assignment.teacher_id !== undefined && Number(assignment.teacher_id) > 0;
+        const nextIsAuto = hasTeacher ? 0 : 1;
+        const nextIsPrimary = hasTeacher && assignment.id === primaryId ? 1 : 0;
+        if (Number(assignment.is_auto) === nextIsAuto && Number(assignment.is_primary) === nextIsPrimary) continue;
+        await env.DB.prepare(`
                   UPDATE teacher_assignments
                   SET is_auto = ?, is_primary = ?
                   WHERE id = ? AND school_id = ?
               `).bind(
-                  nextIsAuto,
-                  nextIsPrimary,
-                  assignment.id,
-                  school.id
-              ).run();
-          }
-      };
+          nextIsAuto,
+          nextIsPrimary,
+          assignment.id,
+          school.id
+        ).run();
+      }
+    };
 
-      if (request.method === 'GET') {
-          const classId = normalizeId(url.searchParams.get('class_id'));
-          const subjectId = normalizeId(url.searchParams.get('subject_id'));
-          const groupId = normalizeId(url.searchParams.get('group_id'));
-          const sectionId = normalizeId(url.searchParams.get('section_id'));
-          
-          if (!Number.isFinite(classId) || !Number.isFinite(subjectId)) {
-              return jsonResponse({ error: "Missing or invalid identifiers" }, 400);
-          }
-          
-          const assignments = await env.DB.prepare(`
+    if (request.method === 'GET') {
+      const classId = normalizeId(url.searchParams.get('class_id'));
+      const subjectId = normalizeId(url.searchParams.get('subject_id'));
+      const groupId = normalizeId(url.searchParams.get('group_id'));
+      const sectionId = normalizeId(url.searchParams.get('section_id'));
+
+      if (!Number.isFinite(classId) || !Number.isFinite(subjectId)) {
+        return jsonResponse({ error: "Missing or invalid identifiers" }, 400);
+      }
+
+      const assignments = await env.DB.prepare(`
               SELECT ta.*, t.full_name as teacher_name
               FROM teacher_assignments ta
               LEFT JOIN profiles_teacher t ON ta.teacher_id = t.id
@@ -794,58 +853,58 @@ export async function handleInstituteRequest(request, env) {
                     ta.subject_id = ?
               ORDER BY ta.is_primary DESC, ta.id ASC
           `).bind(
-              school.id,
-              classId,
-              groupId,
-              groupId,
-              sectionId,
-              sectionId,
-              subjectId
-          ).all();
-          
-          return jsonResponse({ success: true, data: assignments.results || [] });
-      }
-      if (request.method === 'POST') {
-          const body = await request.json();
-          
-          if (body.action === 'assign_teacher') {
-              const classId = normalizeId(body.class_id);
-              const groupId = normalizeId(body.group_id);
-              const sectionId = normalizeId(body.section_id);
-              const subjectId = normalizeId(body.subject_id);
-              const teacherId = normalizeId(body.teacher_id);
+        school.id,
+        classId,
+        groupId,
+        groupId,
+        sectionId,
+        sectionId,
+        subjectId
+      ).all();
 
-              if (!Number.isFinite(classId) || !Number.isFinite(subjectId)) {
-                  return jsonResponse({ error: "Missing or invalid identifiers" }, 400);
-              }
+      return jsonResponse({ success: true, data: assignments.results || [] });
+    }
+    if (request.method === 'POST') {
+      const body = await request.json();
 
-              if (!Number.isFinite(teacherId)) {
-                  return jsonResponse({ error: "Please select a teacher before assigning." }, 400);
-              }
-              
-              const existingTeacherAssignment = await env.DB.prepare(`
+      if (body.action === 'assign_teacher') {
+        const classId = normalizeId(body.class_id);
+        const groupId = normalizeId(body.group_id);
+        const sectionId = normalizeId(body.section_id);
+        const subjectId = normalizeId(body.subject_id);
+        const teacherId = normalizeId(body.teacher_id);
+
+        if (!Number.isFinite(classId) || !Number.isFinite(subjectId)) {
+          return jsonResponse({ error: "Missing or invalid identifiers" }, 400);
+        }
+
+        if (!Number.isFinite(teacherId)) {
+          return jsonResponse({ error: "Please select a teacher before assigning." }, 400);
+        }
+
+        const existingTeacherAssignment = await env.DB.prepare(`
                   SELECT id FROM teacher_assignments 
                   WHERE school_id = ? AND class_id = ? AND 
                         (group_id = ? OR (group_id IS NULL AND ? IS NULL)) AND
                         (section_id = ? OR (section_id IS NULL AND ? IS NULL)) AND
                         subject_id = ? AND teacher_id = ?
               `).bind(
-                  school.id,
-                  classId,
-                  groupId,
-                  groupId,
-                  sectionId,
-                  sectionId,
-                  subjectId,
-                  teacherId
-              ).first();
-              
-              if (existingTeacherAssignment) {
-                  return jsonResponse({ error: "This teacher is already assigned to this subject" }, 400);
-              }
-              
-              
-              const primaryAssignment = await env.DB.prepare(`
+          school.id,
+          classId,
+          groupId,
+          groupId,
+          sectionId,
+          sectionId,
+          subjectId,
+          teacherId
+        ).first();
+
+        if (existingTeacherAssignment) {
+          return jsonResponse({ error: "This teacher is already assigned to this subject" }, 400);
+        }
+
+
+        const primaryAssignment = await env.DB.prepare(`
                   SELECT id FROM teacher_assignments
                   WHERE school_id = ? AND class_id = ? AND
                         (group_id = ? OR (group_id IS NULL AND ? IS NULL)) AND
@@ -853,20 +912,20 @@ export async function handleInstituteRequest(request, env) {
                         subject_id = ? AND is_primary = 1 AND is_auto = 0 AND teacher_id IS NOT NULL
                   LIMIT 1
               `).bind(
-                  school.id,
-                  classId,
-                  groupId,
-                  groupId,
-                  sectionId,
-                  sectionId,
-                  subjectId
-              ).first();
-              
-              const hasPrimaryAssignment = !!primaryAssignment;
-              const isPrimary = hasPrimaryAssignment ? 0 : 1; 
-              
-              
-              const autoAssignment = await env.DB.prepare(`
+          school.id,
+          classId,
+          groupId,
+          groupId,
+          sectionId,
+          sectionId,
+          subjectId
+        ).first();
+
+        const hasPrimaryAssignment = !!primaryAssignment;
+        const isPrimary = hasPrimaryAssignment ? 0 : 1;
+
+
+        const autoAssignment = await env.DB.prepare(`
                   SELECT id FROM teacher_assignments
                   WHERE school_id = ? AND class_id = ? AND
                         (group_id = ? OR (group_id IS NULL AND ? IS NULL)) AND
@@ -875,29 +934,29 @@ export async function handleInstituteRequest(request, env) {
                   ORDER BY id ASC
                   LIMIT 1
               `).bind(
-                  school.id,
-                  classId,
-                  groupId,
-                  groupId,
-                  sectionId,
-                  sectionId,
-                  subjectId
-              ).first();
-              
-              if (autoAssignment) {
-                  await env.DB.prepare(`
+          school.id,
+          classId,
+          groupId,
+          groupId,
+          sectionId,
+          sectionId,
+          subjectId
+        ).first();
+
+        if (autoAssignment) {
+          await env.DB.prepare(`
                       UPDATE teacher_assignments
                       SET teacher_id = ?, is_auto = 0, is_primary = ?
                       WHERE id = ? AND school_id = ?
                   `).bind(
-                      teacherId,
-                      isPrimary,
-                      autoAssignment.id,
-                      school.id
-                  ).run();
-                  
-                  if (!hasPrimaryAssignment) {
-                      await env.DB.prepare(`
+            teacherId,
+            isPrimary,
+            autoAssignment.id,
+            school.id
+          ).run();
+
+          if (!hasPrimaryAssignment) {
+            await env.DB.prepare(`
                           UPDATE teacher_assignments
                           SET is_primary = 0
                           WHERE school_id = ? AND class_id = ? AND
@@ -905,64 +964,64 @@ export async function handleInstituteRequest(request, env) {
                                 (section_id = ? OR (section_id IS NULL AND ? IS NULL)) AND
                                 subject_id = ? AND id != ? AND (is_auto = 1 OR teacher_id IS NULL)
                       `).bind(
-                          school.id,
-                          classId,
-                          groupId,
-                          groupId,
-                          sectionId,
-                          sectionId,
-                          subjectId,
-                          autoAssignment.id
-                      ).run();
-                  }
-                  await normalizeAssignmentsForContext({ classId, groupId, sectionId, subjectId });
-                  return jsonResponse({ success: true });
-              }
-              
-              
-              await env.DB.prepare(`
+              school.id,
+              classId,
+              groupId,
+              groupId,
+              sectionId,
+              sectionId,
+              subjectId,
+              autoAssignment.id
+            ).run();
+          }
+          await normalizeAssignmentsForContext({ classId, groupId, sectionId, subjectId });
+          return jsonResponse({ success: true });
+        }
+
+
+        await env.DB.prepare(`
                   INSERT INTO teacher_assignments (school_id, class_id, group_id, section_id, subject_id, teacher_id, is_auto, is_primary)
                   VALUES (?, ?, ?, ?, ?, ?, 0, ?)
               `).bind(
-                  school.id,
-                  classId,
-                  groupId,
-                  sectionId,
-                  subjectId,
-                  teacherId,
-                  isPrimary
-              ).run();
+          school.id,
+          classId,
+          groupId,
+          sectionId,
+          subjectId,
+          teacherId,
+          isPrimary
+        ).run();
 
-              await normalizeAssignmentsForContext({ classId, groupId, sectionId, subjectId });
-              return jsonResponse({ success: true });
-          }
-          
-          if (body.action === 'replace_teacher') {
-              const currentAssignment = await env.DB.prepare(`
+        await normalizeAssignmentsForContext({ classId, groupId, sectionId, subjectId });
+        return jsonResponse({ success: true });
+      }
+
+      if (body.action === 'replace_teacher') {
+        const currentAssignment = await env.DB.prepare(`
                   SELECT id, class_id, group_id, section_id, subject_id, is_primary FROM teacher_assignments
                   WHERE id = ? AND school_id = ?
               `).bind(
-                  body.existing_assignment_id,
-                  school.id
-              ).first();
-              
-              if (!currentAssignment) {
-                  return jsonResponse({ error: "Assignment not found" }, 404);
-              }
+          body.existing_assignment_id,
+          school.id
+        ).first();
 
-              const teacherId = normalizeId(body.teacher_id);
+        if (!currentAssignment) {
+          return jsonResponse({ error: "Assignment not found" }, 404);
+        }
 
-              if (!Number.isFinite(teacherId)) {
-                  await env.DB.prepare(`
+        const teacherId = normalizeId(body.teacher_id);
+
+        if (!Number.isFinite(teacherId)) {
+          await env.DB.prepare(`
                       UPDATE teacher_assignments
                       SET teacher_id = null, is_auto = 1, is_primary = 0
                       WHERE id = ? AND school_id = ?
                   `).bind(
-                      body.existing_assignment_id,
-                      school.id
-                  ).run();
-              } else {
-                  const primaryExists = await env.DB.prepare(`
+            body.existing_assignment_id,
+            school.id
+          ).run();
+        } else {
+          const primaryExists = await env.DB.prepare(`
                       SELECT id FROM teacher_assignments
                       WHERE school_id = ? AND class_id = ? AND
                             (group_id = ? OR (group_id IS NULL AND ? IS NULL)) AND
@@ -970,113 +1029,113 @@ export async function handleInstituteRequest(request, env) {
                             subject_id = ? AND is_primary = 1 AND is_auto = 0 AND teacher_id IS NOT NULL AND id != ?
                       LIMIT 1
                   `).bind(
-                      school.id,
-                      currentAssignment.class_id,
-                      currentAssignment.group_id,
-                      currentAssignment.group_id,
-                      currentAssignment.section_id,
-                      currentAssignment.section_id,
-                      currentAssignment.subject_id,
-                      body.existing_assignment_id
-                  ).first();
-                  
-                  const shouldBePrimary = currentAssignment.is_primary === 1 || !primaryExists;
-                  
-                  await env.DB.prepare(`
+            school.id,
+            currentAssignment.class_id,
+            currentAssignment.group_id,
+            currentAssignment.group_id,
+            currentAssignment.section_id,
+            currentAssignment.section_id,
+            currentAssignment.subject_id,
+            body.existing_assignment_id
+          ).first();
+
+          const shouldBePrimary = currentAssignment.is_primary === 1 || !primaryExists;
+
+          await env.DB.prepare(`
                       UPDATE teacher_assignments
                       SET teacher_id = ?, is_auto = 0, is_primary = ?
                       WHERE id = ? AND school_id = ?
                   `).bind(
-                      teacherId,
-                      shouldBePrimary ? 1 : 0,
-                      body.existing_assignment_id,
-                      school.id
-                  ).run();
-              }
+            teacherId,
+            shouldBePrimary ? 1 : 0,
+            body.existing_assignment_id,
+            school.id
+          ).run();
+        }
 
-              await normalizeAssignmentsForContext({
-                  classId: currentAssignment.class_id,
-                  groupId: currentAssignment.group_id,
-                  sectionId: currentAssignment.section_id,
-                  subjectId: currentAssignment.subject_id
-              });
-              return jsonResponse({ success: true });
-          }
-          
-          if (body.action === 'assign_auto') {
-              const classId = normalizeId(body.class_id);
-              const groupId = normalizeId(body.group_id);
-              const sectionId = normalizeId(body.section_id);
-              const subjectId = normalizeId(body.subject_id);
+        await normalizeAssignmentsForContext({
+          classId: currentAssignment.class_id,
+          groupId: currentAssignment.group_id,
+          sectionId: currentAssignment.section_id,
+          subjectId: currentAssignment.subject_id
+        });
+        return jsonResponse({ success: true });
+      }
 
-              if (!Number.isFinite(classId) || !Number.isFinite(subjectId)) {
-                  return jsonResponse({ error: "Missing or invalid identifiers" }, 400);
-              }
-              
-              await env.DB.prepare(`
+      if (body.action === 'assign_auto') {
+        const classId = normalizeId(body.class_id);
+        const groupId = normalizeId(body.group_id);
+        const sectionId = normalizeId(body.section_id);
+        const subjectId = normalizeId(body.subject_id);
+
+        if (!Number.isFinite(classId) || !Number.isFinite(subjectId)) {
+          return jsonResponse({ error: "Missing or invalid identifiers" }, 400);
+        }
+
+        await env.DB.prepare(`
                   INSERT INTO teacher_assignments (school_id, class_id, group_id, section_id, subject_id, teacher_id, is_auto, is_primary) 
                   VALUES (?, ?, ?, ?, ?, ?, 1, 0)
               `).bind(
-                  school.id,
-                  classId,
-                  groupId,
-                  sectionId,
-                  subjectId,
-                  null 
-              ).run();
+          school.id,
+          classId,
+          groupId,
+          sectionId,
+          subjectId,
+          null
+        ).run();
 
-              await normalizeAssignmentsForContext({ classId, groupId, sectionId, subjectId });
-              return jsonResponse({ success: true });
-          }
-          
-          if (body.action === 'set_auto') {
-              
-              await env.DB.prepare(`
+        await normalizeAssignmentsForContext({ classId, groupId, sectionId, subjectId });
+        return jsonResponse({ success: true });
+      }
+
+      if (body.action === 'set_auto') {
+
+        await env.DB.prepare(`
                   UPDATE teacher_assignments 
                   SET teacher_id = null, is_auto = 1, is_primary = 0
                   WHERE id = ? AND school_id = ?
               `).bind(
-                  body.assignment_id,
-                  school.id
-              ).run();
+          body.assignment_id,
+          school.id
+        ).run();
 
-              const context = await env.DB.prepare(`
+        const context = await env.DB.prepare(`
                   SELECT class_id, group_id, section_id, subject_id
                   FROM teacher_assignments
                   WHERE id = ? AND school_id = ?
               `).bind(body.assignment_id, school.id).first();
-              if (context) {
-                  await normalizeAssignmentsForContext({
-                      classId: context.class_id,
-                      groupId: context.group_id,
-                      sectionId: context.section_id,
-                      subjectId: context.subject_id
-                  });
-              }
-              return jsonResponse({ success: true });
-          }
-          
-          if (body.action === 'set_manual') {
-              
-              const currentAssignment = await env.DB.prepare(`
+        if (context) {
+          await normalizeAssignmentsForContext({
+            classId: context.class_id,
+            groupId: context.group_id,
+            sectionId: context.section_id,
+            subjectId: context.subject_id
+          });
+        }
+        return jsonResponse({ success: true });
+      }
+
+      if (body.action === 'set_manual') {
+
+        const currentAssignment = await env.DB.prepare(`
                   SELECT id, class_id, group_id, section_id, subject_id, is_primary
                   FROM teacher_assignments
                   WHERE id = ? AND school_id = ?
               `).bind(
-                  body.assignment_id,
-                  school.id
-              ).first();
-              
-              if (!currentAssignment) {
-                  return jsonResponse({ error: "Assignment not found" }, 404);
-              }
+          body.assignment_id,
+          school.id
+        ).first();
 
-              const manualTeacherId = normalizeId(body.teacher_id);
-              if (!Number.isFinite(manualTeacherId)) {
-                  return jsonResponse({ error: "Please select a valid teacher." }, 400);
-              }
-              
-              const primaryExists = await env.DB.prepare(`
+        if (!currentAssignment) {
+          return jsonResponse({ error: "Assignment not found" }, 404);
+        }
+
+        const manualTeacherId = normalizeId(body.teacher_id);
+        if (!Number.isFinite(manualTeacherId)) {
+          return jsonResponse({ error: "Please select a valid teacher." }, 400);
+        }
+
+        const primaryExists = await env.DB.prepare(`
                   SELECT id FROM teacher_assignments
                   WHERE school_id = ? AND class_id = ? AND
                         (group_id = ? OR (group_id IS NULL AND ? IS NULL)) AND
@@ -1084,164 +1143,164 @@ export async function handleInstituteRequest(request, env) {
                         subject_id = ? AND is_primary = 1 AND is_auto = 0 AND teacher_id IS NOT NULL AND id != ?
                   LIMIT 1
               `).bind(
-                  school.id,
-                  currentAssignment.class_id,
-                  currentAssignment.group_id,
-                  currentAssignment.group_id,
-                  currentAssignment.section_id,
-                  currentAssignment.section_id,
-                  currentAssignment.subject_id,
-                  body.assignment_id
-              ).first();
-              
-              const shouldBePrimary = currentAssignment.is_primary === 1 || !primaryExists;
-              
-              await env.DB.prepare(`
+          school.id,
+          currentAssignment.class_id,
+          currentAssignment.group_id,
+          currentAssignment.group_id,
+          currentAssignment.section_id,
+          currentAssignment.section_id,
+          currentAssignment.subject_id,
+          body.assignment_id
+        ).first();
+
+        const shouldBePrimary = currentAssignment.is_primary === 1 || !primaryExists;
+
+        await env.DB.prepare(`
                   UPDATE teacher_assignments 
                   SET teacher_id = ?, is_auto = 0, is_primary = ?
                   WHERE id = ? AND school_id = ?
               `).bind(
-                  manualTeacherId,
-                  shouldBePrimary ? 1 : 0,
-                  body.assignment_id,
-                  school.id
-              ).run();
+          manualTeacherId,
+          shouldBePrimary ? 1 : 0,
+          body.assignment_id,
+          school.id
+        ).run();
 
-              await normalizeAssignmentsForContext({
-                  classId: currentAssignment.class_id,
-                  groupId: currentAssignment.group_id,
-                  sectionId: currentAssignment.section_id,
-                  subjectId: currentAssignment.subject_id
-              });
-              return jsonResponse({ success: true });
-          }
-          
-          return jsonResponse({ error: "Invalid action" }, 400);
+        await normalizeAssignmentsForContext({
+          classId: currentAssignment.class_id,
+          groupId: currentAssignment.group_id,
+          sectionId: currentAssignment.section_id,
+          subjectId: currentAssignment.subject_id
+        });
+        return jsonResponse({ success: true });
       }
-      
-      if (request.method === 'DELETE') {
-          const body = await request.json();
-          
-          if (body.action === 'remove_teacher') {
-              const context = await env.DB.prepare(`
+
+      return jsonResponse({ error: "Invalid action" }, 400);
+    }
+
+    if (request.method === 'DELETE') {
+      const body = await request.json();
+
+      if (body.action === 'remove_teacher') {
+        const context = await env.DB.prepare(`
                   SELECT class_id, group_id, section_id, subject_id
                   FROM teacher_assignments
                   WHERE id = ? AND school_id = ?
               `).bind(
-                  body.assignment_id,
-                  school.id
-              ).first();
+          body.assignment_id,
+          school.id
+        ).first();
 
-              await env.DB.prepare(`
+        await env.DB.prepare(`
                   DELETE FROM teacher_assignments 
                   WHERE id = ? AND school_id = ?
               `).bind(
-                  body.assignment_id,
-                  school.id
-              ).run();
+          body.assignment_id,
+          school.id
+        ).run();
 
-              if (context) {
-                  await normalizeAssignmentsForContext({
-                      classId: context.class_id,
-                      groupId: context.group_id,
-                      sectionId: context.section_id,
-                      subjectId: context.subject_id
-                  });
-              }
-              return jsonResponse({ success: true });
-          }
-          
-          return jsonResponse({ error: "Invalid action" }, 400);
+        if (context) {
+          await normalizeAssignmentsForContext({
+            classId: context.class_id,
+            groupId: context.group_id,
+            sectionId: context.section_id,
+            subjectId: context.subject_id
+          });
+        }
+        return jsonResponse({ success: true });
       }
+
+      return jsonResponse({ error: "Invalid action" }, 400);
+    }
   }
-  
-  
+
+
   if (url.pathname === '/school/classes') {
-      
-      const classes = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ? ORDER BY class_name ASC").bind(school.id).all();
-      const groups = await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ? ORDER BY class_id, group_name").bind(school.id).all();
-      const sections = await env.DB.prepare("SELECT cs.*, cg.group_name FROM class_sections cs LEFT JOIN class_groups cg ON cs.group_id = cg.id WHERE cs.school_id = ?").bind(school.id).all();
-      
-      
-      const subjects = await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
-      const classSubjects = await env.DB.prepare(`
+
+    const classes = await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ? ORDER BY class_name ASC").bind(school.id).all();
+    const groups = await env.DB.prepare("SELECT * FROM class_groups WHERE school_id = ? ORDER BY class_id, group_name").bind(school.id).all();
+    const sections = await env.DB.prepare("SELECT cs.*, cg.group_name FROM class_sections cs LEFT JOIN class_groups cg ON cs.group_id = cg.id WHERE cs.school_id = ?").bind(school.id).all();
+
+
+    const subjects = await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ? ORDER BY subject_name ASC").bind(school.id).all();
+    const classSubjects = await env.DB.prepare(`
         SELECT cs.*, sub.subject_name 
         FROM class_subjects cs 
         JOIN academic_subjects sub ON cs.subject_id = sub.id 
         WHERE cs.school_id = ?
       `).bind(school.id).all();
-      
-      const groupSubjects = await env.DB.prepare(`
+
+    const groupSubjects = await env.DB.prepare(`
         SELECT gs.*, sub.subject_name, g.group_name, g.class_id
         FROM group_subjects gs 
         JOIN academic_subjects sub ON gs.subject_id = sub.id
         JOIN class_groups g ON gs.group_id = g.id
         WHERE gs.school_id = ?
       `).bind(school.id).all();
-      
-      
-      let scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
-      if (!scheduleConfig) {
-        await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days, shifts_json) VALUES (?, ?, ?, ?, ?, ?)")
-          .bind(school.id, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]', '["Full Day"]').run();
-        scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
-      }
-      
-      
-      const workingDaysArray = parseWorkingDays(scheduleConfig?.working_days);
-      const workingDaysCount = workingDaysArray.length; 
-      const scheduleSlots = await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? AND type = 'class'").bind(school.id).all();
-      const shiftList = parseShiftList(scheduleConfig?.shifts_json);
-      const normalizedSlots = normalizeSlotsForShifts(scheduleSlots.results || [], shiftList);
-      const slotIndexesByShift = buildSlotIndexesByShift(normalizedSlots, shiftList);
-      const shiftSlotCounts = {};
-      shiftList.forEach(shift => { shiftSlotCounts[shift] = (slotIndexesByShift[shift] || []).length; });
-      const fallbackPeriods = normalizedSlots.length || 8;
-      const fullDaySlots = shiftSlotCounts['Full Day'] || fallbackPeriods;
-      const maxClassesPerSection = workingDaysCount * fullDaySlots;
-      const classShiftMap = {};
-      const classSlotsPerDayMap = {};
-      const classCapacityMap = {};
-      (classes.results || []).forEach(cls => {
-        const rawShift = cls.shift_name || 'Full Day';
-        const shiftName = shiftList.includes(rawShift) ? rawShift : 'Full Day';
-        classShiftMap[cls.id] = shiftName;
-        const slotsPerDay = shiftSlotCounts[shiftName] || fallbackPeriods;
-        classSlotsPerDayMap[cls.id] = slotsPerDay;
-        classCapacityMap[cls.id] = workingDaysCount * slotsPerDay;
-      });
-      const shiftCapacityMap = {};
-      shiftList.forEach(shift => { shiftCapacityMap[shift] = workingDaysCount * (shiftSlotCounts[shift] || 0); });
-      
-      scheduleConfig.actualClassPeriodsPerDay = fullDaySlots;
-      scheduleConfig.maxClassesPerSection = maxClassesPerSection;
-      scheduleConfig.workingDaysCount = workingDaysCount;
-      scheduleConfig.workingDaysArray = workingDaysArray;
-      scheduleConfig.shiftsEnabled = !!school.shifts_enabled;
-      scheduleConfig.shiftList = shiftList;
-      scheduleConfig.shiftSlotCounts = shiftSlotCounts;
-      scheduleConfig.shiftCapacityMap = shiftCapacityMap;
-      scheduleConfig.classCapacityMap = classCapacityMap;
-      scheduleConfig.classSlotsPerDayMap = classSlotsPerDayMap;
-      scheduleConfig.classShiftMap = classShiftMap;
-      
-      return htmlResponse(InstituteLayout(
-        ClassesPageHTML(
-          school,
-          classes.results, 
-          groups.results, 
-          sections.results,
-          subjects.results,
-          classSubjects.results,
-          groupSubjects.results,
-          scheduleConfig
-        ), 
-        "Classes & Groups", 
-        school.school_name
-      ));
+
+
+    let scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+    if (!scheduleConfig) {
+      await env.DB.prepare("INSERT INTO schedule_config (school_id, active_days, periods_per_day, working_days, off_days, shifts_json) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(school.id, 5, 8, '["monday","tuesday","wednesday","thursday","friday"]', '["saturday","sunday"]', '["Full Day"]').run();
+      scheduleConfig = await env.DB.prepare("SELECT * FROM schedule_config WHERE school_id = ?").bind(school.id).first();
+    }
+
+
+    const workingDaysArray = parseWorkingDays(scheduleConfig?.working_days);
+    const workingDaysCount = workingDaysArray.length;
+    const scheduleSlots = await env.DB.prepare("SELECT * FROM schedule_slots WHERE school_id = ? AND type = 'class'").bind(school.id).all();
+    const shiftList = parseShiftList(scheduleConfig?.shifts_json);
+    const normalizedSlots = normalizeSlotsForShifts(scheduleSlots.results || [], shiftList);
+    const slotIndexesByShift = buildSlotIndexesByShift(normalizedSlots, shiftList);
+    const shiftSlotCounts = {};
+    shiftList.forEach(shift => { shiftSlotCounts[shift] = (slotIndexesByShift[shift] || []).length; });
+    const fallbackPeriods = normalizedSlots.length || 8;
+    const fullDaySlots = shiftSlotCounts['Full Day'] || fallbackPeriods;
+    const maxClassesPerSection = workingDaysCount * fullDaySlots;
+    const classShiftMap = {};
+    const classSlotsPerDayMap = {};
+    const classCapacityMap = {};
+    (classes.results || []).forEach(cls => {
+      const rawShift = cls.shift_name || 'Full Day';
+      const shiftName = shiftList.includes(rawShift) ? rawShift : 'Full Day';
+      classShiftMap[cls.id] = shiftName;
+      const slotsPerDay = shiftSlotCounts[shiftName] || fallbackPeriods;
+      classSlotsPerDayMap[cls.id] = slotsPerDay;
+      classCapacityMap[cls.id] = workingDaysCount * slotsPerDay;
+    });
+    const shiftCapacityMap = {};
+    shiftList.forEach(shift => { shiftCapacityMap[shift] = workingDaysCount * (shiftSlotCounts[shift] || 0); });
+
+    scheduleConfig.actualClassPeriodsPerDay = fullDaySlots;
+    scheduleConfig.maxClassesPerSection = maxClassesPerSection;
+    scheduleConfig.workingDaysCount = workingDaysCount;
+    scheduleConfig.workingDaysArray = workingDaysArray;
+    scheduleConfig.shiftsEnabled = !!school.shifts_enabled;
+    scheduleConfig.shiftList = shiftList;
+    scheduleConfig.shiftSlotCounts = shiftSlotCounts;
+    scheduleConfig.shiftCapacityMap = shiftCapacityMap;
+    scheduleConfig.classCapacityMap = classCapacityMap;
+    scheduleConfig.classSlotsPerDayMap = classSlotsPerDayMap;
+    scheduleConfig.classShiftMap = classShiftMap;
+
+    return htmlResponse(InstituteLayout(
+      ClassesPageHTML(
+        school,
+        classes.results,
+        groups.results,
+        sections.results,
+        subjects.results,
+        classSubjects.results,
+        groupSubjects.results,
+        scheduleConfig
+      ),
+      "Classes & Groups",
+      school.school_name
+    ));
   }
 
-  
+
   if (url.pathname === '/school/routine-generator') {
     try {
       const existingRoutines = (await env.DB.prepare("SELECT * FROM generated_routines WHERE school_id = ? ORDER BY generated_at DESC").bind(school.id).all()).results;
@@ -1286,8 +1345,8 @@ export async function handleInstituteRequest(request, env) {
         max_routines_yearly: school.max_routines_yearly
       };
       return htmlResponse(InstituteLayout(
-        RoutineGeneratorHTML(existingRoutines, generationSettings, schoolData, generationWarnings, routineLimitInfo), 
-        "Routine Generator", 
+        RoutineGeneratorHTML(existingRoutines, generationSettings, schoolData, generationWarnings, routineLimitInfo),
+        "Routine Generator",
         school.school_name
       ));
     } catch (error) {
@@ -1324,20 +1383,20 @@ export async function handleInstituteRequest(request, env) {
             teacherAssignments,
             teacherSubjects,
             workingDays,
-          classSlots,
-          shiftList
-        });
-      } catch (error) {
-        console.error('Generation warnings failed:', error);
-      }
+            classSlots,
+            shiftList
+          });
+        } catch (error) {
+          console.error('Generation warnings failed:', error);
+        }
         const schoolData = { classes, teachers, subjects, slots: normalizedSlots };
         const routineLimitInfo = {
           used: routineYearCount,
           max_routines_yearly: school.max_routines_yearly
         };
         return htmlResponse(InstituteLayout(
-          RoutineGeneratorHTML(existingRoutines, generationSettings, schoolData, generationWarnings, routineLimitInfo), 
-          "Routine Generator", 
+          RoutineGeneratorHTML(existingRoutines, generationSettings, schoolData, generationWarnings, routineLimitInfo),
+          "Routine Generator",
           school.school_name
         ));
       } catch (retryError) {
@@ -1347,18 +1406,18 @@ export async function handleInstituteRequest(request, env) {
     }
   }
 
-  
+
   if (url.pathname === '/school/routine-viewer') {
     const routineId = url.searchParams.get('id');
     if (!routineId) {
-      return new Response("Routine ID required", {status: 400});
+      return new Response("Routine ID required", { status: 400 });
     }
-    
+
     const routine = await env.DB.prepare("SELECT * FROM generated_routines WHERE id = ? AND school_id = ?").bind(routineId, school.id).first();
     if (!routine) {
-      return new Response("Routine not found", {status: 404});
+      return new Response("Routine not found", { status: 404 });
     }
-    
+
     const entries = (await env.DB.prepare(`
       SELECT re.*, 
              c.class_name, 
@@ -1379,7 +1438,7 @@ export async function handleInstituteRequest(request, env) {
       WHERE re.routine_id = ? AND re.school_id = ?
       ORDER BY re.day_of_week, re.slot_index
     `).bind(routineId, school.id).all()).results;
-    
+
     const classes = (await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ?").bind(school.id).all()).results;
     const teachers = (await env.DB.prepare("SELECT * FROM profiles_teacher WHERE school_id = ?").bind(school.id).all()).results;
     const subjects = (await env.DB.prepare("SELECT * FROM academic_subjects WHERE school_id = ?").bind(school.id).all()).results;
@@ -1395,7 +1454,7 @@ export async function handleInstituteRequest(request, env) {
     const shiftList = parseShiftList(scheduleConfig?.shifts_json);
     const normalizedSlots = normalizeSlotsForShifts(slots, shiftList);
     const classSlots = normalizedSlots.filter(slot => slot.type === 'class');
-    
+
     const conflictSummary = buildConflictSummary({
       entries,
       classes,
@@ -1410,17 +1469,17 @@ export async function handleInstituteRequest(request, env) {
       classSlots,
       shiftList
     });
-    
+
     const routineData = { routine, entries, classes, teachers, subjects, slots: normalizedSlots, groups, sections, workingDays, conflictSummary, shiftList };
-    
+
     return htmlResponse(InstituteLayout(
-      RoutineViewerHTML(routineData), 
-      routine.name, 
+      RoutineViewerHTML(routineData),
+      routine.name,
       school.school_name
     ));
   }
 
-  
+
   if (url.pathname === '/school/api/routine-generation-data' && request.method === 'GET') {
     try {
       const classes = (await env.DB.prepare("SELECT * FROM academic_classes WHERE school_id = ?").bind(school.id).all()).results;
@@ -1462,7 +1521,7 @@ export async function handleInstituteRequest(request, env) {
     }
   }
 
-  
+
   if (url.pathname === '/school/api/generate-routine' && request.method === 'POST') {
     try {
       if (school.max_routines_yearly !== null && school.max_routines_yearly !== undefined) {
@@ -1513,9 +1572,9 @@ export async function handleInstituteRequest(request, env) {
         INSERT INTO generated_routines (school_id, name, generated_by, total_periods, conflicts_resolved) 
         VALUES (?, ?, 'auto', ?, ?)
       `).bind(school.id, routineName, plan.totalPeriods, plan.conflicts).run();
-      
+
       const routineId = result.meta.last_row_id;
-      
+
       for (const entry of plan.entries) {
         await env.DB.prepare(`
           INSERT INTO routine_entries (routine_id, school_id, day_of_week, slot_index, class_id, group_id, section_id, subject_id, teacher_id, is_conflict, conflict_reason)
@@ -1541,11 +1600,11 @@ export async function handleInstituteRequest(request, env) {
           `).bind(school.id, routineId).run();
         }
       }
-      
-      return jsonResponse({ 
-        success: true, 
+
+      return jsonResponse({
+        success: true,
         routineId,
-        message: `Generated routine with ${plan.totalPeriods} periods for ${sections.length} sections. ${plan.conflicts} conflicts.` 
+        message: `Generated routine with ${plan.totalPeriods} periods for ${sections.length} sections. ${plan.conflicts} conflicts.`
       });
     } catch (error) {
       console.error('Routine generation error:', error);
@@ -1553,7 +1612,7 @@ export async function handleInstituteRequest(request, env) {
     }
   }
 
-  
+
   if (url.pathname === '/school/api/routine/save-generated' && request.method === 'POST') {
     try {
       if (school.max_routines_yearly !== null && school.max_routines_yearly !== undefined) {
@@ -1655,10 +1714,10 @@ export async function handleInstituteRequest(request, env) {
     }
   }
 
-  
+
   if (url.pathname.startsWith('/school/api/routine/') && request.method === 'DELETE') {
     const routineId = url.pathname.split('/').pop();
-    
+
     try {
       await env.DB.prepare("DELETE FROM routine_entries WHERE routine_id = ? AND school_id = ?").bind(routineId, school.id).run();
       await env.DB.prepare("DELETE FROM generated_routines WHERE id = ? AND school_id = ?").bind(routineId, school.id).run();
@@ -1672,7 +1731,7 @@ export async function handleInstituteRequest(request, env) {
     const parts = url.pathname.split('/');
     const routineId = parts[parts.length - 2];
     const action = parts[parts.length - 1];
-    
+
     if (action === 'activate') {
       try {
         await env.DB.prepare("UPDATE generated_routines SET is_active = 0 WHERE school_id = ?").bind(school.id).run();
@@ -1703,12 +1762,12 @@ export async function handleInstituteRequest(request, env) {
         if (!cleaned.includes('Full Day')) cleaned.unshift('Full Day');
         return Array.from(new Set(cleaned));
       }
-    } catch (e) {}
+    } catch (e) { }
     return ['Full Day'];
   }
 
   function parseWorkingDays(raw) {
-    const defaultDays = ["monday","tuesday","wednesday","thursday","friday"];
+    const defaultDays = ["monday", "tuesday", "wednesday", "thursday", "friday"];
     if (!raw) return defaultDays.slice();
     let parsed = raw;
     if (typeof parsed === 'string') {
@@ -1718,7 +1777,7 @@ export async function handleInstituteRequest(request, env) {
       try { parsed = JSON.parse(parsed); } catch (e) { parsed = null; }
     }
     if (!Array.isArray(parsed)) return defaultDays.slice();
-    const validDays = new Set(["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]);
+    const validDays = new Set(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]);
     const cleaned = parsed
       .map(day => String(day || '').toLowerCase().trim())
       .filter(day => validDays.has(day));
@@ -1754,55 +1813,55 @@ export async function handleInstituteRequest(request, env) {
   }
 
   async function getRoutineCountThisYear(env, schoolId) {
-      try {
-        const yearlyRow = await env.DB.prepare(`
+    try {
+      const yearlyRow = await env.DB.prepare(`
           SELECT COUNT(*) as count
           FROM routine_generation_tokens
           WHERE school_id = ? AND strftime('%Y', generated_at) = strftime('%Y', 'now')
         `).bind(schoolId).first();
 
-        const totalRow = await env.DB.prepare(`
+      const totalRow = await env.DB.prepare(`
           SELECT COUNT(*) as count
           FROM routine_generation_tokens
           WHERE school_id = ?
         `).bind(schoolId).first();
 
-        if ((totalRow?.count || 0) === 0) {
-          const routines = await env.DB.prepare(`
+      if ((totalRow?.count || 0) === 0) {
+        const routines = await env.DB.prepare(`
             SELECT id, generated_at
             FROM generated_routines
             WHERE school_id = ?
           `).bind(schoolId).all();
-          const routineRows = routines?.results || [];
-          if (routineRows.length) {
-            for (const routine of routineRows) {
-              const generatedAt = routine.generated_at || new Date().toISOString();
-              await env.DB.prepare(`
+        const routineRows = routines?.results || [];
+        if (routineRows.length) {
+          for (const routine of routineRows) {
+            const generatedAt = routine.generated_at || new Date().toISOString();
+            await env.DB.prepare(`
                 INSERT INTO routine_generation_tokens (school_id, routine_id, generated_at)
                 VALUES (?, ?, ?)
               `).bind(schoolId, routine.id, generatedAt).run();
-            }
-            const refreshed = await env.DB.prepare(`
+          }
+          const refreshed = await env.DB.prepare(`
               SELECT COUNT(*) as count
               FROM routine_generation_tokens
               WHERE school_id = ? AND strftime('%Y', generated_at) = strftime('%Y', 'now')
             `).bind(schoolId).first();
-            return refreshed?.count || 0;
-          }
+          return refreshed?.count || 0;
         }
+      }
 
-        return yearlyRow?.count || 0;
-      } catch (e) {
-        if (e.message && (e.message.includes("no such table") || e.message.includes("no such column"))) {
-          try { await syncDatabase(env); } catch (err) {}
-        }
-        const fallback = await env.DB.prepare(`
+      return yearlyRow?.count || 0;
+    } catch (e) {
+      if (e.message && (e.message.includes("no such table") || e.message.includes("no such column"))) {
+        try { await syncDatabase(env); } catch (err) { }
+      }
+      const fallback = await env.DB.prepare(`
           SELECT COUNT(*) as count
           FROM generated_routines
           WHERE school_id = ? AND strftime('%Y', generated_at) = strftime('%Y', 'now')
         `).bind(schoolId).first();
-        return fallback?.count || 0;
-      }
+      return fallback?.count || 0;
+    }
   }
 
   function normalizeSlotsForShifts(slots, shiftList) {
@@ -2594,5 +2653,5 @@ export async function handleInstituteRequest(request, env) {
     return { items: warnings };
   }
 
-  return new Response("Not Found", {status:404});
+  return new Response("Not Found", { status: 404 });
 }

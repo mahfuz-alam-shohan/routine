@@ -95,6 +95,24 @@ export async function handleAdminRequest(request, env) {
     return htmlResponse(AdminLayout(SchoolsPageHTML(result.results || []), "Schools", companyName, {email}));
   }
 
+  if (url.pathname === '/admin/school/delete') {
+    if (request.method !== 'POST') return jsonResponse({ error: "Method not allowed" }, 405);
+    try {
+        const body = await request.json();
+        const authId = body.auth_id;
+        if (!authId) return jsonResponse({ error: "Auth ID required" }, 400);
+
+        // Delete institution profile
+        await env.DB.prepare("DELETE FROM profiles_institution WHERE auth_id = ?").bind(authId).run();
+        // Delete auth account
+        await env.DB.prepare("DELETE FROM auth_accounts WHERE id = ?").bind(authId).run();
+
+        return jsonResponse({ success: true });
+    } catch (e) {
+        return jsonResponse({ error: e.message }, 500);
+    }
+  }
+
   if (url.pathname === '/admin/policy-management') {
     if (request.method === 'POST') {
       try {

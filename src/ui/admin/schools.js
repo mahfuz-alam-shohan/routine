@@ -1,5 +1,5 @@
 export function SchoolsPageHTML(schoolsList = []) {
-  const rows = schoolsList.map(school => `
+    const rows = schoolsList.map(school => `
     <tr>
         <td class="border border-gray-300 px-4 py-2 whitespace-nowrap">
             <div class="text-sm font-semibold text-gray-900">${school.school_name}</div>
@@ -9,14 +9,17 @@ export function SchoolsPageHTML(schoolsList = []) {
         <td class="border border-gray-300 px-4 py-2 whitespace-nowrap text-sm text-gray-600">${school.email}</td>
         <td class="border border-gray-300 px-4 py-2 whitespace-nowrap text-sm text-gray-600">Active</td>
         <td class="border border-gray-300 px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
-            <a href="/admin/school/view?id=${school.auth_id}" class="border border-gray-400 text-gray-700 px-3 py-1 text-xs">
+            <a href="/admin/school/view?id=${school.auth_id}" class="border border-gray-400 text-gray-700 px-3 py-1 text-xs hover:bg-gray-100">
                 Manage
             </a>
+            <button onclick="deleteSchool(event, '${school.auth_id}')" class="border border-red-400 text-red-700 px-3 py-1 text-xs hover:bg-red-50 ml-2">
+                Delete
+            </button>
         </td>
     </tr>
   `).join('');
 
-  const mobileCards = schoolsList.map(school => `
+    const mobileCards = schoolsList.map(school => `
     <div class="border border-gray-300 p-4 bg-white">
         <div class="flex items-start justify-between gap-3">
             <div>
@@ -27,14 +30,17 @@ export function SchoolsPageHTML(schoolsList = []) {
             <span class="text-[10px] text-gray-600">Active</span>
         </div>
         <div class="mt-3">
-            <a href="/admin/school/view?id=${school.auth_id}" class="inline-flex items-center text-xs font-semibold text-gray-700 border border-gray-400 px-3 py-1">
+            <a href="/admin/school/view?id=${school.auth_id}" class="inline-flex items-center text-xs font-semibold text-gray-700 border border-gray-400 px-3 py-1 hover:bg-gray-100">
                 Manage
             </a>
+            <button onclick="deleteSchool(event, '${school.auth_id}')" class="inline-flex items-center text-xs font-semibold text-red-700 border border-red-400 px-3 py-1 hover:bg-red-50 ml-2">
+                Delete
+            </button>
         </div>
     </div>
   `).join('');
 
-  return `
+    return `
     <div class="space-y-6 px-3 sm:px-4">
         
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -159,9 +165,12 @@ export function SchoolsPageHTML(schoolsList = []) {
                             '<td class="border border-gray-300 px-4 py-2 whitespace-nowrap text-sm text-gray-600">' + escapeHtml(school.email || '') + '</td>' +
                             '<td class="border border-gray-300 px-4 py-2 whitespace-nowrap text-sm text-gray-600">Active</td>' +
                             '<td class="border border-gray-300 px-4 py-2 whitespace-nowrap text-right text-sm font-medium">' +
-                                '<a href="/admin/school/view?id=' + authId + '" class="border border-gray-400 text-gray-700 px-3 py-1 text-xs">' +
+                                '<a href="/admin/school/view?id=' + authId + '" class="border border-gray-400 text-gray-700 px-3 py-1 text-xs hover:bg-gray-100">' +
                                     'Manage' +
                                 '</a>' +
+                                '<button onclick="deleteSchool(event, \\'' + escapeHtml(school.auth_id || '') + '\\')" class="border border-red-400 text-red-700 px-3 py-1 text-xs hover:bg-red-50 ml-2">' +
+                                    'Delete' +
+                                '</button>' +
                             '</td>' +
                         '</tr>';
                     }).join('');
@@ -185,9 +194,12 @@ export function SchoolsPageHTML(schoolsList = []) {
                                 '<span class="text-[10px] text-gray-600">Active</span>' +
                             '</div>' +
                             '<div class="mt-3">' +
-                                '<a href="/admin/school/view?id=' + authId + '" class="inline-flex items-center text-xs font-semibold text-gray-700 border border-gray-400 px-3 py-1">' +
+                                '<a href="/admin/school/view?id=' + authId + '" class="inline-flex items-center text-xs font-semibold text-gray-700 border border-gray-400 px-3 py-1 hover:bg-gray-100">' +
                                     'Manage' +
                                 '</a>' +
+                                '<button onclick="deleteSchool(event, \\'' + escapeHtml(school.auth_id || '') + '\\')" class="inline-flex items-center text-xs font-semibold text-red-700 border border-red-400 px-3 py-1 hover:bg-red-50 ml-2">' +
+                                    'Delete' +
+                                '</button>' +
                             '</div>' +
                         '</div>';
                     }).join('');
@@ -229,6 +241,41 @@ export function SchoolsPageHTML(schoolsList = []) {
                     e.target.reset();
                     btn.innerText = originalText;
                     btn.disabled = false;
+                } else {
+                    alert("Error: " + result.error);
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                alert("Network Error");
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function deleteSchool(e, authId) {
+            e.preventDefault();
+            if (!confirm("Are you sure you want to permanently delete this institution? This action cannot be undone.")) {
+                return;
+            }
+
+            const btn = e.target;
+            const originalText = btn.innerText;
+            btn.innerText = "...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/admin/school/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ auth_id: authId })
+                });
+
+                const result = await res.json();
+                
+                if (result.success) {
+                    window.adminSchools = window.adminSchools.filter(s => String(s.auth_id) !== String(authId));
+                    renderSchoolsList();
                 } else {
                     alert("Error: " + result.error);
                     btn.innerText = originalText;
