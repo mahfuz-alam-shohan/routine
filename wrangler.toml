@@ -6,7 +6,7 @@ compatibility_date = "2024-01-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "routine"
-database_id = "c5ecdac4-aa6a-4008-b155-588b1e1573d7"
+database_id = "b4a77dc8-1607-407b-994c-2367687c39e6"
 
 # R2 Bucket Binding
 [[r2_buckets]]
